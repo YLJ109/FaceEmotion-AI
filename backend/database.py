@@ -15,6 +15,10 @@ class DatabaseManager:
         self.db_path = db_path
         Path('data').mkdir(exist_ok=True)
         self._conn = None  # 延迟初始化持久连接
+        # ✅ 新增: 统计缓存
+        self._stats_cache = None
+        self._stats_cache_time = 0
+        self._stats_cache_ttl = 300  # 5分钟缓存
 
     def _get_conn(self):
         """获取持久连接（check_same_thread=False允许跨线程）"""
@@ -84,6 +88,28 @@ class DatabaseManager:
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_feedback_timestamp
             ON user_feedback(timestamp DESC)
+        ''')
+
+        # ✅ 新增: 关键查询字段索引（性能优化）
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_history_detection_type
+            ON detection_history(detection_type)
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_history_dominant_emotion
+            ON detection_history(dominant_emotion)
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_history_confidence
+            ON detection_history(confidence)
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_history_compound
+            ON detection_history(detection_type, timestamp DESC)
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_feature_usage_session
+            ON feature_usage(session_id)
         ''')
 
         # === 数据库迁移：为旧表添加缺失字段 ===
@@ -363,7 +389,15 @@ class DatabaseManager:
         return counts
 
     def get_stats(self) -> Dict[str, Any]:
-        """获取统计数据"""
+        """获取统计数据（带缓存优化）"""
+        import time
+
+        # ✅ 优化: 检查缓存是否有效
+        current_time = time.time()
+        if (self._stats_cache and
+                (current_time - self._stats_cache_time) < self._stats_cache_ttl):
+            return self._stats_cache
+
         conn = self._get_conn()
         cursor = conn.cursor()
 
@@ -389,12 +423,18 @@ class DatabaseManager:
         ''')
         source_stats = {row[0]: row[1] for row in cursor.fetchall()}
 
-        return {
+        stats = {
             'total_detections': total_detections,
             'emotion_distribution': emotion_stats,
             'source_distribution': source_stats,
             'average_confidence': round(avg_confidence, 3)
         }
+
+        # ✅ 更新缓存
+        self._stats_cache = stats
+        self._stats_cache_time = current_time
+
+        return stats
 
     def delete_by_detection_type(self, detection_type: str) -> int:
         """根据检测类型删除所有记录

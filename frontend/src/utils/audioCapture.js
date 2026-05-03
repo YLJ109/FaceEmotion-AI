@@ -24,6 +24,11 @@ export class AudioCapture {
     this.compressionEnabled = options.compressionEnabled ?? true
     this.lastSample = 0  // 用于差分编码
     this._debugPrinted = false
+
+    // ✅ 新增: 音频缓冲批量发送（0.5秒 @ 16kHz = 8000 样本）
+    this._audioBuffer = []
+    this._bufferSize = options.bufferSize || 8000  // 默认 0.5 秒
+    this._bufferTargetSampleRate = 16000
   }
 
   async start() {
@@ -112,8 +117,28 @@ export class AudioCapture {
 
       workletNode.port.onmessage = (e) => {
         // e.data 直接是 ArrayBuffer
-        if (this.onAudioData && e.data && e.data.byteLength > 0) {
-          this.onAudioData(e.data)
+        if (e.data && e.data.byteLength > 0) {
+          // ✅ 修复: 累积音频到缓冲区，达到阈值后批量发送
+          const int16View = new Int16Array(e.data)
+          this._audioBuffer.push(...int16View)
+
+          // 当缓冲区达到阈值时，批量发送
+          if (this._audioBuffer.length >= this._bufferSize) {
+            const bufferToSend = new Int16Array(this._audioBuffer.slice(0, this._bufferSize))
+            this._audioBuffer = this._audioBuffer.slice(this._bufferSize)
+
+            // 计算音频能量，检测是否有有效语音
+            let energy = 0
+            for (let i = 0; i < bufferToSend.length; i++) {
+              energy += bufferToSend[i] * bufferToSend[i]
+            }
+            energy = Math.sqrt(energy / bufferToSend.length) / 32768.0  // 归一化到 0-1
+
+            // 只有有效语音时才发送（能量阈值 0.01）
+            if (energy > 0.01 && this.onAudioData) {
+              this.onAudioData(bufferToSend.buffer)
+            }
+          }
         }
       }
 
@@ -168,8 +193,18 @@ export class AudioCapture {
           const s = Math.max(-1, Math.min(1, input[i]))
           int16View[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
         }
-        if (this.onAudioData) {
-          this.onAudioData(int16View.buffer)
+
+        // ✅ 修复: 累积音频到缓冲区，达到阈值后批量发送
+        this._audioBuffer.push(...int16View)
+
+        if (this._audioBuffer.length >= this._bufferSize) {
+          const bufferToSend = new Int16Array(this._audioBuffer.slice(0, this._bufferSize))
+          this._audioBuffer = this._audioBuffer.slice(this._bufferSize)
+
+          if (this.onAudioData) {
+            console.log(` 发送批量音频数据: ${bufferToSend.byteLength} bytes (${bufferToSend.length} 样本)`)
+            this.onAudioData(bufferToSend.buffer)
+          }
         }
       }
 
@@ -185,6 +220,9 @@ export class AudioCapture {
   stop() {
     this.isCapturing = false
     this._debugPrinted = false
+
+    // ✅ 清理音频缓冲区
+    this._audioBuffer = []
 
     // ✅ 清理 AudioWorkletNode
     if (this._workletNode) {

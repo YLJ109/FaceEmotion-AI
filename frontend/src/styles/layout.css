@@ -1,0 +1,79 @@
+/**
+ * 布局相关样式
+ * 包括背景、粒子、主布局等
+ */
+
+/* ===== 全局重置 ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'CustomFont', 'Inter', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    background: var(--background);
+    color: var(--text);
+    /* ✅ 修复: 移除 all 过渡,只过渡需要的属性,避免与 JS 动画冲突 */
+    transition: background 0.3s ease, color 0.3s ease;
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
+#app {
+    width: 100vw;
+    height: 100vh;
+}
+
+/* ===== 主容器 ===== */
+.app-container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    /* ✅ 确保使用主题背景色 */
+    background: var(--background);
+    /* ✅ 修复: 精确指定过渡属性,避免 all 导致的闪烁 */
+    transition: background 0.3s ease;
+}
+
+/* ===== 主布局 ===== */
+.main-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+    z-index: 1;
+    /* ✅ 确保使用主题背景色 */
+    background: var(--background);
+    /* ✅ 修复: 精确指定过渡属性,避免 all 导致的闪烁 */
+    transition: background 0.3s ease;
+}
+
+/* ===== 主体 ===== */
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ===== 内容区 ===== */
+.content-area {
+    flex: 1;
+    overflow: hidden;
+    padding: 20px;
+    height: 100%;
+    background: transparent;
+    /* ✅ 改为透明，显示底层渐变 */
+    position: relative;
+    /* ✅ 修复: 移除 all 过渡,内容区不需要背景过渡(透明) */
+    transition: padding 0.3s ease;
+}
+
+.page {
+    height: 100%;
+    overflow: hidden;
+    animation: fadeIn 0.3s ease;
+}

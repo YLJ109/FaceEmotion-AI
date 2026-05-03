@@ -1,0 +1,49 @@
+/**
+ * CSS 变量和主题定义
+ * 统一管理所有设计令牌（Design Tokens）
+ */
+
+/* ===== 自定义字体声明 ===== */
+@font-face {
+    font-family: 'CustomFont';
+    src: url('/fonts/font.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* ===== 根变量（主题色） ===== */
+:root {
+    /* 动态主题变量 */
+    --primary: #7139FF;
+    --primary-light: #9B4EFF;
+    --secondary: #9B4EFF;
+    --accent: #C47CFF;
+    --highlight: #E2CAFF;
+    --background: #05020A;
+    --card-bg: rgba(13, 6, 27, 0.72);
+    --text: #ffffff;
+    --text-secondary: #ffffff;
+    --border: rgba(156, 78, 255, 0.35);
+    --success: #00D9FF;
+    --warning: #F99E1A;
+    --error: #FF4757;
+    --gradient: linear-gradient(135deg, #7139FF, #9B4EFF);
+    --gradient-2: linear-gradient(135deg, #9B4EFF, #C47CFF);
+    --shadow: 0 20px 30px -18px rgba(92, 44, 179, 0.5);
+    --shadow-lg: 0 30px 60px -20px rgba(92, 44, 179, 0.6);
+    --glow: 0 0 20px rgba(113, 57, 255, 0.3);
+    --primary-transparent: rgba(113, 57, 255, 0.2);
+
+    /* 圆角 */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+
+    /* 过渡时间 */
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow: 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}

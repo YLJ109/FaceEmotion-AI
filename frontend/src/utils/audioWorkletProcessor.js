@@ -23,11 +23,15 @@ class AudioCaptureProcessor extends AudioWorkletProcessor {
             return true
         }
 
-        // 下采样到目标采样率
+        // ✅ 修复: sampleRate 是 AudioWorkletGlobalScope 的全局属性，直接使用
         const downsampled = this._downsample(channelData, sampleRate, this.targetSampleRate)
 
         // Float32 转 PCM16
         const pcm16 = this._float32ToPcm16(downsampled)
+
+        // ✅ 开启调试日志
+        // const volume = pcm16.reduce((sum, val) => sum + Math.abs(val), 0) / pcm16.length
+        // console.log(`AudioWorklet: ${pcm16.length} samples, volume=${volume.toFixed(2)}, range=[${Math.min(...pcm16)}, ${Math.max(...pcm16)}]`)
 
         // 发送到主线程（使用 Transferable 对象提高性能）
         this.port.postMessage(pcm16.buffer, [pcm16.buffer])

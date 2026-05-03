@@ -21,9 +21,7 @@
                         </div>
                         <template #tip>
                             <div class="upload-tip">支持 JPG、PNG 格式</div>
-                        </template>
-                        <template #tip v-if="fileName">
-                            <div class="file-name">
+                            <div v-if="fileName" class="file-name">
                                 <el-icon>
                                     <Document />
                                 </el-icon>
@@ -210,12 +208,14 @@ const fileName = ref('') // 文件名
 const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
 
 const handleFileChange = (file) => {
+    selectedFile.value = file.raw
+    fileName.value = file.name // 立即保存文件名
+
     const reader = new FileReader()
     reader.onload = (e) => {
         previewUrl.value = e.target.result
         detectionResult.value = null
         showDetectionBoxes.value = true // 重置显示状态
-        fileName.value = file.name // 保存文件名
 
         // 立即绘制图片到 Canvas
         setTimeout(() => {
@@ -223,7 +223,6 @@ const handleFileChange = (file) => {
         }, 50) // 等待 DOM 更新
     }
     reader.readAsDataURL(file.raw)
-    selectedFile.value = file.raw
 }
 
 // 绘制图片预览（不带检测框）
@@ -373,25 +372,26 @@ const saveToHistory = async (result, thumbnail) => {
     try {
         const dominantEmotion = result.faces?.[0]?.emotion || 'neutral'
         const confidence = result.faces?.[0]?.confidence || 0
+        const faces = result.faces || []
 
         await fetch(API.historySave, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 detection_type: 'image',
-                results: result.faces || [],
+                results: faces,
                 source: '单张图片检测',
                 image_path: '',
                 image_type: 'single',
                 thumbnail: thumbnail,
                 dominant_emotion: dominantEmotion,
-                confidence: confidence
+                confidence: confidence,
+                detected_faces: faces  // ✅ 修复: 添加 detected_faces 字段
             })
         })
         console.log('✅ 历史记录已保存')
     } catch (error) {
         console.error('保存历史记录失败:', error)
-        // 不显示错误提示，避免影响用户体验
     }
 }
 
@@ -428,6 +428,20 @@ const submitFeedback = async (correctEmotion) => {
     padding-right: 4px;
 }
 
+/* ✅ 新增: 图片检测器主容器滚动条样式 */
+.image-detector::-webkit-scrollbar {
+    width: 6px;
+}
+
+.image-detector::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.image-detector::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
 .detector-layout {
     display: grid;
     grid-template-columns: 1fr 320px;
@@ -441,6 +455,20 @@ const submitFeedback = async (correctEmotion) => {
     height: 100%;
     overflow-y: auto;
     padding-right: 4px;
+}
+
+/* ✅ 新增: 左侧面板滚动条样式 */
+.left-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.left-panel::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.left-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .left-panel .glass-card {
@@ -487,7 +515,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .card-header h3 {
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 100;
     margin: 0;
 }
 
@@ -497,8 +525,9 @@ const submitFeedback = async (correctEmotion) => {
 
 .upload-area {
     margin-bottom: 12px;
-    min-height: 700px;
-    height: 700px;
+    /* ✅ 优化: 减小固定高度，更紧凑 */
+    min-height: 500px;
+    height: 500px;
     display: flex;
     flex-direction: column;
 }
@@ -514,7 +543,8 @@ const submitFeedback = async (correctEmotion) => {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    min-height: 700px;
+    /* ✅ 优化: 减小最小高度，避免大片空白 */
+    min-height: 500px;
     height: 100%;
 }
 
@@ -532,6 +562,20 @@ const submitFeedback = async (correctEmotion) => {
 .right-panel {
     height: 100%;
     overflow-y: auto;
+}
+
+/* ✅ 新增: 右侧面板滚动条样式 */
+.right-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.right-panel::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.right-panel::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .right-panel .el-card {
@@ -648,11 +692,27 @@ const submitFeedback = async (correctEmotion) => {
     gap: 4px;
     overflow-y: auto;
     animation: fadeIn 0.3s ease;
+    /* ✅ 新增: 设置最大高度，超出后滚动 */
+    max-height: calc(100vh - 250px);
+}
+
+/* ✅ 新增: 情绪显示区域滚动条样式 */
+.emotion-display::-webkit-scrollbar {
+    width: 6px;
+}
+
+.emotion-display::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.emotion-display::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .emotion-icon-large {
     margin-bottom: 2px;
-    filter: drop-shadow(0 0 20px rgba(113, 57, 255, 0.25));
+    /* filter: drop-shadow(0 0 20px rgba(113, 57, 255, 0.25)); */
 }
 
 /* 大 Emoji 表情样式 */
@@ -660,12 +720,12 @@ const submitFeedback = async (correctEmotion) => {
     font-size: 64px;
     line-height: 1;
     display: block;
-    filter: drop-shadow(0 0 20px rgba(113, 57, 255, 0.25));
+    /* filter: drop-shadow(0 0 20px rgba(113, 57, 255, 0.25)); */
 }
 
 .emotion-name {
     font-size: 20px;
-    font-weight: 800;
+    /* font-weight: 800; */
     background: var(--gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -675,10 +735,10 @@ const submitFeedback = async (correctEmotion) => {
 
 .emotion-confidence {
     font-size: 24px;
-    font-weight: 800;
+    /* font-weight: 800; */
     color: var(--highlight);
     flex-shrink: 0;
-    text-shadow: 0 0 12px rgba(226, 202, 255, 0.3);
+    /* text-shadow: 0 0 12px rgba(226, 202, 255, 0.3); */
 }
 
 /* ✅ 新增: 反馈按钮样式 */
@@ -696,7 +756,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .feedback-title {
     font-size: 13px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text);
     margin: 0 0 10px 0;
     text-align: center;
@@ -712,7 +772,7 @@ const submitFeedback = async (correctEmotion) => {
 .face-count {
     font-size: 11px;
     color: var(--text-secondary);
-    font-weight: 600;
+    /* font-weight: 600; */
     flex-shrink: 0;
 }
 
@@ -739,7 +799,7 @@ const submitFeedback = async (correctEmotion) => {
     display: flex;
     align-items: center;
     gap: 3px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -768,7 +828,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .bar-value {
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 100;
     text-align: right;
     color: var(--text);
 }
@@ -782,6 +842,22 @@ const submitFeedback = async (correctEmotion) => {
     gap: 10px;
     overflow-y: auto;
     animation: fadeIn 0.3s ease;
+    /* ✅ 新增: 设置最大高度，超出后滚动 */
+    max-height: calc(100vh - 250px);
+}
+
+/* ✅ 新增: 多人脸显示区域滚动条样式 */
+.multi-faces-display::-webkit-scrollbar {
+    width: 6px;
+}
+
+.multi-faces-display::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.multi-faces-display::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .faces-header {
@@ -798,14 +874,14 @@ const submitFeedback = async (correctEmotion) => {
 
 .faces-count {
     font-size: 14px;
-    font-weight: 800;
+    /* font-weight: 800; */
     color: var(--primary);
 }
 
 .faces-summary {
     font-size: 11px;
     color: var(--text-secondary);
-    font-weight: 600;
+    /* font-weight: 600; */
 }
 
 .faces-list {
@@ -814,6 +890,22 @@ const submitFeedback = async (correctEmotion) => {
     gap: 8px;
     flex: 1;
     overflow-y: auto;
+    /* ✅ 新增: 设置最大高度，避免过高 */
+    max-height: 400px;
+}
+
+/* ✅ 新增: 人脸列表滚动条样式 */
+.faces-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.faces-list::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.faces-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .face-item {
@@ -839,7 +931,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .face-index {
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 100;
     color: var(--text-secondary);
 }
 
@@ -847,7 +939,7 @@ const submitFeedback = async (correctEmotion) => {
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 100;
 }
 
 .face-item-content {
@@ -874,14 +966,14 @@ const submitFeedback = async (correctEmotion) => {
     line-height: 1;
     font-size: 24px;
     flex-shrink: 0;
-    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+    /* filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3)); */
 }
 
 .face-confidence {
     font-size: 18px;
-    font-weight: 800;
+    /* font-weight: 800; */
     color: var(--highlight);
-    text-shadow: 0 0 8px rgba(226, 202, 255, 0.3);
+    /* text-shadow: 0 0 8px rgba(226, 202, 255, 0.3); */
     flex-shrink: 0;
     min-width: 60px;
 }
@@ -920,7 +1012,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .mini-bar-label {
     font-size: 9px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -942,7 +1034,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .mini-bar-value {
     font-size: 9px;
-    font-weight: 700;
+    font-weight: 100;
     color: var(--text-secondary);
     text-align: right;
 }

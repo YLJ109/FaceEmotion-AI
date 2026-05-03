@@ -253,6 +253,55 @@ async def get_emotion_trend(days: int = 30):
     return _user_analytics.get_emotion_trend_analysis(days)
 
 
+@router.get("/analytics/emotion_transitions")
+async def get_emotion_transitions(limit: int = 1000):
+    """
+    获取情绪转换矩阵数据
+    分析历史记录中连续检测之间的情绪变化
+    """
+    try:
+        # 获取最近的历史记录（按时间排序）
+        records = _db_manager.get_history(limit=limit, offset=0)
+
+        if not records or len(records) < 2:
+            return {"status": "success", "transitions": [], "total": 0}
+
+        # 统计情绪转换次数
+        transition_counts = defaultdict(int)
+
+        for i in range(len(records) - 1):
+            current_emotion = records[i].get('dominant_emotion')
+            next_emotion = records[i + 1].get('dominant_emotion')
+
+            if current_emotion and next_emotion and current_emotion != next_emotion:
+                # 只统计不同情绪之间的转换
+                key = f"{current_emotion}->{next_emotion}"
+                transition_counts[key] += 1
+
+        # 转换为前端需要的格式
+        transitions = []
+        for key, count in transition_counts.items():
+            source, target = key.split('->')
+            transitions.append({
+                "source": source,
+                "target": target,
+                "value": count
+            })
+
+        # 按转换次数排序
+        transitions.sort(key=lambda x: x['value'], reverse=True)
+
+        return {
+            "status": "success",
+            "transitions": transitions,
+            "total": sum(t['value'] for t in transitions),
+            "record_count": len(records)
+        }
+    except Exception as e:
+        logger.error(f"获取情绪转换数据失败: {e}")
+        return {"status": "error", "detail": str(e)}
+
+
 # === 推理优化 ===
 
 @router.get("/optimizer/status")

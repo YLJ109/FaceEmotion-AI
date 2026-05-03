@@ -16,7 +16,8 @@ export const sunny = {
     accent: '#1E90FF',
     highlight: '#26DE81',
     background: 'linear-gradient(135deg, #E8F8F5 0%, #D5F5E3 100%)',
-    card_bg: 'rgba(255, 255, 255, 0.95)',
+    // ✅ 每个主题使用不同的卡片背景色，确保导航栏和侧边栏有独特颜色
+    card_bg: 'rgba(232, 248, 245, 0.9)',
     text: '#2D3436',
     text_secondary: '#636E72',
     border: '#ABEBC6',
@@ -38,7 +39,8 @@ export const rainy = {
     accent: '#48DBFB',
     highlight: '#0ABDE3',
     background: 'linear-gradient(135deg, #E8F4FD 0%, #D6EAF8 100%)',
-    card_bg: 'rgba(255, 255, 255, 0.95)',
+    // ✅ 雨天蓝色卡片背景
+    card_bg: 'rgba(232, 244, 253, 0.9)',
     text: '#2C3E50',
     text_secondary: '#5D6D7E',
     border: '#AED6F1',
@@ -60,7 +62,8 @@ export const fire = {
     accent: '#FFA502',
     highlight: '#FF6348',
     background: 'linear-gradient(135deg, #FFE5E5 0%, #FFD6D6 100%)',
-    card_bg: 'rgba(255, 255, 255, 0.95)',
+    // ✅ 火焰红卡片背景
+    card_bg: 'rgba(255, 229, 229, 0.9)',
     text: '#2F3542',
     text_secondary: '#57606F',
     border: '#FFC3C3',
@@ -82,7 +85,8 @@ export const galaxy = {
     accent: '#FD79A8',
     highlight: '#E056FD',
     background: 'linear-gradient(135deg, #F3E5F5 0%, #E1D5E7 100%)',
-    card_bg: 'rgba(255, 255, 255, 0.95)',
+    // ✅ 银河紫卡片背景
+    card_bg: 'rgba(243, 229, 245, 0.9)',
     text: '#2D3436',
     text_secondary: '#636E72',
     border: '#D7BDE2',
@@ -104,7 +108,8 @@ export const mist = {
     accent: '#57606F',
     highlight: '#2F3542',
     background: 'linear-gradient(135deg, #F1F2F6 0%, #E5E7EB 100%)',
-    card_bg: 'rgba(255, 255, 255, 0.95)',
+    // ✅ 恐惧灰卡片背景
+    card_bg: 'rgba(241, 242, 246, 0.9)',
     text: '#2F3542',
     text_secondary: '#57606F',
     border: '#D5D8DC',
@@ -126,7 +131,8 @@ export const forest = {
     accent: '#FF6B6B',
     highlight: '#FFA502',
     background: 'linear-gradient(135deg, #FFF5E6 0%, #FFE8CC 100%)',
-    card_bg: 'rgba(255, 255, 255, 0.95)',
+    // ✅ 厌恶橙卡片背景
+    card_bg: 'rgba(255, 245, 230, 0.9)',
     text: '#2D3436',
     text_secondary: '#636E72',
     border: '#FFEAA7',
@@ -148,7 +154,8 @@ export const zen = {
     accent: '#A4B0BE',
     highlight: '#747D8C',
     background: 'linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 100%)',
-    card_bg: 'rgba(255, 255, 255, 0.98)',
+    // ✅ 平静白卡片背景
+    card_bg: 'rgba(248, 249, 250, 0.95)',
     text: '#2F3542',
     text_secondary: '#57606F',
     border: '#DFE4EA',

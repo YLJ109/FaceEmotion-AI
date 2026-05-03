@@ -1,8 +1,7 @@
 <template>
-    <header class="top-navbar"
-        :style="{ background: themeStore.currentTheme.card_bg, borderBottom: `1px solid ${themeStore.currentTheme.border}` }">
+    <header class="top-navbar">
         <div class="navbar-left">
-            <div class="logo-icon-mini" :style="{ background: themeStore.currentTheme.gradient }">
+            <div class="logo-icon-mini">
                 <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10" />
@@ -17,9 +16,9 @@
             </div>
         </div>
         <div class="navbar-right">
-            <!-- ✅ 新增: 性能监控按钮 -->
+            <!-- ✅ 性能监控按钮 -->
             <el-tooltip content="性能监控 (Ctrl+P)" placement="bottom">
-                <el-button class="nav-tool-btn" @click="$emit('toggle-performance')">
+                <el-button class="nav-tool-btn" @click="togglePerformanceMonitor">
                     <el-icon :size="18">
                         <Monitor />
                     </el-icon>
@@ -61,7 +60,12 @@ defineProps({
     }
 })
 
-defineEmits(['navigate', 'toggle-performance', 'toggle-music-panel'])
+defineEmits(['navigate', 'toggle-music-panel'])
+
+// 性能监控切换 - 发送全局事件
+const togglePerformanceMonitor = () => {
+    window.dispatchEvent(new CustomEvent('toggle-performance-monitor'))
+}
 
 const themeStore = useThemeStore()
 </script>
@@ -74,14 +78,13 @@ const themeStore = useThemeStore()
     display: flex;
     justify-content: space-between;
     align-items: center;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    /* ✅ 优化: 使用主题背景色,添加明显边框验证主题切换 */
     background: var(--card-bg);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 2px solid var(--primary);
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);
     z-index: 100;
-    /* ✅ 统一过渡时间,与背景切换同步 */
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    /* ✅ 优化: 背景色和边框色跟随主题切换,0.3s 与主题动画同步 */
+    transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
     flex-shrink: 0;
     position: relative;
 }
@@ -104,22 +107,23 @@ const themeStore = useThemeStore()
 }
 
 .logo-icon-mini {
-    width: 50px;
-    height: 50px;
+    width: 45px;
+    height: 45px;
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 14px;
-    font-weight: 800;
-    color: white;
-    box-shadow: 0 0 20px rgba(113, 57, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    /* font-weight: 800; */
+    color: var(--text);
+    background: var(--gradient);
+    /* box-shadow: 0 0 20px rgba(113, 57, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2); */
     transition: all 0.3s ease;
 }
 
 .logo-icon-mini:hover {
     transform: scale(1.05);
-    box-shadow: 0 0 24px rgba(113, 57, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    /* box-shadow: 0 0 24px rgba(113, 57, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3); */
 }
 
 .logo-text-wrapper {
@@ -129,7 +133,7 @@ const themeStore = useThemeStore()
 
 .logo {
     font-size: 1.2rem;
-    font-weight: 800;
+    font-weight: 100;
     letter-spacing: -0.3px;
     /* ✅ 使用主题色变量,确保在所有主题下都清晰可见 */
     background: var(--gradient);
@@ -139,13 +143,13 @@ const themeStore = useThemeStore()
     line-height: 1.2;
     margin: 0;
     /* 添加文字阴影提升对比度 */
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+    /* filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)); */
 }
 
 .logo-sub {
     font-size: 14px;
     color: var(--text-secondary);
-    font-weight: 500;
+    /* font-weight: 500; */
     letter-spacing: 0.8px;
     opacity: 0.7;
 }
@@ -166,14 +170,14 @@ const themeStore = useThemeStore()
     align-items: center !important;
     gap: 6px !important;
     font-size: 14px !important;
-    font-weight: 600 !important;
+    /* font-weight: 600 !important; */
     transition: all 0.3s ease !important;
 }
 
 .theme-indicator:hover {
     background: color-mix(in srgb, var(--primary) 22%, transparent) !important;
     border-color: var(--primary) !important;
-    box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent);
+    /* box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent); */
 }
 
 .theme-emoji {
@@ -191,7 +195,7 @@ const themeStore = useThemeStore()
     align-items: center !important;
     gap: 6px !important;
     font-size: 13px !important;
-    font-weight: 600 !important;
+    /* font-weight: 600 !important; */
     transition: all 0.3s ease !important;
     position: relative;
 }
@@ -199,15 +203,15 @@ const themeStore = useThemeStore()
 .nav-tool-btn:hover {
     background: color-mix(in srgb, var(--primary) 18%, transparent) !important;
     border-color: var(--primary) !important;
-    box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent);
+    /* box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent); */
     transform: translateY(-1px);
 }
 
 .nav-tool-btn.active {
     background: linear-gradient(135deg, var(--primary), #9B59B6) !important;
     border-color: transparent !important;
-    color: white !important;
-    box-shadow: 0 0 16px rgba(113, 57, 255, 0.4);
+    color: var(--text) !important;
+    /* box-shadow: 0 0 16px rgba(113, 57, 255, 0.4); */
 }
 
 .music-badge {
@@ -222,11 +226,11 @@ const themeStore = useThemeStore()
 
     0%,
     100% {
-        box-shadow: 0 0 4px rgba(103, 194, 58, 0.6);
+        /* box-shadow: 0 0 4px rgba(103, 194, 58, 0.6); */
     }
 
     50% {
-        box-shadow: 0 0 8px rgba(103, 194, 58, 1);
+        /* box-shadow: 0 0 8px rgba(103, 194, 58, 1); */
     }
 }
 </style>

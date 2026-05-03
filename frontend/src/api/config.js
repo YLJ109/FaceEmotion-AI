@@ -5,6 +5,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80
 export const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/stream'
 
 export const API = {
+  baseUrl: API_BASE_URL, // ✅ 新增: 基础 URL
   config: `${API_BASE_URL}/api/config`,
   detectImage: `${API_BASE_URL}/api/detect/image`,
   detectBatch: `${API_BASE_URL}/api/detect/batch`,

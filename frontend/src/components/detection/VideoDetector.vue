@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div class="video-detector">
         <div class="detector-layout">
             <!-- 左侧：视频上传和播放 -->
@@ -84,7 +84,7 @@
                                 <el-card class="stat-card glass-card-inner">
                                     <div class="stat-value">
                                         <span class="dominant-emoji-large">{{ getEmotionEmoji(dominantEmotion) || '😐'
-                                            }}</span>
+                                        }}</span>
                                     </div>
                                     <div class="stat-label">主导情绪</div>
                                     <div class="stat-desc">{{ getEmotionName(dominantEmotion) }}</div>
@@ -122,7 +122,7 @@
                                         <span class="frame-emoji">{{ getEmotionEmoji(segment.dominantEmotion) }}</span>
                                         <span class="frame-time">{{ segment.startTime.toFixed(1) }}s-{{
                                             segment.endTime.toFixed(1)
-                                        }}s</span>
+                                            }}s</span>
                                     </div>
                                     <div class="frame-count">{{ segment.count }}帧</div>
                                 </div>
@@ -557,69 +557,72 @@ const exportCSV = () => {
 // 保存视频检测到历史记录
 const saveToHistory = async (keyFrames) => {
     try {
-        // 计算主导情绪和平均置信度
-        const facesWithEmotion = keyFrames.filter(kf => kf.faces && kf.faces.length > 0)
-        const emotions = facesWithEmotion.map(kf => kf.faces[0].emotion)
-        const confidences = facesWithEmotion.map(kf => kf.faces[0].confidence)
+        // ✅ 优化: 每个人脸单独保存为一条记录
+        let savedCount = 0
+        const allFaces = []
 
-        // 统计主导情绪
-        const emotionCount = {}
-        emotions.forEach(e => { emotionCount[e] = (emotionCount[e] || 0) + 1 })
-        const dominantEmotion = Object.keys(emotionCount).reduce((a, b) => emotionCount[a] > emotionCount[b] ? a : b, 'neutral')
+        // 收集所有检测到的人脸
+        keyFrames.forEach(kf => {
+            if (kf.faces && kf.faces.length > 0) {
+                kf.faces.forEach(face => {
+                    allFaces.push({
+                        ...face,
+                        frame: kf.frame,
+                        timestamp: kf.timestamp || 0
+                    })
+                })
+            }
+        })
 
-        // 计算平均置信度
-        const avgConfidence = confidences.length > 0
-            ? confidences.reduce((sum, c) => sum + c, 0) / confidences.length
-            : 0
+        // 每个人脸保存一条记录
+        for (const face of allFaces) {
+            try {
+                // 生成缩略图（使用canvas生成简单的缩略图）
+                const canvas = document.createElement('canvas')
+                canvas.width = 200
+                canvas.height = 150
+                const ctx = canvas.getContext('2d')
 
-        // 提取所有检测到的人脸数据（用于历史记录显示）
-        const detectedFaces = facesWithEmotion.map(kf => kf.faces[0]).slice(0, 10)
+                // 绘制渐变背景
+                const gradient = ctx.createLinearGradient(0, 0, 200, 150)
+                gradient.addColorStop(0, '#1a1a2e')
+                gradient.addColorStop(1, '#16213e')
+                ctx.fillStyle = gradient
+                ctx.fillRect(0, 0, 200, 150)
 
-        // 生成缩略图（使用第一个有关键帧生成简单的缩略图
-        let thumbnail = null
-        if (keyFrames.length > 0) {
-            // 使用canvas生成简单的缩略图
-            const canvas = document.createElement('canvas')
-            canvas.width = 200
-            canvas.height = 150
-            const ctx = canvas.getContext('2d')
+                // 绘制情绪图标
+                ctx.font = '48px Arial'
+                ctx.textAlign = 'center'
+                ctx.textBaseline = 'middle'
+                ctx.fillStyle = '#ffffff'
+                ctx.fillText(getEmotionEmoji(face.emotion), 100, 75)
 
-            // 绘制渐变背景
-            const gradient = ctx.createLinearGradient(0, 0, 200, 150)
-            gradient.addColorStop(0, '#1a1a2e')
-            gradient.addColorStop(1, '#16213e')
-            ctx.fillStyle = gradient
-            ctx.fillRect(0, 0, 200, 150)
+                const thumbnail = canvas.toDataURL('image/jpeg', 0.8)
 
-            // 绘制情绪图标
-            ctx.font = '48px Arial'
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillStyle = '#ffffff'
-            ctx.fillText(getEmotionEmoji(dominantEmotion), 100, 75)
-
-            thumbnail = canvas.toDataURL('image/jpeg', 0.8)
+                await fetch(API.historySave, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        detection_type: 'video',
+                        results: [face],
+                        source: `视频检测 (帧 ${face.frame})`,
+                        image_path: '',
+                        image_type: 'video',
+                        thumbnail: thumbnail,
+                        dominant_emotion: face.emotion,
+                        confidence: face.confidence,
+                        detected_faces: [face]  // 只包含当前人脸
+                    })
+                })
+                savedCount++
+            } catch (error) {
+                console.error('保存单个人脸历史记录失败:', error)
+            }
         }
 
-        await fetch(API.historySave, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                detection_type: 'video',
-                results: keyFrames,
-                source: '视频检测',
-                image_path: '',
-                image_type: 'video',
-                thumbnail: thumbnail,
-                dominant_emotion: dominantEmotion,
-                confidence: avgConfidence,
-                detected_faces: detectedFaces
-            })
-        })
-        console.log('✅ 视频历史记录已保存')
+        console.log(`✅ 视频历史记录已保存 (${savedCount} 张人脸)`)
     } catch (error) {
         console.error('保存视频历史记录失败:', error)
-        // 不显示错误提示，避免影响用户体验
     }
 }
 </script>
@@ -641,7 +644,8 @@ const saveToHistory = async (keyFrames) => {
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow-y: auto;
+    /* ✅ 修复: 移除 overflow-y，让 el-card__body 管理滚动 */
+    overflow-y: visible;
     padding-right: 4px;
 }
 
@@ -656,9 +660,24 @@ const saveToHistory = async (keyFrames) => {
     overflow-y: auto;
 }
 
+/* ✅ 新增: 左侧面板滚动条样式 */
+.left-panel .el-card__body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.left-panel .el-card__body::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.left-panel .el-card__body::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
 .right-panel {
     height: 100%;
-    overflow-y: auto;
+    /* ✅ 修复: 移除 overflow-y，让 el-card__body 管理滚动 */
+    overflow-y: visible;
 }
 
 .right-panel .el-card {
@@ -670,6 +689,20 @@ const saveToHistory = async (keyFrames) => {
 .right-panel .el-card__body {
     flex: 1;
     overflow-y: auto;
+}
+
+/* ✅ 新增: 右侧面板滚动条样式 */
+.right-panel .el-card__body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.right-panel .el-card__body::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.right-panel .el-card__body::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .result-card {
@@ -711,7 +744,7 @@ const saveToHistory = async (keyFrames) => {
 
 .card-header h3 {
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 100;
     margin: 0;
 }
 
@@ -721,19 +754,20 @@ const saveToHistory = async (keyFrames) => {
 
 .badge {
     font-size: 10px;
-    font-weight: 600;
+    /* font-weight: 600; */
     padding: 2px 8px;
     border-radius: 20px;
     background: linear-gradient(135deg, #F99E1A, #FF6B35);
-    color: white;
+    color: var(--text);
     margin-left: 8px;
     vertical-align: middle;
 }
 
 .upload-area {
     margin-bottom: 12px;
-    min-height: 700px;
-    height: 700px;
+    /* ✅ 优化: 减小固定高度，更紧凑 */
+    min-height: 500px;
+    height: 500px;
     display: flex;
     flex-direction: column;
 }
@@ -749,7 +783,8 @@ const saveToHistory = async (keyFrames) => {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    min-height: 700px;
+    /* ✅ 优化: 减小最小高度，避免大片空白 */
+    min-height: 500px;
     height: 100%;
 }
 
@@ -837,7 +872,7 @@ const saveToHistory = async (keyFrames) => {
     padding: 20px 32px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
         0 0 0 1px rgba(113, 57, 255, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        inset 0 1px 0 color-mix(in srgb, var(--card-bg) 90%, transparent);
     min-width: 480px;
     max-width: 600px;
 }
@@ -862,7 +897,7 @@ const saveToHistory = async (keyFrames) => {
     margin: 0;
     color: var(--text);
     font-size: 14px;
-    font-weight: 600;
+    /* font-weight: 600; */
     text-align: center;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -886,7 +921,7 @@ const saveToHistory = async (keyFrames) => {
 
 .stat-value {
     font-size: 22px;
-    font-weight: 800;
+    /* font-weight: 800; */
     margin-bottom: 4px;
     background: var(--gradient);
     -webkit-background-clip: text;
@@ -916,7 +951,7 @@ const saveToHistory = async (keyFrames) => {
 
 .stat-desc {
     font-size: 13px;
-    font-weight: 600;
+    /* font-weight: 600; */
     margin-top: 4px;
     color: var(--text);
 }
@@ -927,11 +962,25 @@ const saveToHistory = async (keyFrames) => {
     overflow-y: auto;
 }
 
+/* ✅ 新增: 情绪分布区域滚动条样式 */
+.emotion-distribution::-webkit-scrollbar {
+    width: 6px;
+}
+
+.emotion-distribution::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.emotion-distribution::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
 .emotion-distribution h5 {
     font-size: 14px;
     margin-bottom: 12px;
     color: var(--text);
-    font-weight: 700;
+    font-weight: 100;
 }
 
 .distribution-item {
@@ -949,13 +998,13 @@ const saveToHistory = async (keyFrames) => {
 }
 
 .distribution-item .name {
-    font-weight: 500;
+    /* font-weight: 500; */
     font-size: 12px;
     color: var(--text);
 }
 
 .distribution-item .count {
-    font-weight: 700;
+    font-weight: 100;
     text-align: right;
     font-size: 12px;
     color: var(--text-secondary);
@@ -975,11 +1024,25 @@ const saveToHistory = async (keyFrames) => {
     overflow-y: auto;
 }
 
+/* ✅ 新增: 关键帧区域滚动条样式 */
+.key-frames-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.key-frames-section::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.key-frames-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
 .key-frames-section h5 {
     font-size: 14px;
     margin-bottom: 12px;
     color: var(--text);
-    font-weight: 700;
+    font-weight: 100;
 }
 
 .key-frames-grid {
@@ -1008,7 +1071,7 @@ const saveToHistory = async (keyFrames) => {
 .frame-number {
     font-size: 11px;
     color: var(--text-secondary);
-    font-weight: 600;
+    /* font-weight: 600; */
     line-height: 1.2;
 }
 
@@ -1027,14 +1090,14 @@ const saveToHistory = async (keyFrames) => {
 .frame-time {
     font-size: 10px;
     color: var(--text-secondary);
-    font-weight: 600;
+    /* font-weight: 600; */
     line-height: 1.2;
 }
 
 .frame-count {
     font-size: 9px;
     color: var(--text);
-    font-weight: 700;
+    font-weight: 100;
     background: color-mix(in srgb, var(--primary) 20%, transparent);
     padding: 2px 6px;
     border-radius: 10px;

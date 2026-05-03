@@ -200,13 +200,13 @@ onMounted(() => {
     top: 60px;
     right: 24px;
     width: 280px;
-    background: rgba(0, 0, 0, 0.85);
+    background: color-mix(in srgb, var(--card-bg) 95%, transparent);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
     border-radius: 12px;
     padding: 12px;
     z-index: 9999;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 40px color-mix(in srgb, var(--primary) 10%, transparent);
     animation: slideIn 0.3s ease;
 }
 
@@ -228,7 +228,7 @@ onMounted(() => {
     justify-content: space-between;
     margin-bottom: 10px;
     padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
 }
 
 .monitor-title {
@@ -236,8 +236,8 @@ onMounted(() => {
     align-items: center;
     gap: 8px;
     font-size: 14px;
-    font-weight: 700;
-    color: rgba(255, 255, 255, 0.95);
+    font-weight: 100;
+    color: var(--text);
 }
 
 .monitor-title .el-icon {
@@ -246,14 +246,14 @@ onMounted(() => {
 }
 
 .close-btn {
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: color-mix(in srgb, var(--primary) 10%, transparent) !important;
     border: none !important;
-    color: rgba(255, 255, 255, 0.7) !important;
+    color: var(--text-secondary) !important;
 }
 
 .close-btn:hover {
-    background: rgba(255, 71, 87, 0.2) !important;
-    color: #FF4757 !important;
+    background: color-mix(in srgb, var(--error) 20%, transparent) !important;
+    color: var(--error) !important;
 }
 
 .monitor-body {
@@ -272,7 +272,7 @@ onMounted(() => {
 .music-control-btn {
     width: 100%;
     font-size: 14px !important;
-    font-weight: 600 !important;
+    /* font-weight: 600 !important; */
 }
 
 /* 音量控制 */
@@ -281,7 +281,7 @@ onMounted(() => {
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
     border-radius: 8px;
 }
 
@@ -291,8 +291,8 @@ onMounted(() => {
 
 .volume-value {
     font-size: 13px;
-    font-weight: 700;
-    color: #9B59B6;
+    font-weight: 100;
+    color: var(--accent);
     min-width: 40px;
     text-align: right;
     font-family: 'Consolas', 'Monaco', monospace;
@@ -304,24 +304,24 @@ onMounted(() => {
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
     border-radius: 8px;
 }
 
 .status-label {
     font-size: 13px;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 600;
+    color: var(--text-secondary);
+    /* font-weight: 600; */
 }
 
 .status-value {
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 100;
 }
 
 .status-value.active {
     color: #67C23A;
-    text-shadow: 0 0 8px rgba(103, 194, 58, 0.4);
+    /* text-shadow: 0 0 8px rgba(103, 194, 58, 0.4); */
 }
 
 .status-value.inactive {
@@ -334,13 +334,13 @@ onMounted(() => {
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
     border-radius: 8px;
     transition: background 0.2s ease;
 }
 
 .metric-row:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .metric-label {
@@ -348,8 +348,8 @@ onMounted(() => {
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 600;
+    color: var(--text-secondary);
+    /* font-weight: 600; */
 }
 
 .metric-icon {
@@ -358,21 +358,21 @@ onMounted(() => {
 
 .metric-value {
     font-size: 14px;
-    font-weight: 800;
+    /* font-weight: 800; */
     font-family: 'Consolas', 'Monaco', monospace;
-    color: #fff;
+    color: var(--text);
 }
 
 .metric-value.good {
-    color: #26DE81;
-    text-shadow: 0 0 8px rgba(38, 222, 129, 0.4);
+    color: var(--success);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--success) 40%, transparent);
 }
 
 /* 建议 */
 .suggestions {
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -383,7 +383,7 @@ onMounted(() => {
     align-items: flex-start;
     gap: 6px;
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text);
     line-height: 1.4;
 }
 

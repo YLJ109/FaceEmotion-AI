@@ -98,9 +98,9 @@ export const useThemeStore = defineStore('theme', () => {
     currentEmotion.value = emotion
     const themeName = EMOTION_TO_THEME[emotion] || 'zen'
     if (themeName !== currentThemeName.value) {
-      // 防抖：相同情绪 2 秒内不重复切换
+      // ✅ 优化: 防抖间隔 500ms,平衡响应速度与防止频繁切换
       const now = Date.now()
-      if (now - _lastThemeChange.value < 2000) return
+      if (now - _lastThemeChange.value < 500) return
       _lastThemeChange.value = now
       // 保存旧主题用于插值
       _savedPrevTheme.value = getTheme(currentThemeName.value)
@@ -109,11 +109,12 @@ export const useThemeStore = defineStore('theme', () => {
     }
   }
 
-  // ── 渐变过渡动画 ──
+  // ─ 渐变过渡动画 ──
   function animateToTheme(themeName) {
     const targetTheme = getTheme(themeName)
     const fromTheme = _savedPrevTheme.value || getTheme(themeName)
-    const duration = 600 // ms
+    // ✅ 优化: 动画时长保持 300ms,确保视觉平滑
+    const duration = 300
     const startTime = performance.now()
 
     _animating.value = true
@@ -121,7 +122,7 @@ export const useThemeStore = defineStore('theme', () => {
     function step(now) {
       const elapsed = now - startTime
       const t = Math.min(1, elapsed / duration)
-      // cubic-bezier: ease-out
+      // ✅ 使用 cubic-bezier ease-out,前半段快后半段慢,感知更快
       const eased = 1 - Math.pow(1 - t, 3)
 
       // 应用插值后的 CSS 变量
@@ -148,7 +149,17 @@ export const useThemeStore = defineStore('theme', () => {
     INTERPOLATED_PROPS.forEach(prop => {
       const fromVal = fromTheme[prop] || '#000'
       const toVal = toTheme[prop] || '#000'
-      map[`--${prop}`] = prop === 'card_bg' ? lerpRgba(fromVal, toVal, t) : lerpColor(fromVal, toVal, t)
+      // ✅ 修复: card_bg 转换为 --card-bg（下划线转连字符）
+      const cssProp = prop === 'card_bg' ? 'card-bg' : prop
+
+      // ✅ 关键修复: background 使用渐变插值，card_bg 使用 rgba 插值，其他使用 hex 插值
+      if (prop === 'background') {
+        map[`--${cssProp}`] = lerpGradient(fromVal, toVal, t)
+      } else if (prop === 'card_bg') {
+        map[`--${cssProp}`] = lerpRgba(fromVal, toVal, t)
+      } else {
+        map[`--${cssProp}`] = lerpColor(fromVal, toVal, t)
+      }
     })
     // primary-light = primary
     map['--primary-light'] = map['--primary']

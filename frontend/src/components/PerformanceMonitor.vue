@@ -35,8 +35,9 @@
             <!-- 跳帧率 -->
             <div class="metric-item">
                 <div class="metric-label">
-                    <span class="metric-icon">🔄</span>
+                    <span class="metric-icon"></span>
                     跳帧率
+                    <span v-if="skipRate === 0" class="metric-hint">(正常)</span>
                 </div>
                 <div class="metric-value" :class="getSkipRateClass(skipRate)">
                     {{ skipRate.toFixed(1) }}%
@@ -195,9 +196,13 @@ const toggleVisible = () => {
     isVisible.value = !isVisible.value
 }
 
+// ✅ 事件处理函数（需要保存引用以便清理）
+let handleKeydown = null
+let handleToggle = null
+
 // ✅ 键盘快捷键 Ctrl+P 切换显示
 onMounted(() => {
-    const handleKeydown = (e) => {
+    handleKeydown = (e) => {
         if (e.ctrlKey && e.key === 'p') {
             e.preventDefault()
             toggleVisible()
@@ -205,16 +210,20 @@ onMounted(() => {
     }
     window.addEventListener('keydown', handleKeydown)
 
-    // ✅ 新增: 监听导航栏的事件
-    const handleToggle = () => {
+    // ✅ 监听导航栏的事件
+    handleToggle = () => {
         toggleVisible()
     }
     window.addEventListener('toggle-performance-monitor', handleToggle)
+})
 
-    onUnmounted(() => {
+onUnmounted(() => {
+    if (handleKeydown) {
         window.removeEventListener('keydown', handleKeydown)
+    }
+    if (handleToggle) {
         window.removeEventListener('toggle-performance-monitor', handleToggle)
-    })
+    }
 })
 </script>
 
@@ -226,13 +235,13 @@ onMounted(() => {
     right: 110px;
     /* ✅ 调整: 靠右对齐 */
     width: 280px;
-    background: rgba(0, 0, 0, 0.85);
+    background: color-mix(in srgb, var(--card-bg) 95%, transparent);
     backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
     border-radius: 12px;
     padding: 12px;
     z-index: 9999;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 40px color-mix(in srgb, var(--primary) 10%, transparent);
     animation: slideIn 0.3s ease;
 }
 
@@ -254,13 +263,13 @@ onMounted(() => {
     justify-content: space-between;
     margin-bottom: 10px;
     padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
 }
 
 .monitor-title {
     font-size: 13px;
-    font-weight: 700;
-    color: #fff;
+    font-weight: 100;
+    color: var(--text);
 }
 
 .monitor-content {
@@ -274,13 +283,13 @@ onMounted(() => {
     align-items: center;
     justify-content: space-between;
     padding: 6px 8px;
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
     border-radius: 6px;
     transition: all 0.2s ease;
 }
 
 .metric-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .metric-label {
@@ -288,41 +297,48 @@ onMounted(() => {
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 600;
+    color: var(--text-secondary);
+    /* font-weight: 600; */
 }
 
 .metric-icon {
     font-size: 14px;
 }
 
+.metric-hint {
+    font-size: 11px;
+    color: var(--success);
+    opacity: 0.7;
+    margin-left: 4px;
+}
+
 .metric-value {
     font-size: 14px;
-    font-weight: 800;
+    /* font-weight: 800; */
     font-family: 'Consolas', 'Monaco', monospace;
 }
 
 /* 等级颜色 */
 .metric-value.good {
-    color: #26DE81;
-    text-shadow: 0 0 8px rgba(38, 222, 129, 0.4);
+    color: var(--success);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--success) 40%, transparent);
 }
 
 .metric-value.medium {
-    color: #F99E1A;
-    text-shadow: 0 0 8px rgba(249, 158, 26, 0.4);
+    color: var(--warning);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--warning) 40%, transparent);
 }
 
 .metric-value.bad {
-    color: #FF4757;
-    text-shadow: 0 0 8px rgba(255, 71, 87, 0.4);
+    color: var(--error);
+    text-shadow: 0 0 8px color-mix(in srgb, var(--error) 40%, transparent);
 }
 
 /* 性能建议 */
 .suggestions {
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -333,7 +349,7 @@ onMounted(() => {
     align-items: flex-start;
     gap: 6px;
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text);
     line-height: 1.4;
 }
 </style>

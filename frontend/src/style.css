@@ -156,24 +156,73 @@ body {
   }
 }
 
-/* ===== 自定义滚动条 ===== */
+/* ===== 自定义滚动条 - 全局统一样式 ===== */
+/* ✅ 优化: 所有滚动条使用统一的紫色半透明样式，与主题保持一致 */
+/* ✅ 修复: 使用 !important 确保覆盖浏览器默认样式 */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px !important;
+  height: 6px !important;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: transparent !important;
+  border-radius: 3px !important;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(146, 78, 255, 0.4);
-  border-radius: 8px;
-  transition: background 0.3s;
+  background: rgba(146, 78, 255, 0.3) !important;
+  border-radius: 3px !important;
+  transition: all 0.3s ease !important;
+  border: 1px solid transparent !important;
+  background-clip: padding-box !important;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(146, 78, 255, 0.7);
+  background: rgba(146, 78, 255, 0.5) !important;
+  border: 1px solid rgba(146, 78, 255, 0.2) !important;
+}
+
+/* ✅ 新增: 对话框内部滚动条优化 */
+.el-dialog__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.el-dialog__body::-webkit-scrollbar-thumb {
+  background: rgba(146, 78, 255, 0.3);
+}
+
+.el-dialog__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(146, 78, 255, 0.5);
+}
+
+/* ✅ 新增: 表格滚动条优化 */
+.el-table__body-wrapper::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.el-table__body-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(146, 78, 255, 0.3);
+  border-radius: 3px;
+}
+
+.el-table__body-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(146, 78, 255, 0.5);
+}
+
+/* ✅ 新增: 卡片内容滚动条优化 */
+.el-card__body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.el-card__body::-webkit-scrollbar-thumb {
+  background: rgba(146, 78, 255, 0.3);
+  border-radius: 3px;
+}
+
+.el-card__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(146, 78, 255, 0.5);
 }
 
 /* ===== 粒子背景 ===== */

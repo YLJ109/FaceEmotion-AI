@@ -14,7 +14,8 @@ export const EMOTION_NAMES = {
   fearful: '恐惧',    // 兼容后端数据库
   disgust: '厌恶',
   disgusted: '厌恶',  // 兼容后端数据库
-  neutral: '平静'
+  neutral: '平静',
+  calm: '平静'        // ✅ 新增: wav2vec2 模型标签
 }
 
 export const EMOTION_EMOJI = {
@@ -22,12 +23,16 @@ export const EMOTION_EMOJI = {
   sad: '😢',
   angry: '😠',
   surprise: '😲',
-  fear: '😨',
+  surprised: '😲',  // ✅ 新增: 兼容 surprised 标签
+  fear: '',
+  fearful: '😨',    // ✅ 新增: 兼容 fearful 标签
   disgust: '🤢',
-  neutral: '😐'
+  disgusted: '🤢',  // ✅ 新增: 兼容 disgusted 标签
+  neutral: '',
+  calm: '😌'        // ✅ 新增: calm 表情
 }
 
-export const EMOTION_LIST = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+export const EMOTION_LIST = ['happy', 'sad', 'angry', 'surprise', 'surprised', 'fear', 'fearful', 'disgust', 'neutral']
 
 /** 情绪对应的颜色映射（与主题配色统一） */
 export const EMOTION_COLORS = {
@@ -37,11 +42,12 @@ export const EMOTION_COLORS = {
   angry: '#FF6348',
   surprise: '#E056FD',
   surprised: '#E056FD',  // 兼容后端数据库
-  fear: '#2F3542',
-  fearful: '#2F3542',    // 兼容后端数据库
+  fear: '#9B59B6',        // ✅ 修复: 恐惧颜色从深灰改为明亮的紫色
+  fearful: '#9B59B6',     // 兼容后端数据库
   disgust: '#FFA502',
-  disgusted: '#FFA502',  // 兼容后端数据库
-  neutral: '#747D8C'
+  disgusted: '#FFA502',   // 兼容后端数据库
+  neutral: '#747D8C',
+  calm: '#A4B0BE'         // ✅ 新增: calm 颜色（浅灰色）
 }
 
 export function getEmotionName(emotion) {

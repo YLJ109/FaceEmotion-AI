@@ -976,22 +976,15 @@ server {
 - **Vue.js**: 渐进式 JavaScript 框架
 - **Element Plus**: Vue 3 UI 组件库
 
----
-
-## 📧 联系方式
-
-- **项目地址**: https://github.com/yourusername/FaceEmotion-AI
-- **问题反馈**: https://github.com/yourusername/FaceEmotion-AI/issues
-- **邮箱**: your-email@example.com
 
 ---
 
 ## 📊 项目统计
 
-![GitHub stars](https://img.shields.io/github/stars/yourusername/FaceEmotion-AI?style=social)
-![GitHub forks](https://img.shields.io/github/forks/yourusername/FaceEmotion-AI?style=social)
-![GitHub issues](https://img.shields.io/github/issues/yourusername/FaceEmotion-AI)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/FaceEmotion-AI)
+![GitHub stars](https://img.shields.io/github/stars/YLJ109/FaceEmotion-AI?style=social)
+![GitHub forks](https://img.shields.io/github/forks/YLJ109/FaceEmotion-AI?style=social)
+![GitHub issues](https://img.shields.io/github/issues/YLJ109/FaceEmotion-AI)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/YLJ109/FaceEmotion-AI)
 
 ---
 

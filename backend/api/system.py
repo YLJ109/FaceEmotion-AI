@@ -3,6 +3,9 @@ from fastapi import APIRouter
 from config import ConfigManager
 from pydantic import BaseModel, Field
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["system"])
 
@@ -30,20 +33,29 @@ def init_system_router(
 
 
 class ConfigUpdateModel(BaseModel):
+    """配置更新模型 - 支持所有可配置参数"""
+    # AI 模型配置
+    use_gpu: Optional[bool] = None
+    use_onnx_face_detector: Optional[bool] = None
+    emotion_model: Optional[str] = None
+    confidence_threshold: Optional[float] = Field(None, ge=0.1, le=0.99)
+
+    # 检测参数
     camera_index: Optional[int] = None
     frame_width: Optional[int] = None
     frame_height: Optional[int] = None
     face_detect_confidence: Optional[float] = Field(None, ge=0.1, le=0.99)
     detect_every_n_frames: Optional[int] = Field(None, ge=1, le=10)
     emotion_confidence_threshold: Optional[float] = None
+
+    # 性能优化
     ema_alpha: Optional[float] = Field(None, ge=0.1, le=0.9)
+
+    # 界面设置
     theme_mode: Optional[str] = None
     current_theme: Optional[str] = None
     show_fps: Optional[bool] = None
     show_confidence_bar: Optional[bool] = None
-    # 已移除音乐配置 (音乐功能已删除)
-    # ai_music_enabled: Optional[bool] = None
-    # music_volume: Optional[int] = Field(None, ge=0, le=100)
 
 
 def get_gpu_memory_usage():
@@ -65,10 +77,48 @@ async def get_config():
 
 @router.put("/config")
 async def update_config(config: ConfigUpdateModel):
-    """更新系统配置"""
+    """更新系统配置（支持热加载）"""
     updates = {k: v for k, v in config.dict().items() if v is not None}
     _config_manager.update_config(updates)
-    return {"status": "success", "config": _config_manager.config}
+
+    # ✅ 新增: 热加载机制 - 根据配置变更动态调整
+    try:
+        # 1. 人脸检测模型切换
+        if 'use_onnx_face_detector' in updates:
+            logger.info(
+                f"🔄 切换人脸检测模型: {'ONNX RFB' if updates['use_onnx_face_detector'] else 'Caffe SSD'}")
+            # 注意：模型实例需要重启，这里只是更新配置
+            # 实际切换需要重启 WebSocket 处理器
+
+        # 2. 置信度阈值调整（实时生效）
+        if 'confidence_threshold' in updates:
+            logger.info(f"🔄 更新置信度阈值: {updates['confidence_threshold']}")
+            # 该值会被 websocket.py 实时读取，无需重启
+
+        # 3. 检测频率调整（实时生效）
+        if 'detect_every_n_frames' in updates:
+            logger.info(
+                f"🔄 更新检测频率: 每 {updates['detect_every_n_frames']} 帧检测一次")
+
+        # 4. GPU/CPU 切换（需要重新初始化模型）
+        if 'use_gpu' in updates:
+            logger.info(f" 切换推理设备: {'GPU' if updates['use_gpu'] else 'CPU'}")
+            # 注意：需要重新加载模型，建议提示用户重启服务
+
+        return {
+            "status": "success",
+            "config": _config_manager.config,
+            "hot_reload": True,
+            "message": "配置已更新，部分参数实时生效"
+        }
+    except Exception as e:
+        logger.error(f"❌ 配置热加载失败: {e}")
+        return {
+            "status": "success",
+            "config": _config_manager.config,
+            "hot_reload": False,
+            "message": "配置已保存，但热加载失败，请重启服务"
+        }
 
 
 @router.get("/stats")

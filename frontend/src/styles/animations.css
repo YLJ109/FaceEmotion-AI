@@ -1,0 +1,44 @@
+/**
+ * 动画和过渡效果
+ * 统一管理所有动画定义
+ */
+
+/* ===== 页面切换动画 ===== */
+.page-fade-enter-active,
+.page-fade-leave-active {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.page-fade-enter-from {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.page-fade-leave-to {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+/* ===== 淡入动画 ===== */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* ===== 脉冲光晕动画 ===== */
+@keyframes pulseGlow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 8px var(--primary), 0 0 16px var(--primary);
+    }
+
+    50% {
+        box-shadow: 0 0 20px var(--primary), 0 0 32px var(--primary);
+    }
+}

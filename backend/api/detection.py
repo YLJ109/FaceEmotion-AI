@@ -49,19 +49,43 @@ async def detect_image(file: UploadFile = File(...)):
     from constants import ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE
 
     try:
+        # ✅ 优化1: 模型可用性检查
+        if _face_detector is None or _emotion_model is None:
+            raise HTTPException(
+                status_code=503,
+                detail="AI 模型未就绪，请稍后重试"
+            )
+
+        # ✅ 优化2: 文件类型验证（不要信任客户端提供的 content_type）
         if file.content_type and file.content_type not in ALLOWED_IMAGE_TYPES:
             raise HTTPException(
-                status_code=400, detail=f"不支持的文件类型: {file.content_type}")
+                status_code=415,
+                detail=f"不支持的文件类型: {file.content_type}。支持的格式: {', '.join(ALLOWED_IMAGE_TYPES)}"
+            )
 
         contents = await file.read()
+
+        # ✅ 优化3: 文件大小验证
         if len(contents) > MAX_IMAGE_SIZE:
             raise HTTPException(
-                status_code=413, detail=f"文件大小超过限制 ({MAX_IMAGE_SIZE//1024//1024}MB)")
+                status_code=413,
+                detail=f"文件大小超过限制 ({MAX_IMAGE_SIZE//1024//1024}MB)，请压缩后重试"
+            )
+
+        # ✅ 优化4: 空文件检查
+        if len(contents) == 0:
+            raise HTTPException(status_code=400, detail="文件为空")
 
         nparr = np.frombuffer(contents, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # ✅ 优化5: 图片解码验证
         if frame is None:
-            raise HTTPException(status_code=400, detail="无效的图片文件")
+            raise HTTPException(status_code=422, detail="图片格式无效或已损坏")
+
+        # ✅ 优化6: 图片尺寸验证
+        if frame.shape[0] < 10 or frame.shape[1] < 10:
+            raise HTTPException(status_code=422, detail="图片尺寸过小")
 
         faces = _face_detector.detect(frame)
         results = []
@@ -83,10 +107,13 @@ async def detect_image(file: UploadFile = File(...)):
 
     except HTTPException:
         raise
+    except cv2.error as e:
+        logger.error(f"❌ OpenCV 处理失败: {e}")
+        raise HTTPException(status_code=422, detail="图片格式无效，请使用标准 JPG/PNG 格式")
     except Exception as e:
         error_trace = traceback.format_exc()
         logger.error(f"❌ 图片检测失败: {e}\n{error_trace}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="内部服务器错误，请稍后重试")
 
 
 @router.post("/batch")

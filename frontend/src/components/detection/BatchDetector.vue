@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div class="batch-detector">
         <div class="detector-layout">
             <!-- 左侧：上传区域 / 图片预览 -->
@@ -106,7 +106,7 @@
                                             <span class="face-label">人脸 {{ faceIndex + 1 }}</span>
                                             <span class="face-emotion">{{ getEmotionName(face.emotion) }}</span>
                                             <span class="face-confidence">{{ (face.confidence * 100).toFixed(1)
-                                                }}%</span>
+                                            }}%</span>
                                         </div>
                                         <el-progress :percentage="face.confidence * 100"
                                             :color="getEmotionColor(face.emotion)" :stroke-width="6" :show-text="false"
@@ -294,31 +294,64 @@ const exportResults = () => {
 // 批量保存到历史记录
 const saveBatchToHistory = async () => {
     try {
-        // 对每个结果分别保存
+        let successCount = 0
+        let failCount = 0
+
+        // ✅ 优化: 为每张图片单独保存一条历史记录
         for (let i = 0; i < results.value.length; i++) {
             const result = results.value[i]
+
+            // 提取关键数据
             const dominantEmotion = result.dominant_emotion || 'neutral'
             const confidence = result.confidence || 0
+            const faces = result.faces || []
 
-            await fetch(API.historySave, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    detection_type: 'batch',
-                    results: result.faces || [],
-                    source: '批量图片检测',
-                    image_path: '',
-                    image_type: 'batch',
-                    thumbnail: result.imageUrl,
-                    dominant_emotion: dominantEmotion,
-                    confidence: confidence
+            // 数据验证
+            if (!result.imageUrl && faces.length === 0) {
+                console.warn(`⚠️ 跳过第 ${i + 1} 张图片：无缩略图且无人脸数据`)
+                failCount++
+                continue
+            }
+
+            try {
+                const response = await fetch(API.historySave, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        detection_type: 'batch',
+                        results: faces,
+                        source: `批量图片检测 (${i + 1}/${results.value.length})`,
+                        image_path: '',
+                        image_type: 'batch',
+                        thumbnail: result.imageUrl || '',  // ✅ 确保 thumbnail 存在
+                        dominant_emotion: dominantEmotion,
+                        confidence: confidence,
+                        detected_faces: faces  // ✅ 包含完整的人脸数据（含 bbox）
+                    })
                 })
-            })
+
+                if (response.ok) {
+                    successCount++
+                } else {
+                    console.error(`❌ 第 ${i + 1} 张图片保存失败: HTTP ${response.status}`)
+                    failCount++
+                }
+            } catch (err) {
+                console.error(` 第 ${i + 1} 张图片保存异常:`, err)
+                failCount++
+            }
         }
-        console.log(`✅ 批量历史记录已保存 (${results.value.length} 条)`)
+
+        // 输出保存结果
+        console.log(`✅ 批量历史记录保存完成: 成功 ${successCount} 条, 失败 ${failCount} 条`)
+
+        // 如果有失败，提示用户
+        if (failCount > 0) {
+            ElMessage.warning(`⚠️ 部分记录保存失败 (${failCount}/${results.value.length})`)
+        }
     } catch (error) {
         console.error('保存批量历史记录失败:', error)
-        // 不显示错误提示，避免影响用户体验
+        ElMessage.error('❌ 批量历史记录保存失败')
     }
 }
 </script>
@@ -340,7 +373,8 @@ const saveBatchToHistory = async () => {
     display: flex;
     flex-direction: column;
     height: 100%;
-    overflow-y: auto;
+    /* ✅ 修复: 移除 overflow-y，让 el-card__body 管理滚动 */
+    overflow-y: visible;
     padding-right: 4px;
 }
 
@@ -353,11 +387,26 @@ const saveBatchToHistory = async () => {
 .left-panel .el-card__body {
     flex: 1;
     overflow-y: auto;
+    /* ✅ 新增: 卡片内容滚动条样式 */
+}
+
+.left-panel .el-card__body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.left-panel .el-card__body::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.left-panel .el-card__body::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .right-panel {
     height: 100%;
-    overflow-y: auto;
+    /* ✅ 修复: 移除 overflow-y，让 el-card__body 管理滚动 */
+    overflow-y: visible;
 }
 
 .right-panel .el-card {
@@ -369,6 +418,20 @@ const saveBatchToHistory = async () => {
 .right-panel .el-card__body {
     flex: 1;
     overflow-y: auto;
+    /* ✅ 新增: 结果卡片滚动条样式 */
+}
+
+.right-panel .el-card__body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.right-panel .el-card__body::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.right-panel .el-card__body::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .result-card {
@@ -410,7 +473,7 @@ const saveBatchToHistory = async () => {
 
 .card-header h3 {
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 100;
     margin: 0;
 }
 
@@ -420,19 +483,20 @@ const saveBatchToHistory = async () => {
 
 .badge {
     font-size: 10px;
-    font-weight: 600;
+    /* font-weight: 600; */
     padding: 2px 8px;
     border-radius: 20px;
     background: var(--gradient);
-    color: white;
+    color: var(--text);
     margin-left: 8px;
     vertical-align: middle;
 }
 
 .upload-area {
     margin-bottom: 12px;
-    min-height: 700px;
-    height: 700px;
+    /* ✅ 优化: 减小固定高度，更紧凑 */
+    min-height: 500px;
+    height: 500px;
     display: flex;
     flex-direction: column;
 }
@@ -448,7 +512,8 @@ const saveBatchToHistory = async () => {
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    min-height: 700px;
+    /* ✅ 优化: 减小最小高度，避免大片空白 */
+    min-height: 500px;
     height: 100%;
 }
 
@@ -470,7 +535,7 @@ const saveBatchToHistory = async () => {
 
 .file-count {
     font-size: 13px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text);
 }
 
@@ -502,9 +567,24 @@ const saveBatchToHistory = async () => {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 10px;
-    max-height: calc(100vh - 300px);
+    /* ✅ 优化: 动态最大高度，根据视口调整 */
+    max-height: calc(100vh - 350px);
     overflow-y: auto;
     padding: 4px;
+}
+
+/* ✅ 新增: 文件列表网格滚动条样式 */
+.file-list-grid::-webkit-scrollbar {
+    width: 6px;
+}
+
+.file-list-grid::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.file-list-grid::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .file-item {
@@ -583,7 +663,7 @@ const saveBatchToHistory = async () => {
     padding: 20px 32px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4),
         0 0 0 1px rgba(113, 57, 255, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        inset 0 1px 0 color-mix(in srgb, var(--card-bg) 90%, transparent);
     min-width: 480px;
     max-width: 600px;
 }
@@ -608,7 +688,7 @@ const saveBatchToHistory = async () => {
     margin: 0;
     color: var(--text);
     font-size: 14px;
-    font-weight: 600;
+    /* font-weight: 600; */
     text-align: center;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -628,6 +708,20 @@ const saveBatchToHistory = async () => {
     max-height: calc(100vh - 250px);
     overflow-y: auto;
     padding: 4px;
+}
+
+/* ✅ 新增: 批量预览区域滚动条样式 */
+.batch-preview-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.batch-preview-section::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.batch-preview-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .preview-item {
@@ -658,7 +752,7 @@ const saveBatchToHistory = async () => {
     right: 0;
     padding: 10px;
     background: linear-gradient(to top, rgba(0, 0, 0, 0.85), transparent);
-    color: white;
+    color: var(--text);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -666,7 +760,7 @@ const saveBatchToHistory = async () => {
 
 .preview-overlay .face-count {
     font-size: 13px;
-    font-weight: 600;
+    /* font-weight: 600; */
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
@@ -678,6 +772,20 @@ const saveBatchToHistory = async () => {
     max-height: calc(100vh - 180px);
     overflow-y: auto;
     padding: 4px;
+}
+
+/* ✅ 新增: 批量结果网格滚动条样式 */
+.batch-results-grid::-webkit-scrollbar {
+    width: 6px;
+}
+
+.batch-results-grid::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.batch-results-grid::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .result-card-item {
@@ -705,13 +813,13 @@ const saveBatchToHistory = async () => {
 
 .result-index {
     font-size: 12px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text-secondary);
 }
 
 .face-count-badge {
     font-size: 10px;
-    font-weight: 600;
+    /* font-weight: 600; */
     padding: 2px 8px;
     background: color-mix(in srgb, var(--primary) 15%, transparent);
     border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
@@ -755,19 +863,19 @@ const saveBatchToHistory = async () => {
 
 .face-label {
     font-size: 10px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text-secondary);
 }
 
 .face-emotion {
     font-size: 12px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text);
 }
 
 .face-confidence {
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 100;
     background: var(--gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -837,12 +945,12 @@ const saveBatchToHistory = async () => {
     right: 0;
     padding: 8px;
     background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-    color: white;
+    color: var(--text);
 }
 
 .face-count {
     font-size: 12px;
-    font-weight: 600;
+    /* font-weight: 600; */
 }
 
 .result-info {
@@ -869,14 +977,14 @@ const saveBatchToHistory = async () => {
 
 .dominant-emotion .name {
     font-size: 13px;
-    font-weight: 600;
+    /* font-weight: 600; */
     flex: 1;
     color: var(--text);
 }
 
 .dominant-emotion .confidence {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 100;
     background: var(--gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;

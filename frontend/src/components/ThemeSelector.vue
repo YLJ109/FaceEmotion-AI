@@ -15,10 +15,14 @@
                     <div class="mode-switch">
                         <el-radio-group v-model="themeStore.themeMode" size="small">
                             <el-radio-button value="auto">
-                                <el-icon style="margin-right:4px"><Aim /></el-icon>自动
+                                <el-icon style="margin-right:4px">
+                                    <Aim />
+                                </el-icon>自动
                             </el-radio-button>
                             <el-radio-button value="manual">
-                                <el-icon style="margin-right:4px"><MagicStick /></el-icon>手动
+                                <el-icon style="margin-right:4px">
+                                    <MagicStick />
+                                </el-icon>手动
                             </el-radio-button>
                         </el-radio-group>
                     </div>
@@ -107,8 +111,13 @@ const selectTheme = (name) => themeStore.setTheme(name)
     transform: translateY(-1px);
 }
 
-.btn-emoji { font-size: 19px; }
-.btn-text { font-size: 15px; }
+.btn-emoji {
+    font-size: 19px;
+}
+
+.btn-text {
+    font-size: 15px;
+}
 
 .theme-selector-header {
     text-align: center;
@@ -117,7 +126,7 @@ const selectTheme = (name) => themeStore.setTheme(name)
 
 .theme-selector-header h4 {
     font-size: 17px;
-    font-weight: 700;
+    font-weight: 100;
     margin-bottom: 12px;
     background: linear-gradient(135deg, var(--highlight), var(--accent));
     -webkit-background-clip: text;
@@ -130,13 +139,15 @@ const selectTheme = (name) => themeStore.setTheme(name)
     justify-content: center;
 }
 
-.theme-section { margin-bottom: 14px; }
+.theme-section {
+    margin-bottom: 14px;
+}
 
 .section-title {
     font-size: 12px;
     color: var(--text-secondary);
     margin-bottom: 8px;
-    font-weight: 600;
+    /* font-weight: 600; */
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -175,11 +186,17 @@ const selectTheme = (name) => themeStore.setTheme(name)
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.emoji { font-size: 20px; }
+.emoji {
+    font-size: 20px;
+}
+
 .name {
     font-size: 11px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text-secondary);
 }
-.theme-item.active .name { color: var(--text); }
+
+.theme-item.active .name {
+    color: var(--text);
+}
 </style>

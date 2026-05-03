@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 # ── 声学特征提取参数 ──────────────────────────────────
 
 SAMPLE_RATE = 16000       # 预期采样率
-FRAME_SIZE = 1024          # FFT 帧大小
-HOP_LENGTH = 512           # 帧移
+FRAME_SIZE = 512           # ✅ 优化: FFT 帧大小（从 1024 降到 512，适应 1024 bytes 缓冲区）
+HOP_LENGTH = 256           # ✅ 优化: 帧移（从 512 降到 256，提高时间分辨率）
 F_MIN = 80                 # 基频搜索下界 (Hz)
 F_MAX = 600                # 基频搜索上界 (Hz)
 
@@ -68,33 +68,18 @@ class VoiceAnalyzer:
         返回:
             {pitch_mean, pitch_std, energy_mean, energy_std, spectral_centroid, speaking_rate, has_voice}
         """
-        # ✅ 关闭调试日志
-        # if len(audio_data) < 64:
-        #     print(f"❌ 音频数据太短: {len(audio_data)} bytes")
-        #     return self._empty_features()
-
-        # # ✅ 新增: 解压缩音频数据(如果启用)
-        # if self.compression_enabled:
-        #     print(f"⚠️  尝试解压缩音频数据...")
-        #     try:
-        #         decompressed = self._decompress_audio(audio_data)
-        #         audio_data = decompressed['buffer']
-        #         self.last_sample = decompressed['lastSample']
-        #     except Exception as e:
-        #         logger.warning(f'音频解压缩失败，使用原始数据: {e}')
+        # ✅ 临时调试: 打印音频数据信息
+        if len(audio_data) < 64:
+            return self._empty_features()
 
         # PCM16 → float32 [-1, 1]
         samples = self._pcm16_to_float(audio_data)
-        # print(
-        #     f"  转换后样本数: {len(samples)}, 范围: [{samples.min():.3f}, {samples.max():.3f}]")
 
         if len(samples) < FRAME_SIZE:
-            # print(f"❌ 样本数不足: {len(samples)} < {FRAME_SIZE}")
             return self._empty_features()
 
         # 分帧
         frames = self._frame(samples)
-        # print(f"  分帧数量: {len(frames)}")
 
         # 提取各特征
         pitch_contour = self._extract_pitch_contour(frames)
@@ -104,10 +89,10 @@ class VoiceAnalyzer:
 
         # 过滤静音段
         voiced_frames = [p for p in pitch_contour if p > 0]
-        # print(f"  有声帧数量: {len(voiced_frames)} / {len(pitch_contour)}")
 
-        if not voiced_frames:
-            # print(f"⚠️  未检测到声音，返回空特征")
+        # ✅ 优化: 降低有效帧比例要求，从全部帧变为 10% 即可
+        # 只要有一小部分帧检测到声音，就认为有声音
+        if len(voiced_frames) < len(pitch_contour) * 0.1:
             return self._empty_features()
 
         features = {
@@ -189,7 +174,9 @@ class VoiceAnalyzer:
                 continue
 
             search_region = corr[min_lag:max_lag + 1]
-            if len(search_region) == 0 or np.max(search_region) < 0.3:
+
+            # 降低阈值到 0.05，适应低音量音频
+            if len(search_region) == 0 or np.max(search_region) < 0.05:
                 pitch.append(0.0)  # 无声音
                 continue
 
@@ -239,8 +226,20 @@ class VoiceAnalyzer:
 
         使用高斯概率密度匹配模板
         """
-        if features.get('has_voice', 0) < 0.5:
-            return {e: 0.0 for e in EMOTION_ORDER}
+        # ✅ 优化: 降低阈值到 0.3，提高检测敏感度
+        # 即使声音较小也能进行分析，避免一直返回默认值
+        if features.get('has_voice', 0) < 0.3:
+            # return {e: 0.0 for e in EMOTION_ORDER}  #  旧代码：全部返回0
+            # ✅ 新代码：返回默认分布，平静占主导
+            return {
+                'happy': 0.05,
+                'sad': 0.05,
+                'angry': 0.05,
+                'surprise': 0.05,
+                'fear': 0.05,
+                'disgust': 0.05,
+                'neutral': 0.70,  # 默认平静
+            }
 
         scores = {}
         for emotion, template in VOICE_TEMPLATES.items():

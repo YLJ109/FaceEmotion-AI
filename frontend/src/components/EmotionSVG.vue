@@ -151,7 +151,7 @@ const svgSize = computed(() => ({
 .emotion-svg {
     display: inline-block;
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
+    /* filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25)); */
     vertical-align: middle;
 }
 
@@ -160,12 +160,12 @@ const svgSize = computed(() => ({
 }
 
 .emotion-svg.small {
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    /* filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)); */
 }
 
 .emotion-svg.large,
 .emotion-svg.xlarge {
-    filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.35));
+    /* filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.35)); */
 }
 
 .emotion-group {

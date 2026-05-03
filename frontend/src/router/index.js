@@ -11,15 +11,8 @@ const BatchDetector = () => import('@/components/detection/BatchDetector.vue')
 const VideoDetector = () => import('@/components/detection/VideoDetector.vue')
 const AnalyticsDashboard = () => import('@/components/analytics/AnalyticsDashboard.vue')
 const HistoryViewer = () => import('@/components/HistoryViewer.vue')
-
-// 主题页面组件 (内联在 App.vue 中,使用空组件占位)
-const ThemePage = {
-    template: '<div></div>'
-}
-
-const SettingsPage = {
-    template: '<div></div>'
-}
+const ThemePage = () => import('@/components/pages/ThemePage.vue')
+const SettingsPage = () => import('@/components/pages/SettingsPage.vue')
 
 const routes = [
     {
@@ -120,27 +113,7 @@ router.beforeEach((to, from, next) => {
     // 更新页面标题
     document.title = `${to.meta.title || 'AI情感检测'} - AI情感检测系统`
 
-    // 上报功能使用 (静默失败)
-    if (to.name && to.name !== from.name) {
-        logFeatureUsage(to.name).catch(() => { })
-    }
-
     next()
 })
-
-/**
- * 上报功能使用统计
- */
-async function logFeatureUsage(featureName) {
-    try {
-        await fetch('http://localhost:8000/api/analytics/log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ feature: featureName }),
-        })
-    } catch (e) {
-        // 静默失败,不影响用户体验
-    }
-}
 
 export default router

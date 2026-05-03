@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div class="realtime-page">
         <!-- 视频区域 -->
         <div class="video-section">
@@ -73,6 +73,9 @@
                         <el-button :icon="Microphone" :class="['mic-button', { 'mic-active': isMicOn }]"
                             @click="toggleMicrophone" circle size="small" />
                     </el-tooltip>
+                    <el-tooltip content="反馈识别结果" placement="top" v-if="currentEmotion">
+                        <el-button :icon="Edit" @click="showFeedback = true" circle size="small" />
+                    </el-tooltip>
                 </div>
             </div>
 
@@ -91,6 +94,11 @@
                     <span class="voice-icon"></span>
                     <span class="voice-text">{{ isFused ? '多模态融合' : '仅视觉检测' }}</span>
                     <span class="voice-badge">{{ isFused ? '语音+视觉' : '仅视觉' }}</span>
+
+                    <!-- ✅ 新增: 音频活动指示器 -->
+                    <div class="audio-activity-bar">
+                        <div class="audio-activity-fill" :style="{ width: `${audioActivityLevel * 100}%` }"></div>
+                    </div>
                 </div>
 
                 <!-- ✅ 移除: 情绪纠正按钮 -->
@@ -116,19 +124,22 @@
 
                 <!-- 置信度分布条 -->
                 <div class="confidence-bars">
-                    <div v-for="(score, emotion) in emotionScores" :key="emotion" class="confidence-bar-item">
-                        <span class="bar-label">
-                            <EmotionSVG :emotion="emotion" size="small" :animated="false" />
-                            {{ getEmotionName(emotion) }}
-                        </span>
-                        <div class="bar-track">
-                            <div class="bar-fill" :style="{
-                                width: `${score * 100}%`, background: getEmotionColor(emotion),
-                                boxShadow: `0 0 8px ${getEmotionColor(emotion)}`
-                            }"></div>
+                    <transition-group name="emotion-sort" tag="div">
+                        <div v-for="(item, index) in sortedEmotionScores" :key="item.emotion"
+                            class="confidence-bar-item">
+                            <span class="bar-label">
+                                <EmotionSVG :emotion="item.emotion" size="small" :animated="false" />
+                                {{ getEmotionName(item.emotion) }}
+                            </span>
+                            <div class="bar-track">
+                                <div class="bar-fill" :style="{
+                                    width: `${item.score * 100}%`, background: getEmotionColor(item.emotion),
+                                    boxShadow: `0 0 8px ${getEmotionColor(item.emotion)}`
+                                }"></div>
+                            </div>
+                            <span class="bar-value">{{ (item.score * 100).toFixed(0) }}%</span>
                         </div>
-                        <span class="bar-value">{{ (score * 100).toFixed(0) }}%</span>
-                    </div>
+                    </transition-group>
                 </div>
 
                 <!-- ✅ 修改: 移除 hasVoiceData 条件，避免闪烁 -->
@@ -168,11 +179,15 @@
         <!-- ✅ 新增: 性能监控面板 -->
         <PerformanceMonitor :fps="fps" :latency="perfLatency" :skip-rate="perfSkipRate" :gpu-memory="perfGpuMemory"
             :detect-interval="perfDetectInterval" :http-latency="perfHttpLatency" :error-rate="perfErrorRate" />
+
+        <!-- ✅ 新增: 情绪反馈对话框 -->
+        <EmotionFeedback v-model:visible="showFeedback" :predicted-emotion="currentEmotion"
+            :predicted-confidence="currentConfidence" @submitted="handleFeedbackSubmitted" />
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, reactive } from 'vue'
+import { ref, onMounted, onUnmounted, reactive, computed } from 'vue'
 import { VideoCamera, VideoPlay, MagicStick, Microphone, Edit } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
@@ -185,6 +200,7 @@ import httpMonitor from '@/utils/httpMonitor'
 import AudioCapture from '@/utils/audioCapture'
 import { API } from '@/api/config'
 import PerformanceMonitor from '../PerformanceMonitor.vue'
+import EmotionFeedback from '../EmotionFeedback.vue'
 
 const themeStore = useThemeStore()
 const videoElement = ref(null)
@@ -194,43 +210,58 @@ const isCameraOn = ref(false)
 const isEmotionDetectionOn = ref(true)
 const currentEmotion = ref(null)
 const currentConfidence = ref(0)
-const hasVoiceData = ref(false)  // ✅ 新增: 标记是否有语音数据
+const showFeedback = ref(false)  // ✅ 新增: 反馈对话框显示状态
+// const hasVoiceData = ref(false)  // ✅ 已移除: 未使用的变量
 const isFused = ref(false)  // ✅ 新增: 标记是否是多模态融合结果
 const emotionScores = ref({})
 const voiceScores = ref({})  // ✅ 新增: 语音情绪分数
 const visionScores = ref({})  // ✅ 新增: 视觉情绪分数（融合前）
+
+// ✅ 修复: 暴露 voiceScores 为响应式变量
+const exposedVoiceScores = computed(() => voiceScores.value)
 const currentFaces = ref([])
 const fps = ref(0)
 // ✅ 新增: 麦克风控制
 const isMicOn = ref(false)
+const audioActivityLevel = ref(0)  // ✅ 新增: 音频活动级别 (0-1)
+let lastAudioSendTime = 0  // ✅ 新增: 上次发送音频的时间
 const audioCapture = new AudioCapture({
     sampleRate: 16000,
-    compressionEnabled: false,  // ✅ 修复: 禁用音频压缩，直接发送原始PCM16数据
+    compressionEnabled: false,  // 禁用音频压缩，直接发送原始PCM16数据
+    bufferSize: 16000,  // ✅ 优化: 1 秒缓冲（16kHz * 1.0 = 16000 样本），提高识别准确率
     onAudioData: (pcmData) => {
-        // ✅ 关闭调试日志
-        // console.log('🎤 音频数据:', pcmData.byteLength, 'bytes')
-
-        // 通过WebSocket发送音频数据
+        // ✅ 修复: 通过 WebSocket 发送批量音频数据
         if (wsManager.isConnected && pcmData.byteLength > 0) {
             try {
-                // ✅ 修复: 添加类型标识，避免与视频帧混淆
+                // 添加类型标识，避免与视频帧混淆
                 // 格式: [type(1B)] + [audio_data]
                 const typeByte = new Uint8Array([0x02]) // 0x01=video, 0x02=audio
                 const combined = new Uint8Array(typeByte.length + pcmData.byteLength)
                 combined.set(typeByte, 0)
                 combined.set(new Uint8Array(pcmData), typeByte.length)
                 wsManager.sendBinary(combined.buffer)
-                // console.log('✅ 音频数据已发送:', combined.byteLength, 'bytes')
+
+                // ✅ 优化: 更新音频活动指示器（使用平滑算法）
+                const int16View = new Int16Array(pcmData)
+                const volume = int16View.reduce((sum, val) => sum + Math.abs(val), 0) / int16View.length
+                // 使用 EMA 平滑，避免跳动
+                audioActivityLevel.value = audioActivityLevel.value * 0.7 + Math.min(1, volume / 5000) * 0.3
+                lastAudioSendTime = performance.now()
             } catch (error) {
-                console.warn('发送音频数据失败:', error)
+                console.error(' 发送批量音频数据失败:', error)
             }
-        } else {
-            console.warn('⚠️ WebSocket未连接或音频数据为空')
         }
     }
 })
-// ✅ 新增: 情绪列表
-const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+// ✅ 修复: 情绪列表（7种情绪，calm 合并到 neutral）
+const emotionList = ['happy', 'sad', 'angry', 'surprised', 'fearful', 'disgust', 'neutral']
+
+// ✅ 新增: 情绪分数排序计算属性（从高到低）
+const sortedEmotionScores = computed(() => {
+    return Object.entries(emotionScores.value)
+        .map(([emotion, score]) => ({ emotion, score }))
+        .sort((a, b) => b.score - a.score)  // 降序排序
+})
 // ✅ 新增: 性能监控数据
 const perfLatency = ref(0)
 const perfSkipRate = ref(0)
@@ -302,16 +333,47 @@ onMounted(() => {
         perfErrorRate.value = stats.errorRate
     }, 2000)
 
+    // ✅ 新增: 音频活动指示器衰减定时器（每100ms衰减一次）
+    const audioActivityInterval = setInterval(() => {
+        if (isMicOn.value && audioActivityLevel.value > 0) {
+            // 如果超过 500ms 没有新的音频数据，快速衰减
+            if (performance.now() - lastAudioSendTime > 500) {
+                audioActivityLevel.value *= 0.7  // 快速衰减
+                if (audioActivityLevel.value < 0.01) {
+                    audioActivityLevel.value = 0
+                }
+            } else {
+                audioActivityLevel.value *= 0.95  // 慢速衰减
+            }
+        }
+    }, 100)
+
     // 组件卸载时清除定时器
     onUnmounted(() => {
         clearInterval(httpMonitorInterval)
+        clearInterval(audioActivityInterval)
     })
 })
 
 onUnmounted(() => {
     stopCamera()
-    if (_themeChangeTimer) clearTimeout(_themeChangeTimer)
+    // ✅ 优化: 清理 Canvas 防止内存泄漏
+    cleanupCanvas()
+
+    // ✅ 新增: 清理防抖定时器
+    if (saveHistoryDebounceTimer) {
+        clearTimeout(saveHistoryDebounceTimer)
+        saveHistoryDebounceTimer = null
+    }
 })
+
+// ✅ 新增: Canvas 清理函数
+const cleanupCanvas = () => {
+    if (sendCanvas) {
+        sendCtx = null
+        sendCanvas = null
+    }
+}
 
 // === 摄像头控制 ===
 
@@ -325,10 +387,21 @@ const startCamera = async () => {
             startRendering()
             isCameraOn.value = true
         }
-        ElMessage.success(' 摄像头已启动')
+        ElMessage.success('✅ 摄像头已启动')
     } catch (error) {
         console.error('摄像头启动失败:', error)
-        ElMessage.error('无法访问摄像头，请检查权限或连接')
+        // ✅ 优化: 细化错误类型，提供友好提示
+        if (error.name === 'NotAllowedError') {
+            ElMessage.error('❌ 摄像头权限被拒绝，请在浏览器设置中允许访问')
+        } else if (error.name === 'NotFoundError') {
+            ElMessage.error('❌ 未检测到摄像头设备，请检查连接')
+        } else if (error.name === 'NotReadableError') {
+            ElMessage.error('❌ 摄像头被其他应用占用，请关闭后重试')
+        } else if (error.name === 'OverconstrainedError') {
+            ElMessage.error('❌ 摄像头不支持 requested 分辨率')
+        } else {
+            ElMessage.error(`❌ 摄像头启动失败: ${error.message}`)
+        }
     }
 }
 
@@ -513,10 +586,13 @@ const startRendering = () => {
         }
         lastRenderTime = timestamp - (elapsed % FRAME_INTERVAL)
 
+        // ✅ 优化: 只在视频尺寸变化时更新 canvas 宽高，避免频繁重布局
         const vw = video.videoWidth || 640
         const vh = video.videoHeight || 480
-        canvas.width = vw
-        canvas.height = vh
+        if (canvas.width !== vw || canvas.height !== vh) {
+            canvas.width = vw
+            canvas.height = vh
+        }
 
         // 绘制视频帧
         ctx.save()
@@ -651,25 +727,30 @@ const startRendering = () => {
 
 // === WebSocket 消息处理 (含 EMA + 自适应质量) ===
 
+// ✅ 新增: 防抖保存历史记录（避免频繁调用）
+let saveHistoryDebounceTimer = null
+const SAVE_HISTORY_INTERVAL = 5000  // 每 5 秒保存一次
+
 const handleWsMessage = (data) => {
     if (data.type !== 'result') return
 
-    // ✅ 新增: 更新语音数据标记
-    hasVoiceData.value = data.has_voice_data || false
+    // ✅ 已移除: hasVoiceData.value = data.has_voice_data || false （未使用）
 
     updateInferenceFps()  // 统计 AI 推理帧率
 
     // ✅ 新增: 更新性能监控数据
     const processTime = data.process_time
-    const actualRtt = processTime ? performance.now() - (processTime * 1000) : 0
-    perfLatency.value = actualRtt > 0 ? actualRtt : 0
+    // ✅ 修复: 使用 lastSentTime 计算往返延迟，而不是 process_time
+    // process_time 是后端处理完成的时间戳，不能直接用于计算 RTT
+    const actualRtt = performance.now() - lastSentTime
+    perfLatency.value = Math.max(0, actualRtt)  // 确保非负
 
     if (data.gpu_memory !== undefined) {
         perfGpuMemory.value = data.gpu_memory
     }
 
     // 计算真实处理延迟
-    const rtt = actualRtt > 0 ? actualRtt : (performance.now() - lastSentTime)
+    const rtt = Math.max(0, actualRtt)
 
     _roundTripHistory.push(rtt)
     if (_roundTripHistory.length > 10) _roundTripHistory.shift()
@@ -682,6 +763,11 @@ const handleWsMessage = (data) => {
 
     awaitingResult = false
 
+    // 接收语音情绪分数（无论是否检测到人脸都更新）
+    if (data.voice_scores) {
+        voiceScores.value = data.voice_scores
+    }
+
     // 过滤掉低置信度的缓存结果（置信度 < 0.6 视为无效）
     const validFaces = data.faces?.filter(face => face.confidence >= 0.6 && !face._cached) || []
 
@@ -691,13 +777,6 @@ const handleWsMessage = (data) => {
         // ✅ 新增: 接收视觉情绪分数（融合前）
         if (validFaces[0].vision_scores) {
             visionScores.value = validFaces[0].vision_scores
-        }
-
-        // ✅ 新增: 接收语音情绪分数
-        if (data.voice_scores) {
-            voiceScores.value = data.voice_scores
-            // ✅ 关闭调试日志
-            // console.log(' 语音情绪数据:', data.voice_scores)
         }
 
         if (Object.keys(_emaScores).length === 0) {
@@ -732,16 +811,22 @@ const handleWsMessage = (data) => {
         emotionScores.value = { ..._emaScores }
         currentFaces.value = validFaces
 
-        if (_themeChangeTimer) clearTimeout(_themeChangeTimer)
-        _themeChangeTimer = setTimeout(() => {
-            themeStore.updateThemeByEmotion(smoothedEmotion)
-        }, 400)
+        // ✅ 优化: 移除延迟,立即触发主题更新(防抖在 themeStore 内部处理)
+        themeStore.updateThemeByEmotion(smoothedEmotion)
 
-        // 首次检测到人脸时记录分析数据（每个会话仅一次）
+        // ✅ 新增: 自动保存历史记录（防抖：每 5 秒保存一次）
         if (!_analyticsLogged) {
             _analyticsLogged = true
             logFeatureUsage('实时检测', { emotion: smoothedEmotion })
         }
+
+        // 触发防抖保存
+        if (saveHistoryDebounceTimer) {
+            clearTimeout(saveHistoryDebounceTimer)
+        }
+        saveHistoryDebounceTimer = setTimeout(() => {
+            saveRealtimeToHistory(smoothedEmotion, smoothedConf, validFaces)
+        }, SAVE_HISTORY_INTERVAL)
     } else {
         // 没有检测到有效人脸
         _consecutiveEmpty++
@@ -798,6 +883,81 @@ const takeScreenshot = () => {
         link.href = canvas.toDataURL()
         link.click()
         ElMessage.success('✅ 截图已保存')
+    }
+}
+
+// ✅ 新增: 处理反馈提交成功
+const handleFeedbackSubmitted = () => {
+    // 反馈提交后，可以在这里添加一些额外逻辑
+    // 比如记录反馈统计、显示学习进度等
+    console.log('✅ 用户反馈已提交，系统将自动学习优化')
+}
+
+// ✅ 新增: 保存实时检测历史记录
+const saveRealtimeToHistory = async (emotion, confidence, faces) => {
+    try {
+        const canvas = canvasElement.value
+        if (!canvas) {
+            console.warn('⚠️ Canvas 元素未找到，无法保存历史记录')
+            return
+        }
+
+        // 截取当前 Canvas 帧作为缩略图（压缩到 320x240）
+        const thumbnailCanvas = document.createElement('canvas')
+        const thumbCtx = thumbnailCanvas.getContext('2d')
+        thumbnailCanvas.width = 320
+        thumbnailCanvas.height = 240
+
+        // 保持宽高比
+        const scale = Math.min(320 / canvas.width, 240 / canvas.height)
+        const scaledWidth = canvas.width * scale
+        const scaledHeight = canvas.height * scale
+        const offsetX = (320 - scaledWidth) / 2
+        const offsetY = (240 - scaledHeight) / 2
+
+        thumbCtx.fillStyle = '#000'  // 黑色背景
+        thumbCtx.fillRect(0, 0, 320, 240)
+        thumbCtx.drawImage(canvas, offsetX, offsetY, scaledWidth, scaledHeight)
+
+        // 转换为 JPEG 格式（质量 0.7）
+        const thumbnail = thumbnailCanvas.toDataURL('image/jpeg', 0.7)
+
+        // 构建保存数据
+        const historyData = {
+            detection_type: 'realtime',
+            results: [{
+                emotion: emotion,
+                confidence: confidence,
+                bbox: faces[0]?.bbox || [0, 0, 0, 0]
+            }],
+            source: '摄像头实时检测',
+            image_path: '',
+            image_type: 'realtime',
+            thumbnail: thumbnail,
+            dominant_emotion: emotion,
+            confidence: confidence,
+            detected_faces: faces.map(face => ({
+                bbox: face.bbox,
+                emotion: face.emotion,
+                confidence: face.confidence,
+                scores: face.scores
+            }))
+        }
+
+        // 调用保存接口
+        const response = await fetch(API.historySave, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(historyData)
+        })
+
+        if (response.ok) {
+            console.log('✅ 实时检测历史记录已保存')
+        } else {
+            console.warn('⚠️ 保存历史记录失败:', response.statusText)
+        }
+    } catch (error) {
+        console.error('❌ 保存实时检测历史记录失败:', error)
     }
 }
 </script>
@@ -862,12 +1022,12 @@ const takeScreenshot = () => {
     padding: 5px 12px;
     border-radius: 8px;
     font-size: 11px;
-    font-weight: 600;
+    /* font-weight: 600; */
     z-index: 10;
     display: flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid color-mix(in srgb, var(--border) 15%, transparent);
 }
 
 .fps-badge {
@@ -927,7 +1087,7 @@ const takeScreenshot = () => {
     backdrop-filter: blur(14px);
     padding: 6px 12px;
     border-radius: 40px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid color-mix(in srgb, var(--border) 15%, transparent);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -943,15 +1103,15 @@ const takeScreenshot = () => {
     cursor: pointer;
     outline: none;
     border: none;
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.7);
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    color: var(--text-secondary);
     transition: all 0.2s ease;
     padding: 0;
 }
 
 .ctrl-btn:hover {
-    background: rgba(255, 255, 255, 0.16);
-    color: white;
+    background: color-mix(in srgb, var(--primary) 18%, transparent);
+    color: var(--text);
     transform: scale(1.1);
 }
 
@@ -976,7 +1136,7 @@ const takeScreenshot = () => {
 
 .btn-label {
     font-size: 12px;
-    font-weight: 600;
+    /* font-weight: 600; */
 }
 
 .camera-start-overlay {
@@ -1006,7 +1166,7 @@ const takeScreenshot = () => {
 
 .overlay-content h3 {
     font-size: 20px;
-    font-weight: 700;
+    font-weight: 100;
     color: var(--text);
     margin-bottom: 6px;
 }
@@ -1021,9 +1181,12 @@ const takeScreenshot = () => {
 .emotion-panel {
     height: 100%;
     padding: 16px;
-    overflow-y: auto;
+    /* ✅ 修复: 移除 overflow-y，让内部元素管理滚动 */
+    overflow-y: visible;
     display: flex;
     flex-direction: column;
+    /* ✅ 优化: 减小最小高度，避免内容少时出现大片空白 */
+    min-height: 350px;
 }
 
 .panel-header {
@@ -1038,7 +1201,7 @@ const takeScreenshot = () => {
 
 .panel-header h3 {
     font-size: 19px;
-    font-weight: 700;
+    font-weight: 100;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1057,7 +1220,7 @@ const takeScreenshot = () => {
 }
 
 .emotion-display {
-    /* padding: 10px 10px; */
+    padding: 10px 10px;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1065,6 +1228,22 @@ const takeScreenshot = () => {
     gap: 6px;
     overflow-y: auto;
     animation: fadeIn 0.3s ease;
+    /* ✅ 优化: 动态最大高度，根据视口调整 */
+    max-height: calc(100vh - 280px);
+}
+
+/* ✅ 新增: 情绪显示区域滚动条样式 */
+.emotion-display::-webkit-scrollbar {
+    width: 6px;
+}
+
+.emotion-display::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.emotion-display::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
 }
 
 .emotion-icon-large {
@@ -1074,7 +1253,7 @@ const takeScreenshot = () => {
 
 .emotion-name {
     font-size: 20px;
-    font-weight: 800;
+    /* font-weight: 800; */
     background: var(--gradient);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -1084,7 +1263,7 @@ const takeScreenshot = () => {
 
 .emotion-confidence {
     font-size: 26px;
-    font-weight: 800;
+    /* font-weight: 800; */
     color: var(--highlight);
     flex-shrink: 0;
     text-shadow: 0 0 12px rgba(226, 202, 255, 0.3);
@@ -1110,19 +1289,37 @@ const takeScreenshot = () => {
 
 .voice-text {
     font-size: 13px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text);
     flex: 1;
 }
 
 .voice-badge {
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 100;
     color: var(--primary-light);
     background: rgba(113, 57, 255, 0.2);
     padding: 2px 8px;
     border-radius: 12px;
     border: 1px solid rgba(113, 57, 255, 0.3);
+}
+
+/* ✅ 新增: 音频活动指示器样式 */
+.audio-activity-bar {
+    width: 60px;
+    height: 4px;
+    background: color-mix(in srgb, var(--border) 20%, transparent);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-left: 8px;
+}
+
+.audio-activity-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #67C23A, #E6A23C, #F56C6C);
+    border-radius: 2px;
+    transition: width 0.1s ease-out;
+    box-shadow: 0 0 8px rgba(103, 194, 58, 0.5);
 }
 
 @keyframes voicePulse {
@@ -1164,7 +1361,7 @@ const takeScreenshot = () => {
 
 .feedback-title {
     font-size: 13px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text);
     margin: 0 0 10px 0;
     text-align: center;
@@ -1181,9 +1378,46 @@ const takeScreenshot = () => {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    /* gap: 6px; */
     margin-top: 12px;
     flex-shrink: 0;
+    /* ✅ 优化: 减小最大高度，更紧凑 */
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+/* ✅ 新增: 置信度条容器滚动条样式 */
+.confidence-bars::-webkit-scrollbar {
+    width: 6px;
+}
+
+.confidence-bars::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.confidence-bars::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
+/* ✅ 新增: 情绪排序丝滑动画 */
+.emotion-sort-move {
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.emotion-sort-enter-active {
+    transition: all 0.3s ease;
+}
+
+.emotion-sort-leave-active {
+    transition: all 0.3s ease;
+    position: absolute;
+}
+
+.emotion-sort-enter-from,
+.emotion-sort-leave-to {
+    opacity: 0;
+    transform: translateX(30px);
 }
 
 .confidence-bar-item {
@@ -1191,7 +1425,8 @@ const takeScreenshot = () => {
     grid-template-columns: 90px minmax(100px, 1fr) 45px;
     /* ✅ 修改: 进度条列设置最小宽度 100px */
     align-items: center;
-    gap: 8px;
+    gap: 15px;
+    margin-top: 6px;
 }
 
 .voice-bar-item {
@@ -1205,7 +1440,7 @@ const takeScreenshot = () => {
     display: flex;
     align-items: center;
     gap: 3px;
-    font-weight: 600;
+    /* font-weight: 600; */
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -1233,16 +1468,16 @@ const takeScreenshot = () => {
 
 .bar-value {
     font-size: 18px;
-    font-weight: 700;
+    font-weight: 100;
     text-align: right;
     color: var(--text);
 }
 
 /* ✅ 新增: 语音情绪区域样式 */
 .voice-emotion-section {
-    margin-top: 16px;
+    /* margin-top: 16px; */
     padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
 }
 
 .voice-emotion-title {
@@ -1251,7 +1486,7 @@ const takeScreenshot = () => {
     gap: 6px;
     font-size: 18px;
     /* ✅ 修改: 与上方标题保持一致 */
-    font-weight: 700;
+    font-weight: 100;
     /* ✅ 修改: 加粗 */
     color: var(--text);
     /* ✅ 修改: 使用主题色 */
@@ -1310,7 +1545,7 @@ const takeScreenshot = () => {
 
 .status-hint {
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 100;
     color: var(--text);
 }
 
@@ -1318,6 +1553,7 @@ const takeScreenshot = () => {
     font-size: 12px;
     color: var(--text-secondary);
     opacity: 0.7;
+    font-weight: 100;
 }
 
 @keyframes fadeIn {
@@ -1357,7 +1593,7 @@ const takeScreenshot = () => {
 .mic-button {
     background: rgba(13, 6, 27, 0.5) !important;
     border: 1px solid rgba(156, 78, 255, 0.2) !important;
-    color: #ffffff !important;
+    color: var(--text) !important;
     transition: all 0.3s ease !important;
 }
 
@@ -1376,7 +1612,7 @@ const takeScreenshot = () => {
 .mic-button.mic-active {
     background: linear-gradient(135deg, var(--primary), #9B59B6) !important;
     border: none !important;
-    color: #ffffff !important;
+    color: var(--text) !important;
     box-shadow: 0 0 12px rgba(113, 57, 255, 0.6), 0 0 20px rgba(113, 57, 255, 0.3) !important;
     animation: micPulse 2s ease-in-out infinite;
 }

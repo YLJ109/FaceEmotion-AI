@@ -52,17 +52,16 @@ const { navigateTo, isActive, navigationMenus } = useNavigation()
 <style scoped>
 /* ===== 侧边栏 ===== */
 .sidebar {
-    width: 220px;
+    width: 200px;
     height: 100%;
     display: flex;
     flex-direction: column;
+    /* ✅ 优化: 使用主题背景色,添加明显边框验证主题切换 */
     background: var(--card-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-right: 1px solid var(--border);
+    border-right: 2px solid var(--primary);
     overflow: hidden;
-    /* ✅ 统一过渡时间,与背景切换同步 */
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    /* ✅ 优化: 背景色和边框色跟随主题切换,0.3s 与主题动画同步 */
+    transition: background 0.3s ease, border-color 0.3s ease;
     flex-shrink: 0;
     position: relative;
 }
@@ -98,7 +97,7 @@ const { navigateTo, isActive, navigationMenus } = useNavigation()
 
 .nav-group-label {
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 100;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 1.8px;
@@ -115,13 +114,13 @@ const { navigateTo, isActive, navigationMenus } = useNavigation()
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 16px;
+    padding: 8px 12px;
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.2s ease;
     color: var(--text);
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 19px;
+    font-weight: 100;
     position: relative;
     margin-bottom: 2px;
 }
@@ -134,7 +133,7 @@ const { navigateTo, isActive, navigationMenus } = useNavigation()
 .nav-item.active {
     background: color-mix(in srgb, var(--primary) 14%, transparent);
     color: var(--text);
-    font-weight: 600;
+    /* font-weight: 600; */
 }
 
 .nav-item.active::before {
@@ -147,7 +146,7 @@ const { navigateTo, isActive, navigationMenus } = useNavigation()
     height: 50%;
     background: var(--gradient);
     border-radius: 0 2px 2px 0;
-    box-shadow: 0 0 8px var(--primary);
+    /* box-shadow: 0 0 8px var(--primary); */
 }
 
 .nav-item .el-icon {
@@ -165,7 +164,7 @@ const { navigateTo, isActive, navigationMenus } = useNavigation()
 .nav-badge {
     margin-left: auto;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 100;
     padding: 2px 7px;
     border-radius: 20px;
     background: color-mix(in srgb, var(--primary) 22%, transparent);

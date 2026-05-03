@@ -5,7 +5,7 @@ AI情感检测系统 - FastAPI后端 (V3.0.0)
 from api import register_all_routes
 from optimizer.dynamic_inference import DynamicInferenceOptimizer
 from analytics.user_analytics import UserAnalytics
-from multimodal.voice_analyzer import VoiceAnalyzer
+# from multimodal.voice_analyzer import VoiceAnalyzer  # 已注释: 使用 wav2vec2 代替
 from adaptation.active_learner import AdaptiveLearner
 from models.emotion_classifier_onnx import EmotionClassifierONNX
 from models.detector import FaceDetector
@@ -23,6 +23,7 @@ import os
 import logging
 import warnings
 import concurrent.futures
+import multiprocessing
 from contextlib import asynccontextmanager
 
 # 抑制废弃警告
@@ -57,8 +58,12 @@ adaptive_learner = None
 voice_analyzer = None
 user_analytics = None
 inference_optimizer = None
-# 全局共享线程池
-_shared_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+# ✅ 优化: 根据 CPU 核心数动态配置线程池（最多 8 个线程）
+cpu_count = multiprocessing.cpu_count()
+_shared_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=min(cpu_count * 2, 8)
+)
+logger.info(f"✅ 线程池初始化: {cpu_count} CPU 核心, {min(cpu_count * 2, 8)} 工作线程")
 
 # ==================== Lifespan 事件处理器 ====================
 
@@ -116,12 +121,25 @@ async def lifespan(app: FastAPI):
     logger.info("✅ 数据库初始化完成")
 
     # 初始化 AI 引擎
-    adaptive_learner = AdaptiveLearner(db_manager)
-    adaptive_learner.load_from_database()
-    logger.info("✅ AI自适应学习引擎就绪")
+    # ✅ 新增: 支持增强版自适应学习器
+    use_enhanced = config_manager.get('use_enhanced_learner', False)
 
-    voice_analyzer = VoiceAnalyzer()
-    logger.info("✅ AI多模态语音分析器就绪")
+    if use_enhanced:
+        from adaptation.enhanced_learner import EnhancedAdaptiveLearner
+        adaptive_learner = EnhancedAdaptiveLearner(db_manager)
+        logger.info("✅ 使用增强版 AI 自适应学习引擎（场景自适应 + 遗忘机制）")
+    else:
+        from adaptation.active_learner import AdaptiveLearner
+        adaptive_learner = AdaptiveLearner(db_manager)
+        logger.info("✅ AI 自适应学习引擎就绪（标准版）")
+
+    adaptive_learner.load_from_database()
+    logger.info(f"✅ 已加载 {adaptive_learner.total_corrections} 条历史反馈")
+
+    # ✅ 修复: 不再创建旧的 VoiceAnalyzer，改用 wav2vec2 模型
+    # voice_analyzer = VoiceAnalyzer()  # 已注释: 使用 wav2vec2 代替
+    voice_analyzer = None  # 让 websocket.py 使用 wav2vec2
+    logger.info("✅ AI多模态语音分析器就绪（wav2vec2）")
 
     user_analytics = UserAnalytics(db_manager)
     user_analytics._ensure_tables()
@@ -143,7 +161,7 @@ async def lifespan(app: FastAPI):
         face_detector=face_detector,
         emotion_model=emotion_model,
         adaptive_learner=adaptive_learner,
-        voice_analyzer=voice_analyzer,
+        voice_analyzer=voice_analyzer,  # None，让websocket使用wav2vec2
         user_analytics=user_analytics,
         inference_optimizer=inference_optimizer,
         executor=_shared_executor

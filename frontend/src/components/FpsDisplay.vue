@@ -25,14 +25,38 @@ defineProps({
     font-family: 'Consolas', monospace;
     border: 1px solid rgba(0, 217, 255, 0.2);
 }
+
 .fps-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: #00D9FF; animation: pulse 1s ease-in-out infinite;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00D9FF;
+    animation: pulse 1s ease-in-out infinite;
 }
-.fps-value { font-size: 14px; font-weight: 700; color: #00D9FF; }
-.fps-unit { font-size: 11px; color: rgba(0, 217, 255, 0.6); font-weight: 600; }
+
+.fps-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #00D9FF;
+}
+
+.fps-unit {
+    font-size: 11px;
+    color: rgba(0, 217, 255, 0.6);
+    font-weight: 600;
+}
+
 @keyframes pulse {
-    0%, 100% { opacity: 1; box-shadow: 0 0 4px #00D9FF; }
-    50% { opacity: 0.3; box-shadow: none; }
+
+    0%,
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 4px #00D9FF;
+    }
+
+    50% {
+        opacity: 0.3;
+        box-shadow: none;
+    }
 }
 </style>
