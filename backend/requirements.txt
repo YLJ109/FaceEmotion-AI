@@ -1,0 +1,12 @@
+fastapi==0.109.0
+uvicorn==0.27.0
+opencv-python==4.13.0.92
+numpy==2.0.0
+Pillow==11.0.0
+websockets==12.0
+python-multipart==0.0.6
+pydantic==2.5.3
+onnxruntime-gpu[cuda,cudnn]==1.25.1
+nvidia-ml-py==12.560.30
+# ✅ 新增: 环境变量管理
+python-dotenv==1.0.0
