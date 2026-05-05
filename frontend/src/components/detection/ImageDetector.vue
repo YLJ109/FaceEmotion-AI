@@ -85,7 +85,7 @@
                                     'neutral') }}</div>
                                 <div class="emotion-confidence">{{ (detectionResult.faces[0].confidence *
                                     100).toFixed(1)
-                                }}%
+                                    }}%
                                 </div>
                                 <div class="face-count">1 张人脸</div>
 
@@ -193,7 +193,7 @@ import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
 import { useThemeStore } from '@/stores/theme'
 import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotion'
 import { API } from '@/api/config'
-import EmotionSVG from '../EmotionSVG.vue'
+import EmotionSVG from '@/components/common/EmotionSVG.vue'
 import { logFeatureUsage } from '@/utils/analytics'
 
 const themeStore = useThemeStore()
