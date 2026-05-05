@@ -1597,9 +1597,12 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     transition: all 0.3s ease !important;
 }
 
-/* 修改所有圆形按钮的圆角 */
+/* 圆形按钮样式 - 保持正圆形 */
 :deep(.el-button.is-circle) {
-    border-radius: 25% !important;
+    border-radius: 50% !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .mic-button:hover {
