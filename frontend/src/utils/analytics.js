@@ -6,7 +6,7 @@
  *   logFeatureUsage('实时检测', { emotion: 'happy' })
  */
 
-import { API_BASE_URL } from '@/api/config'
+import { logFeatureUsage as apiLogFeatureUsage } from '@/api/modules/analytics'
 
 // 会话级别唯一 ID，每个浏览器标签页生成一次
 let _sessionId = null
@@ -29,12 +29,9 @@ export function logFeatureUsage(feature, metadata = {}) {
     duration_ms: 0,
     metadata,
   }
-  // 静默上报，不阻塞调用方
-  fetch(`${API_BASE_URL}/api/analytics/log`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }).catch(() => {
+
+  // 使用新的 API 模块，静默上报（不显示错误提示）
+  apiLogFeatureUsage(body).catch(() => {
     /* 忽略网络错误 */
   })
 }
