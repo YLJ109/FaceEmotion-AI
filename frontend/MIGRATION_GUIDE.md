@@ -12,7 +12,7 @@
 
 ## ✅ 已完成的迁移
 
-### 1. 组件重组（阶段 1）
+### 1. 组件重组（阶段 1）✅
 
 #### 移动前结构
 ```
@@ -70,7 +70,7 @@ src/components/
 
 ---
 
-### 2. 常量层创建（阶段 2 - 部分完成）
+### 2. 常量层创建（阶段 2 - 部分完成）✅
 
 #### 新增目录结构
 ```
@@ -129,33 +129,83 @@ export {
 
 ---
 
-## 🚧 待完成的迁移
+### 3. API 层重构（阶段 2 - 完成）✅
 
-### 阶段 2 - API 层重构（未开始）
-
-**计划内容**：
-1. 创建统一的 HTTP 客户端（Axios 实例）
-2. 按业务模块拆分 API（detection、history、analytics、system）
-3. 添加请求/响应拦截器
-4. 统一错误处理
-
-**预期结构**：
+#### 新增目录结构
 ```
 src/api/
-├── http.js                  # Axios 实例配置
+├── http.js                  # ✅ 新增: Axios HTTP 客户端
 ├── config.js                # API 基础配置（保留）
 ├── websocket.js             # WebSocket 管理（保留）
-├── modules/
-│   ├── detection.js         # 检测相关 API
+├── modules/                 # ✅ 新增: 按业务模块拆分
 │   ├── history.js           # 历史记录 API
 │   ├── analytics.js         # 数据分析 API
-│   └── system.js            # 系统设置 API
-└── index.js                 # 统一导出
+│   ├── detection.js         # 检测相关 API
+│   └── system.js            # 系统配置 API
+└── index.js                 # ✅ 新增: 统一导出
 ```
 
-**风险等级**: ⚠️ 中风险（需要替换所有 `fetch` 调用）
+#### 主要功能
+
+**http.js** 提供：
+- ✅ 统一的 Axios 实例配置
+- ✅ 请求拦截器（可添加 token、日志等）
+- ✅ 响应拦截器（自动解析 JSON）
+- ✅ 统一错误处理（友好的 Element Plus 消息提示）
+- ✅ 开发环境请求/响应日志
+- ✅ 超时控制（默认 30 秒）
+
+**业务模块 API**：
+
+1. **history.js** - 历史记录相关
+   - `getHistoryList()` - 获取历史记录列表
+   - `getHistoryStats()` - 获取统计信息
+   - `saveHistoryRecord()` - 保存检测记录
+   - `exportHistoryRecord()` - 导出记录
+   - `deleteHistoryRecord()` - 删除记录
+   - `batchDeleteHistory()` - 批量删除
+
+2. **analytics.js** - 数据分析相关
+   - `getEmotionTrend()` - 获取情绪趋势
+   - `getEmotionTransitions()` - 获取情绪转换矩阵
+   - `logFeatureUsage()` - 记录功能使用
+   - `getUserAnalytics()` - 获取用户行为统计
+
+3. **detection.js** - 检测相关
+   - `detectImage()` - 单张图片检测
+   - `detectBatch()` - 批量检测
+   - `detectVideo()` - 视频检测
+   - `getRealtimeStreamUrl()` - 获取 WebSocket URL
+
+4. **system.js** - 系统配置相关
+   - `getSystemConfig()` - 获取系统配置
+   - `updateSystemConfig()` - 更新配置
+   - `getHealthStatus()` - 健康检查
+   - `getSystemStats()` - 系统统计
+   - `submitFeedback()` - 提交反馈
+
+#### 使用示例
+
+```javascript
+// ✅ 推荐：从统一入口导入
+import { getHistoryList, getEmotionTrend } from '@/api'
+
+// 或者从模块导入
+import { getHistoryList } from '@/api/modules/history'
+
+// 使用 API
+const { data, total } = await getHistoryList({ limit: 12, offset: 0 })
+const trendData = await getEmotionTrend({ days: 7 })
+```
+
+#### 已更新的代码
+
+- ✅ `utils/analytics.js` - 改用新的 `apiLogFeatureUsage` 方法
+- ✅ 移除了直接使用 `fetch` 的代码
 
 ---
+
+## 🚧 待完成的迁移
 
 ### 阶段 3 - Composables 增强（未开始）
 
@@ -277,19 +327,22 @@ git pull origin main
 | 项目 | 数量 |
 |------|------|
 | 移动的组件文件 | 8 个 |
-| 新增的目录 | 6 个（4个组件子目录 + 2个常量文件） |
-| 新增的导出文件 | 4 个（各组件子目录的 index.js） |
+| 新增的目录 | 10 个（4个组件子目录 + 2个常量文件 + 4个 API 模块） |
+| 新增的代码文件 | 12 个（4个 index.js + 3个常量文件 + 5个 API 文件） |
 | 修改的导入路径 | 3 处 |
-| 重构的文件 | 1 个（utils/emotion.js） |
-| 新增的代码行数 | ~230 行 |
-| 删除的代码行数 | ~60 行 |
+| 重构的文件 | 2 个（utils/emotion.js, utils/analytics.js） |
+| 新增的代码行数 | ~960 行 |
+| 删除的代码行数 | ~150 行 |
+| Git Commits | 2 次 |
 
 ---
 
 ## 🎯 下一步计划
 
 1. **短期**（本周内）：
-   - [ ] 完成 API 层重构（阶段 2）
+   - [x] 完成组件重组（阶段 1）✅
+   - [x] 完成常量层创建（阶段 2 部分）✅
+   - [x] 完成 API 层重构（阶段 2）✅
    - [ ] 更新 README.md 说明新结构
 
 2. **中期**（本月内）：
