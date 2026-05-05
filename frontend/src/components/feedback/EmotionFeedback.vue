@@ -46,7 +46,7 @@
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
-import EmotionSVG from '@/components/EmotionSVG.vue'
+import EmotionSVG from '@/components/common/EmotionSVG.vue'
 import { getEmotionName } from '@/utils/emotion'
 import { API } from '@/api/config'
 

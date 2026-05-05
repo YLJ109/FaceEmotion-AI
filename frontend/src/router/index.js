@@ -10,7 +10,7 @@ const ImageDetector = () => import('@/components/detection/ImageDetector.vue')
 const BatchDetector = () => import('@/components/detection/BatchDetector.vue')
 const VideoDetector = () => import('@/components/detection/VideoDetector.vue')
 const AnalyticsDashboard = () => import('@/components/analytics/AnalyticsDashboard.vue')
-const HistoryViewer = () => import('@/components/HistoryViewer.vue')
+const HistoryViewer = () => import('@/components/history/HistoryViewer.vue')
 const ThemePage = () => import('@/components/pages/ThemePage.vue')
 const SettingsPage = () => import('@/components/pages/SettingsPage.vue')
 
