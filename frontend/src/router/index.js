@@ -5,14 +5,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 // 懒加载组件 - Vue Router 自动处理异步加载
-const RealtimeDetector = () => import('@/components/detection/RealtimeDetector.vue')
-const ImageDetector = () => import('@/components/detection/ImageDetector.vue')
-const BatchDetector = () => import('@/components/detection/BatchDetector.vue')
-const VideoDetector = () => import('@/components/detection/VideoDetector.vue')
-const AnalyticsDashboard = () => import('@/components/analytics/AnalyticsDashboard.vue')
-const HistoryViewer = () => import('@/components/history/HistoryViewer.vue')
-const ThemePage = () => import('@/components/pages/ThemePage.vue')
-const SettingsPage = () => import('@/components/pages/SettingsPage.vue')
+const RealtimeDetector = () => import('@/components/detection/RealtimeDetector')
+const ImageDetector = () => import('@/components/detection/ImageDetector')
+const BatchDetector = () => import('@/components/detection/BatchDetector')
+const VideoDetector = () => import('@/components/detection/VideoDetector')
+const AnalyticsDashboard = () => import('@/components/analytics/AnalyticsDashboard')
+const HistoryViewer = () => import('@/components/history/HistoryViewer')
+const ThemePage = () => import('@/components/pages/ThemePage')
+const SettingsPage = () => import('@/components/pages/SettingsPage')
 
 const routes = [
     {
