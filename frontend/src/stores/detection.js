@@ -5,6 +5,7 @@
  * - 统一管理检测状态，避免组件间重复实现
  * - EMA 平滑逻辑集中管理
  * - 提供计算属性简化组件逻辑
+ * - ✅ 新增: 支持各检测模块的状态持久化
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -24,6 +25,12 @@ export const useDetectionStore = defineStore('detection', () => {
     const _consecutiveEmpty = ref(0)
 
     const EMA_ALPHA = 0.15  // EMA 平滑系数 (降低以减少情绪波动)
+
+    // ✅ 新增: 各检测模块的状态持久化
+    const imageDetectionState = ref(null) // 图片检测状态
+    const videoDetectionState = ref(null) // 视频检测状态
+    const batchDetectionState = ref(null) // 批量检测状态
+    const realtimeDetectionState = ref(null) // 实时检测状态
 
     // === 计算属性 ===
     const dominantEmotion = computed(() => currentEmotion.value)
@@ -132,6 +139,63 @@ export const useDetectionStore = defineStore('detection', () => {
         _lastGoodScores.value = {}
     }
 
+    // ✅ 新增: 保存各检测模块的状态
+    const saveImageState = (state) => {
+        imageDetectionState.value = state
+        console.log('💾 保存图片检测状态')
+    }
+
+    const saveVideoState = (state) => {
+        videoDetectionState.value = state
+        console.log('💾 保存视频检测状态')
+    }
+
+    const saveBatchState = (state) => {
+        batchDetectionState.value = state
+        console.log('💾 保存批量检测状态')
+    }
+
+    const saveRealtimeState = (state) => {
+        realtimeDetectionState.value = state
+        console.log('💾 保存实时检测状态')
+    }
+
+    // ✅ 新增: 获取各检测模块的状态
+    const getImageState = () => imageDetectionState.value
+    const getVideoState = () => videoDetectionState.value
+    const getBatchState = () => batchDetectionState.value
+    const getRealtimeState = () => realtimeDetectionState.value
+
+    // ✅ 新增: 清除特定模块的状态
+    const clearImageState = () => {
+        imageDetectionState.value = null
+        console.log('🗑️ 清除图片检测状态')
+    }
+
+    const clearVideoState = () => {
+        videoDetectionState.value = null
+        console.log('🗑️ 清除视频检测状态')
+    }
+
+    const clearBatchState = () => {
+        batchDetectionState.value = null
+        console.log('️ 清除批量检测状态')
+    }
+
+    const clearRealtimeState = () => {
+        realtimeDetectionState.value = null
+        console.log('🗑️ 清除实时检测状态')
+    }
+
+    // ✅ 新增: 清除所有检测状态
+    const clearAllStates = () => {
+        clearImageState()
+        clearVideoState()
+        clearBatchState()
+        clearRealtimeState()
+        console.log('🗑️ 清除所有检测状态')
+    }
+
     return {
         // 状态
         currentFaces,
@@ -139,6 +203,12 @@ export const useDetectionStore = defineStore('detection', () => {
         currentConfidence,
         emotionScores,
         inferenceFps,
+
+        // ✅ 新增: 各检测模块状态
+        imageDetectionState,
+        videoDetectionState,
+        batchDetectionState,
+        realtimeDetectionState,
 
         // 计算属性
         dominantEmotion,
@@ -150,6 +220,21 @@ export const useDetectionStore = defineStore('detection', () => {
         updateDetection,
         clearDetection,
         updateInferenceFps,
-        resetEma
+        resetEma,
+
+        // ✅ 新增: 状态持久化方法
+        saveImageState,
+        saveVideoState,
+        saveBatchState,
+        saveRealtimeState,
+        getImageState,
+        getVideoState,
+        getBatchState,
+        getRealtimeState,
+        clearImageState,
+        clearVideoState,
+        clearBatchState,
+        clearRealtimeState,
+        clearAllStates
     }
 })

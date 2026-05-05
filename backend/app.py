@@ -5,7 +5,6 @@ AI情感检测系统 - FastAPI后端 (V3.0.0)
 from api import register_all_routes
 from optimizer.dynamic_inference import DynamicInferenceOptimizer
 from analytics.user_analytics import UserAnalytics
-# from multimodal.voice_analyzer import VoiceAnalyzer  # 已注释: 使用 wav2vec2 代替
 from adaptation.active_learner import AdaptiveLearner
 from models.emotion_classifier_onnx import EmotionClassifierONNX
 from models.detector import FaceDetector
@@ -55,7 +54,6 @@ db_manager = DatabaseManager()
 face_detector = None
 emotion_model = None
 adaptive_learner = None
-voice_analyzer = None
 user_analytics = None
 inference_optimizer = None
 # ✅ 优化: 根据 CPU 核心数动态配置线程池（最多 8 个线程）
@@ -71,7 +69,7 @@ logger.info(f"✅ 线程池初始化: {cpu_count} CPU 核心, {min(cpu_count * 2
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用启动和关闭的生命周期管理"""
-    global face_detector, emotion_model, adaptive_learner, voice_analyzer, user_analytics, inference_optimizer
+    global face_detector, emotion_model, adaptive_learner, user_analytics, inference_optimizer
 
     logger.info("=" * 60)
     logger.info("🚀 AI情感检测系统 V3.0.0 启动中...")
@@ -94,19 +92,24 @@ async def lifespan(app: FastAPI):
     # 加载模型
     try:
         # ✅ 优化1: 启用ONNX RFB人脸检测器(更高精度)
-        onnx_face_model_path = './models/version-RFB-320.onnx'
+        onnx_face_model_path = '../models/weights/version-RFB-320.onnx'
         use_onnx_detector = config_manager.get('use_onnx_face_detector', False)
 
         face_detector = FaceDetector(
-            proto_file='./models/deploy.prototxt',
-            model_file='./models/res10_300x300_ssd_iter_140000_fp16.caffemodel',
+            proto_file='../models/configs/deploy.prototxt',
+            model_file='../models/weights/res10_300x300_ssd_iter_140000_fp16.caffemodel',
             onnx_model_path=onnx_face_model_path,
             use_onnx=use_onnx_detector
         )
         logger.info("✅ 人脸检测器加载成功")
 
-        onnx_path = os.path.join(os.path.dirname(
-            __file__), 'models', 'emotion_model.onnx')
+        # ✅ 修改: 使用配置文件中的模型路径
+        onnx_path = config_manager.get(
+            'emotion_model', '../models/weights/emotion_model.onnx')
+        # 如果是相对路径，转换为绝对路径
+        if not os.path.isabs(onnx_path):
+            onnx_path = os.path.join(os.path.dirname(__file__), onnx_path)
+
         if not os.path.exists(onnx_path):
             raise RuntimeError(f"ONNX模型不存在: {onnx_path}")
 
@@ -136,11 +139,6 @@ async def lifespan(app: FastAPI):
     adaptive_learner.load_from_database()
     logger.info(f"✅ 已加载 {adaptive_learner.total_corrections} 条历史反馈")
 
-    # ✅ 修复: 不再创建旧的 VoiceAnalyzer，改用 wav2vec2 模型
-    # voice_analyzer = VoiceAnalyzer()  # 已注释: 使用 wav2vec2 代替
-    voice_analyzer = None  # 让 websocket.py 使用 wav2vec2
-    logger.info("✅ AI多模态语音分析器就绪（wav2vec2）")
-
     user_analytics = UserAnalytics(db_manager)
     user_analytics._ensure_tables()
     logger.info("✅ AI用户行为分析器就绪")
@@ -161,7 +159,6 @@ async def lifespan(app: FastAPI):
         face_detector=face_detector,
         emotion_model=emotion_model,
         adaptive_learner=adaptive_learner,
-        voice_analyzer=voice_analyzer,  # None，让websocket使用wav2vec2
         user_analytics=user_analytics,
         inference_optimizer=inference_optimizer,
         executor=_shared_executor

@@ -3,7 +3,6 @@ from database import DatabaseManager
 from optimizer.dynamic_inference import DynamicInferenceOptimizer
 from analytics.user_analytics import UserAnalytics
 from adaptation.active_learner import AdaptiveLearner
-from multimodal.voice_analyzer import VoiceAnalyzer
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, validator
 from typing import Dict, Optional
@@ -19,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["ai-features"])
 
-_voice_analyzer = None
 _adaptive_learner = None
 _user_analytics = None
 _inference_optimizer = None
@@ -36,15 +34,13 @@ _RATE_LIMIT_MAX = 10  # 最多10次
 
 
 def init_ai_router(
-    voice_analyzer: VoiceAnalyzer,
     adaptive_learner: AdaptiveLearner,
     user_analytics: UserAnalytics,
     inference_optimizer: DynamicInferenceOptimizer,
     db_manager: DatabaseManager
 ):
     """初始化路由依赖"""
-    global _voice_analyzer, _adaptive_learner, _user_analytics, _inference_optimizer, _db_manager
-    _voice_analyzer = voice_analyzer
+    global _adaptive_learner, _user_analytics, _inference_optimizer, _db_manager
     _adaptive_learner = adaptive_learner
     _user_analytics = user_analytics
     _inference_optimizer = inference_optimizer
@@ -58,31 +54,35 @@ def init_ai_router(
 #     scores: Dict[str, float]
 
 
-class AudioChunkModel(BaseModel):
-    audio_data: str
-    sample_rate: int = 16000
-
-
-class FusionModel(BaseModel):
-    face_scores: Dict[str, float] = {}
-    voice_scores: Dict[str, float] = {}
-    voice_weight: float = 0.4
-
-
 class FeedbackModel(BaseModel):
     emotion: Optional[str] = None
     predicted_emotion: Optional[str] = None
     correct_emotion: Optional[str] = None
     feedback_type: str = Field(..., pattern=r'^(correct|incorrect)$')
     notes: Optional[str] = Field(None, max_length=500)
+    # ✅ 新增: 静态快照相关字段
+    confidence: Optional[float] = None
+    bbox: Optional[list] = None
+    snapshot: Optional[str] = None  # Base64 图片数据
+    timestamp: Optional[int] = None
 
     @validator('correct_emotion', 'predicted_emotion', pre=True, always=True)
     def validate_emotion(cls, v):
-        """✅ 新增: 验证情绪值是否合法"""
+        """✅ 新增: 验证情绪值是否合法（支持多种别名）"""
         if v is None:
             return v
-        valid_emotions = ['happy', 'sad', 'angry',
-                          'surprise', 'fear', 'disgust', 'neutral']
+
+        # ✅ 修复: 支持前后端所有情绪名称变体
+        valid_emotions = [
+            'happy', 'enjoy',           # 开心
+            'sad',                       # 悲伤
+            'angry',                     # 愤怒
+            'surprise', 'surprised',     # 惊讶
+            'fear', 'fearful',           # 恐惧
+            'disgust', 'disgusted',      # 厌恶
+            'neutral', 'calm'            # 平静
+        ]
+
         if v not in valid_emotions:
             raise ValueError(
                 f'Invalid emotion: {v}. Must be one of {valid_emotions}')
@@ -118,36 +118,6 @@ class FeatureLogModel(BaseModel):
 #         "emotion_bpm": {k: list(v) for k, v in EMOTION_BPM.items()},
 #         "emotion_root": {k: list(v) for k, v in EMOTION_ROOT.items()},
 #     }
-
-
-# === 多模态分析 ===
-
-@router.post("/audio/analyze")
-async def analyze_audio(req: AudioChunkModel):
-    """音频情绪分析"""
-    try:
-        audio_bytes = base64.b64decode(req.audio_data)
-        features = _voice_analyzer.extract_features(audio_bytes)
-        voice_scores = _voice_analyzer.predict_voice_emotion(features)
-        return {
-            "status": "success",
-            "features": features,
-            "voice_scores": voice_scores,
-            "has_voice": features.get('has_voice', 0) > 0.5
-        }
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
-
-
-@router.post("/multimodal/fuse")
-async def fuse_multimodal(data: FusionModel):
-    """多模态融合"""
-    try:
-        fused = _voice_analyzer.fuse_scores(
-            data.face_scores, data.voice_scores, data.voice_weight)
-        return {"status": "success", "fused_scores": fused}
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
 
 
 # === 自适应学习 ===
@@ -318,3 +288,58 @@ async def toggle_optimizer(enabled: bool = True):
     if _inference_optimizer:
         _inference_optimizer.enabled = enabled
     return {"status": "success", "enabled": enabled}
+
+
+# === 反馈历史 ===
+
+@router.get("/feedback/history")
+async def get_feedback_history(
+    limit: int = 50,
+    offset: int = 0,
+    emotion: str = None,
+    start_date: str = None,
+    end_date: str = None
+):
+    """获取反馈历史记录"""
+    try:
+        records = _db_manager.get_feedback_history(
+            limit=limit,
+            offset=offset,
+            emotion_filter=emotion,
+            start_date=start_date,
+            end_date=end_date
+        )
+        total = _db_manager.get_feedback_count(
+            emotion_filter=emotion,
+            start_date=start_date,
+            end_date=end_date
+        )
+        return {
+            "status": "success",
+            "records": records,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+    except Exception as e:
+        logger.error(f"获取反馈历史失败: {e}")
+        raise HTTPException(status_code=500, detail="服务器内部错误")
+
+
+@router.delete("/feedback/{feedback_id}")
+async def delete_feedback(feedback_id: int):
+    """删除反馈记录"""
+    try:
+        success = _db_manager.delete_feedback(feedback_id)
+        if success:
+            return {
+                "status": "success",
+                "message": "反馈记录已删除"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="反馈记录不存在")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除反馈记录失败: {e}")
+        raise HTTPException(status_code=500, detail="服务器内部错误")

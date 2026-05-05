@@ -23,11 +23,12 @@
 
             <!-- 记录模式分组 -->
             <div class="nav-group-label">记录</div>
-            <div class="nav-item" :class="{ active: isActive('history') }" @click="navigateTo('history')">
+            <div v-for="item in navigationMenus.record" :key="item.key" class="nav-item"
+                :class="{ active: isActive(item.key) }" @click="navigateTo(item.key)">
                 <el-icon>
-                    <Clock />
+                    <component :is="item.icon" />
                 </el-icon>
-                <span>历史档案</span>
+                <span>{{ item.label }}</span>
             </div>
 
             <div class="nav-group-label">管理</div>
@@ -44,7 +45,6 @@
 
 <script setup>
 import { useNavigation } from '@/composables/useNavigation'
-import { DataAnalysis, Clock } from '@element-plus/icons-vue'
 
 const { navigateTo, isActive, navigationMenus } = useNavigation()
 </script>
@@ -133,7 +133,7 @@ const { navigateTo, isActive, navigationMenus } = useNavigation()
 .nav-item.active {
     background: color-mix(in srgb, var(--primary) 14%, transparent);
     color: var(--text);
-    /* font-weight: 600; */
+    /* font-weight: 100; */
 }
 
 .nav-item.active::before {

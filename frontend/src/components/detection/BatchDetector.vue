@@ -61,7 +61,7 @@
                             </el-icon>
                             开始检测 ({{ fileList.length }} 张)
                         </el-button>
-                        <el-button @click="clearAll" round size="large">清空列表</el-button>
+                        <el-button type="primary" @click="clearAll" round size="large">清空列表</el-button>
                     </div>
 
                     <div v-if="detecting" class="floating-progress">
@@ -106,7 +106,7 @@
                                             <span class="face-label">人脸 {{ faceIndex + 1 }}</span>
                                             <span class="face-emotion">{{ getEmotionName(face.emotion) }}</span>
                                             <span class="face-confidence">{{ (face.confidence * 100).toFixed(1)
-                                            }}%</span>
+                                                }}%</span>
                                         </div>
                                         <el-progress :percentage="face.confidence * 100"
                                             :color="getEmotionColor(face.emotion)" :stroke-width="6" :show-text="false"
@@ -119,13 +119,14 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="export-bar">
-                            <el-button size="small" @click="exportResults" round>导出 JSON</el-button>
-                        </div>
                     </div>
                 </el-card>
             </div>
         </div>
+
+        <!-- ✅ 新增: 性能监控面板 -->
+        <PerformanceMonitor :fps="perfFps" :latency="perfLatency" :skip-rate="perfSkipRate" :gpu-memory="perfGpuMemory"
+            :detect-interval="perfDetectInterval" :http-latency="perfHttpLatency" :error-rate="perfErrorRate" />
     </div>
 </template>
 
@@ -138,6 +139,14 @@ import { useThemeStore } from '@/stores/theme'
 import { getEmotionName, getEmotionEmoji, getEmotionColor } from '@/utils/emotion'
 import { API } from '@/api/config'
 import { logFeatureUsage } from '@/utils/analytics'
+import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
+import generativeAudio from '@/utils/generativeAudio'
+import wsManager from '@/api/websocket'
+
+// ✅ 新增: 组件名称,用于 keep-alive 缓存
+defineOptions({
+    name: 'BatchDetector'
+})
 
 const themeStore = useThemeStore()
 const fileList = ref([])
@@ -147,6 +156,16 @@ const currentIndex = ref(0)
 const results = ref([])
 const canvasRefs = ref([]) // 存储多个 canvas 引用
 const BATCH_CONCURRENCY = 3
+
+// ✅ 新增: 性能监控数据
+const perfFps = ref(0)
+const perfLatency = ref(0)
+const perfSkipRate = ref(0)
+const perfGpuMemory = ref(0)
+const perfDetectInterval = ref(1)
+const perfHttpLatency = ref(0)
+const perfErrorRate = ref(0)
+const totalProcessingTime = ref(0)
 
 const handleFilesChange = async (file, files) => {
     // 为每个文件生成预览 URL
@@ -162,25 +181,45 @@ const startBatchDetection = async () => {
     if (!fileList.value.length) { ElMessage.warning('请先选择图片'); return }
     detecting.value = true; progress.value = 0; currentIndex.value = 0; results.value = []
 
+    const startTime = performance.now()
+
     const total = fileList.value.length
     const queue = fileList.value.map((f, i) => ({ file: f.raw, imageUrl: f.imageUrl, index: i, name: f.name }))
     let completed = 0
+    let errorCount = 0
+    let totalLatency = 0
 
     const processOne = async (item) => {
         try {
+            const itemStartTime = performance.now()
             const formData = new FormData()
             formData.append('file', item.file)
             const res = await fetch(API.detectImage, { method: 'POST', body: formData })
             const result = await res.json()
+            const itemEndTime = performance.now()
+
+            // ✅ 新增: 累计延迟
+            totalLatency += (itemEndTime - itemStartTime)
 
             // 使用已生成的预览 URL
             const imageUrl = item.imageUrl
             const dominantEmotion = result.faces?.[0]?.emotion || 'neutral'
             const confidence = result.faces?.[0]?.confidence || 0
 
+            // ✅ 新增: 传递情绪数据到音乐引擎（使用第一张检测到人脸的图片）
+            if (result.faces?.length > 0 && result.music_params && completed === 0) {
+                wsManager.emit('batch_result', {
+                    type: 'result',
+                    music_params: result.music_params,
+                    emotion: dominantEmotion,
+                    confidence: confidence
+                })
+            }
+
             return { imageUrl, faces: result.faces || [], dominant_emotion: dominantEmotion, confidence }
         } catch (e) {
             console.error(`处理 ${item.name} 失败:`, e)
+            errorCount++
             return null
         }
     }
@@ -198,6 +237,16 @@ const startBatchDetection = async () => {
 
     const workers = Array(Math.min(BATCH_CONCURRENCY, total)).fill(null).map(() => worker())
     await Promise.all(workers)
+
+    // ✅ 新增: 计算总体性能指标
+    const endTime = performance.now()
+    totalProcessingTime.value = endTime - startTime
+    perfHttpLatency.value = totalLatency / completed  // 平均 HTTP 延迟
+    perfLatency.value = perfHttpLatency.value
+    perfFps.value = completed / (totalProcessingTime.value / 1000)  // FPS = 处理数量 / 总时间(秒)
+    perfSkipRate.value = 0
+    perfGpuMemory.value = 0
+    perfErrorRate.value = (errorCount / total) * 100  // 错误率百分比
 
     logFeatureUsage('批量检测', { total: results.value.length })
     ElMessage.success(`✅ 批量检测完成！共 ${results.value.length} 张图片`)
@@ -281,16 +330,6 @@ const clearAll = () => {
     fileList.value = []; results.value = []; progress.value = 0; currentIndex.value = 0
 }
 
-const exportResults = () => {
-    const data = JSON.stringify(results.value, null, 2)
-    const blob = new Blob([data], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url; link.download = `batch_results_${Date.now()}.json`; link.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success('✅ 结果已导出')
-}
-
 // 批量保存到历史记录
 const saveBatchToHistory = async () => {
     try {
@@ -367,6 +406,7 @@ const saveBatchToHistory = async () => {
     grid-template-columns: 1fr 320px;
     gap: 12px;
     height: 100%;
+    overflow: hidden;
 }
 
 .left-panel {
@@ -374,7 +414,7 @@ const saveBatchToHistory = async () => {
     flex-direction: column;
     height: 100%;
     /* ✅ 修复: 移除 overflow-y，让 el-card__body 管理滚动 */
-    overflow-y: visible;
+    overflow: hidden;
     padding-right: 4px;
 }
 
@@ -387,6 +427,7 @@ const saveBatchToHistory = async () => {
 .left-panel .el-card__body {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     /* ✅ 新增: 卡片内容滚动条样式 */
 }
 
@@ -406,7 +447,7 @@ const saveBatchToHistory = async () => {
 .right-panel {
     height: 100%;
     /* ✅ 修复: 移除 overflow-y，让 el-card__body 管理滚动 */
-    overflow-y: visible;
+    overflow: hidden;
 }
 
 .right-panel .el-card {
@@ -418,6 +459,7 @@ const saveBatchToHistory = async () => {
 .right-panel .el-card__body {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     /* ✅ 新增: 结果卡片滚动条样式 */
 }
 
@@ -483,7 +525,7 @@ const saveBatchToHistory = async () => {
 
 .badge {
     font-size: 10px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     padding: 2px 8px;
     border-radius: 20px;
     background: var(--gradient);
@@ -495,8 +537,8 @@ const saveBatchToHistory = async () => {
 .upload-area {
     margin-bottom: 12px;
     /* ✅ 优化: 减小固定高度，更紧凑 */
-    min-height: 500px;
-    height: 500px;
+    min-height: 730px;
+    height: 730px;
     display: flex;
     flex-direction: column;
 }
@@ -535,7 +577,7 @@ const saveBatchToHistory = async () => {
 
 .file-count {
     font-size: 13px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text);
 }
 
@@ -568,7 +610,7 @@ const saveBatchToHistory = async () => {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 10px;
     /* ✅ 优化: 动态最大高度，根据视口调整 */
-    max-height: calc(100vh - 350px);
+    max-height: calc(100vh - 280px);
     overflow-y: auto;
     padding: 4px;
 }
@@ -688,7 +730,7 @@ const saveBatchToHistory = async () => {
     margin: 0;
     color: var(--text);
     font-size: 14px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     text-align: center;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -705,23 +747,9 @@ const saveBatchToHistory = async () => {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 12px;
     margin-top: 12px;
-    max-height: calc(100vh - 250px);
-    overflow-y: auto;
+    /* ✅ 修复: 移除固定高度和滚动，让 el-card__body 统一管理滚动 */
     padding: 4px;
-}
-
-/* ✅ 新增: 批量预览区域滚动条样式 */
-.batch-preview-section::-webkit-scrollbar {
-    width: 6px;
-}
-
-.batch-preview-section::-webkit-scrollbar-thumb {
-    background: rgba(146, 78, 255, 0.3);
-    border-radius: 3px;
-}
-
-.batch-preview-section::-webkit-scrollbar-thumb:hover {
-    background: rgba(146, 78, 255, 0.5);
+    width: 100%;
 }
 
 .preview-item {
@@ -741,8 +769,13 @@ const saveBatchToHistory = async () => {
 
 .batch-canvas {
     width: 100%;
+    height: auto;
     aspect-ratio: 1;
+    border-radius: 10px;
+    background: #000;
     display: block;
+    position: relative;
+    z-index: 1;
 }
 
 .preview-overlay {
@@ -760,7 +793,7 @@ const saveBatchToHistory = async () => {
 
 .preview-overlay .face-count {
     font-size: 13px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
@@ -769,6 +802,7 @@ const saveBatchToHistory = async () => {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    height: 100%;
     max-height: calc(100vh - 180px);
     overflow-y: auto;
     padding: 4px;
@@ -813,13 +847,13 @@ const saveBatchToHistory = async () => {
 
 .result-index {
     font-size: 12px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text-secondary);
 }
 
 .face-count-badge {
     font-size: 10px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     padding: 2px 8px;
     background: color-mix(in srgb, var(--primary) 15%, transparent);
     border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
@@ -863,13 +897,13 @@ const saveBatchToHistory = async () => {
 
 .face-label {
     font-size: 10px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text-secondary);
 }
 
 .face-emotion {
     font-size: 12px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text);
 }
 
@@ -897,12 +931,6 @@ const saveBatchToHistory = async () => {
     border-radius: 3px;
     box-shadow: 0 0 8px currentColor;
     transition: width 0.6s ease;
-}
-
-.export-bar {
-    display: flex;
-    justify-content: center;
-    flex-shrink: 0;
 }
 
 .results-grid {
@@ -950,7 +978,7 @@ const saveBatchToHistory = async () => {
 
 .face-count {
     font-size: 12px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
 }
 
 .result-info {
@@ -977,7 +1005,7 @@ const saveBatchToHistory = async () => {
 
 .dominant-emotion .name {
     font-size: 13px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     flex: 1;
     color: var(--text);
 }

@@ -30,17 +30,36 @@
 /* ===== 工具提示 ===== */
 .el-tooltip__popper {
   background: var(--card-bg) !important;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
   border: 1px solid var(--border) !important;
   color: var(--text) !important;
   font-size: 12px !important;
   border-radius: 8px !important;
   padding: 6px 12px !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
 .el-tooltip__popper.is-dark {
   background: var(--card-bg) !important;
   color: var(--text) !important;
+}
+
+/* ✅ 修复: Tooltip 箭头颜色 */
+.el-tooltip__popper[x-placement^="top"] .popper__arrow::after {
+  border-top-color: var(--card-bg) !important;
+}
+
+.el-tooltip__popper[x-placement^="bottom"] .popper__arrow::after {
+  border-bottom-color: var(--card-bg) !important;
+}
+
+.el-tooltip__popper[x-placement^="left"] .popper__arrow::after {
+  border-left-color: var(--card-bg) !important;
+}
+
+.el-tooltip__popper[x-placement^="right"] .popper__arrow::after {
+  border-right-color: var(--card-bg) !important;
 }
 
 /* ===== 对话框 ===== */
@@ -51,9 +70,8 @@
   border-radius: var(--radius-lg) !important;
   box-shadow: var(--shadow-lg) !important;
   /* ✅ 优化: 动态高度，根据内容自适应，避免大片空白 */
-  max-height: 85vh !important;
-  display: flex !important;
-  flex-direction: column !important;
+  /* max-height: 85vh !important; */
+  /* display: flex !important; */
 }
 
 .el-dialog__header {
@@ -65,17 +83,18 @@
 
 .el-dialog__title {
   color: var(--text) !important;
-  /* font-weight: 700 !important; */
+  font-weight: 100 !important;
   font-size: 16px !important;
 }
 
 .el-dialog__body {
   color: var(--text-secondary) !important;
   padding: 20px !important;
-  /* ✅ 新增: 对话框内容区域滚动优化 */
+  /* ✅ 优化: 对话框内容区域滚动优化 */
   flex: 1 !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
+  max-height: none !important;
 }
 
 .el-dialog__footer {
@@ -285,22 +304,53 @@
 }
 
 /* ===== 滚动条全局优化 ===== */
+/* ✅ 新增: 全局滚动条基础样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(146, 78, 255, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(146, 78, 255, 0.5);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Element Plus Scrollbar 组件 */
 .el-scrollbar__bar.is-horizontal>div {
   background: color-mix(in srgb, var(--primary) 25%, transparent) !important;
-  border-radius: 4px !important;
+  border-radius: 3px !important;
+  transition: background 0.2s ease !important;
 }
 
 .el-scrollbar__bar.is-vertical>div {
   background: color-mix(in srgb, var(--primary) 25%, transparent) !important;
-  border-radius: 4px !important;
+  border-radius: 3px !important;
+  transition: background 0.2s ease !important;
 }
 
 .el-scrollbar__bar:hover>div {
   background: color-mix(in srgb, var(--primary) 40%, transparent) !important;
 }
 
-/* ✅ 新增: 对话框内容区域滚动条优化 */
+/* ✅ 新增: 滚动条轨道样式 */
+.el-scrollbar__bar {
+  background: transparent !important;
+}
+
+/* ✅ 优化: 对话框内容区域滚动条 */
 .el-dialog__body::-webkit-scrollbar {
   width: 6px !important;
 }
@@ -314,7 +364,11 @@
   background: rgba(146, 78, 255, 0.5) !important;
 }
 
-/* ✅ 新增: 表格滚动条统一优化 */
+.el-dialog__body::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* ✅ 优化: 表格滚动条统一样式 */
 .el-table__body-wrapper::-webkit-scrollbar {
   width: 6px !important;
   height: 6px !important;
@@ -329,7 +383,11 @@
   background: rgba(146, 78, 255, 0.5) !important;
 }
 
-/* ✅ 新增: 卡片内容区域滚动条优化 */
+.el-table__body-wrapper::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* ✅ 优化: 卡片内容区域滚动条 */
 .el-card__body::-webkit-scrollbar {
   width: 6px !important;
   height: 6px !important;
@@ -342,6 +400,68 @@
 
 .el-card__body::-webkit-scrollbar-thumb:hover {
   background: rgba(146, 78, 255, 0.5) !important;
+}
+
+.el-card__body::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* ✅ 新增: 侧边栏滚动条优化 */
+.el-menu::-webkit-scrollbar,
+.el-sub-menu .el-menu::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.el-menu::-webkit-scrollbar-thumb,
+.el-sub-menu .el-menu::-webkit-scrollbar-thumb {
+  background: rgba(146, 78, 255, 0.2) !important;
+  border-radius: 2px !important;
+}
+
+.el-menu::-webkit-scrollbar-thumb:hover,
+.el-sub-menu .el-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(146, 78, 255, 0.4) !important;
+}
+
+.el-menu::-webkit-scrollbar-track,
+.el-sub-menu .el-menu::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* ✅ 新增: 下拉菜单滚动条优化 */
+.el-select-dropdown__wrap::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.el-select-dropdown__wrap::-webkit-scrollbar-thumb {
+  background: rgba(146, 78, 255, 0.2) !important;
+  border-radius: 2px !important;
+}
+
+.el-select-dropdown__wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(146, 78, 255, 0.4) !important;
+}
+
+.el-select-dropdown__wrap::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+/* ✅ 新增: 消息框滚动条优化 */
+.el-message-box__content::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.el-message-box__content::-webkit-scrollbar-thumb {
+  background: rgba(146, 78, 255, 0.2) !important;
+  border-radius: 2px !important;
+}
+
+.el-message-box__content::-webkit-scrollbar-thumb:hover {
+  background: rgba(146, 78, 255, 0.4) !important;
+}
+
+.el-message-box__content::-webkit-scrollbar-track {
+  background: transparent !important;
 }
 
 /* ===== 空状态 ===== */
@@ -520,7 +640,7 @@
 .el-upload__text em {
   color: var(--primary-light) !important;
   font-style: normal;
-  /* font-weight: 600; */
+  /* font-weight: 100; */
 }
 
 .el-upload__tip {
@@ -559,6 +679,7 @@
 
 /* ===== 选择器 ===== */
 .el-select__wrapper {
+  width: 160px;
   background: var(--card-bg) !important;
   backdrop-filter: blur(12px);
   border: 1px solid var(--border) !important;
@@ -583,6 +704,13 @@
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-lg) !important;
+  z-index: 9999 !important;
+  /* ✅ 新增: 确保下拉菜单在最上层 */
+}
+
+/* ✅ 新增: 强制 el-option 透明背景 */
+.el-option {
+  background: transparent !important;
 }
 
 .el-select-dropdown__item {
@@ -594,17 +722,21 @@
   align-items: center !important;
   height: 34px !important;
   line-height: 34px !important;
+  background: transparent !important;
+  /* ✅ 修复: 强制透明背景 */
 }
 
 .el-select-dropdown__item.hover,
 .el-select-dropdown__item:hover {
   background: color-mix(in srgb, var(--primary) 16%, transparent) !important;
+  /* ✅ 修复: 使用主题色半透明 */
 }
 
 .el-select-dropdown__item.selected {
   color: var(--primary-light) !important;
   background: color-mix(in srgb, var(--primary) 12%, transparent) !important;
-  /* font-weight: 600; */
+  /* ✅ 修复: 使用主题色半透明 */
+  /* font-weight: 100; */
 }
 
 /* ===== 进度条 ===== */
@@ -622,7 +754,7 @@
 
 .el-progress__text {
   color: var(--text) !important;
-  /* font-weight: 600; */
+  /* font-weight: 100; */
 }
 
 /* ===== 滑块 ===== */
@@ -643,11 +775,26 @@
 /* ===== Popover ===== */
 .el-popover.el-popper {
   background: var(--card-bg) !important;
-  backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
   border: 1px solid var(--border) !important;
   box-shadow: var(--shadow-lg) !important;
   border-radius: var(--radius-md) !important;
   color: var(--text) !important;
+}
+
+/* ✅ 修复: Popover 内部文字颜色 */
+.el-popover.el-popper * {
+  color: var(--text) !important;
+}
+
+.el-popover__title {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+}
+
+.el-popover__reference {
+  color: var(--text-secondary) !important;
 }
 
 /* ===== 单选按钮组 ===== */
@@ -693,7 +840,7 @@
 
 .el-tabs__item.is-active {
   color: var(--primary-light) !important;
-  /* font-weight: 600; */
+  /* font-weight: 100; */
 }
 
 .el-tabs__active-bar {
@@ -815,7 +962,7 @@
 
 .el-step__title.is-process {
   color: var(--primary-light) !important;
-  /* font-weight: 600; */
+  /* font-weight: 100; */
 }
 
 .el-step__title.is-wait {
@@ -833,4 +980,36 @@
   --el-tag-border-color: color-mix(in srgb, var(--primary) 30%, transparent) !important;
   --el-tag-text-color: var(--primary-light) !important;
   border-radius: 8px !important;
+}
+
+/* ===== ECharts 图表容器样式覆盖 ===== */
+/* ✅ 新增: 确保所有 ECharts 图表容器背景透明，适配主题 */
+.analytics-dashboard .chart-body,
+.analytics-dashboard .chart-card {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(16px);
+}
+
+/* 防止 ECharts canvas 元素出现黑色背景 */
+.analytics-dashboard canvas {
+  background: transparent !important;
+}
+
+/* ✅ 修复: ECharts tooltip 全局样式覆盖 - 玻璃拟态效果 */
+/* 强制覆盖所有 ECharts tooltip 容器 */
+.css-echarts-tooltip,
+[data-echarts-tooltip] {
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--shadow-lg) !important;
+  color: var(--text) !important;
+}
+
+/* ECharts tooltip 内部文字颜色 */
+.css-echarts-tooltip *,
+[data-echarts-tooltip] * {
+  color: var(--text) !important;
 }

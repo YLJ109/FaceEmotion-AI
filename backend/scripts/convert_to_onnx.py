@@ -41,8 +41,8 @@ def convert_to_onnx():
     print("🔄 PyTorch → ONNX 模型转换")
     print("=" * 60)
 
-    pth_path = './models/pytorch_final_3060.pth'
-    onnx_path = './models/emotion_model.onnx'
+    pth_path = '../../models/weights/pytorch_final_3060.pth'
+    onnx_path = '../../models/weights/emotion_model.onnx'
 
     if not os.path.exists(pth_path):
         print(f"❌ 模型文件不存在: {pth_path}")

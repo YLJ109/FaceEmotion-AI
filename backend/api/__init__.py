@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from config import ConfigManager
 from database import DatabaseManager
 from adaptation.active_learner import AdaptiveLearner
-from multimodal.voice_analyzer import VoiceAnalyzer
 from analytics.user_analytics import UserAnalytics
 from optimizer.dynamic_inference import DynamicInferenceOptimizer
 import concurrent.futures
@@ -16,7 +15,6 @@ def register_all_routes(
     face_detector,
     emotion_model,
     adaptive_learner: AdaptiveLearner,
-    voice_analyzer: VoiceAnalyzer,
     user_analytics: UserAnalytics,
     inference_optimizer: DynamicInferenceOptimizer,
     executor: concurrent.futures.ThreadPoolExecutor
@@ -37,8 +35,7 @@ def register_all_routes(
         face_detector=face_detector,
         emotion_model=emotion_model,
         adaptive_learner=adaptive_learner,
-        executor=executor,
-        voice_analyzer=voice_analyzer  # ✅ 新增: 传入语音分析器
+        executor=executor
     )
 
     init_detection_router(
@@ -50,7 +47,6 @@ def register_all_routes(
     init_history_router(db_manager=db_manager)
 
     init_ai_router(
-        voice_analyzer=voice_analyzer,
         adaptive_learner=adaptive_learner,
         user_analytics=user_analytics,
         inference_optimizer=inference_optimizer,

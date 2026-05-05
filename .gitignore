@@ -58,3 +58,9 @@ tmp/
 temp/
 *.tmp
 .env.example
+
+/*.safetensors
+wav2vac2
+
+# Backend Data
+backend/data

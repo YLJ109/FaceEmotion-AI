@@ -102,7 +102,8 @@ async def detect_image(file: UploadFile = File(...)):
                     'scores': {k: float(v) for k, v in scores.items()}
                 })
 
-        _db_manager.save_detection_result('image', results, source='单张图片检测')
+        # ✅ 修复: 移除后端的重复保存逻辑,由前端统一调用 /api/history/save 保存
+        # _db_manager.save_detection_result('image', results, source='单张图片检测')
         return {"status": "success", "faces": results, "count": len(results)}
 
     except HTTPException:
@@ -147,7 +148,8 @@ async def detect_batch(files: List[UploadFile] = File(...)):
         except Exception:
             pass
 
-    _db_manager.save_detection_result('batch', results, source='批量图片检测')
+    # ✅ 修复: 移除后端的重复保存逻辑,由前端统一调用 /api/history/save 保存
+    # _db_manager.save_detection_result('batch', results, source='批量图片检测')
     return {"status": "success", "results": results, "total": len(results)}
 
 

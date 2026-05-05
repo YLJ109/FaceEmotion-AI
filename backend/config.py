@@ -65,11 +65,11 @@ class ConfigManager:
 
             # AI模型配置
             'use_gpu': os.getenv('USE_GPU', 'true').lower() == 'true',
-            'model_path': os.getenv('MODEL_PATH', './models/pytorch_final_3060.pth'),
-            'face_detector_model': os.getenv('FACE_DETECTOR_MODEL', './models/res10_300x300_ssd_iter_140000_fp16.caffemodel'),
+            'model_path': os.getenv('MODEL_PATH', '../models/weights/pytorch_final_3060.pth'),
+            'face_detector_model': os.getenv('FACE_DETECTOR_MODEL', '../models/weights/res10_300x300_ssd_iter_140000_fp16.caffemodel'),
             # ✅ 修改: 禁用ONNX RFB，切换到更准确的Caffe SSD模型
             'use_onnx_face_detector': os.getenv('USE_ONNX_FACE_DETECTOR', 'false').lower() == 'true',
-            'emotion_model': os.getenv('EMOTION_MODEL', './models/emotion_model.onnx'),
+            'emotion_model': os.getenv('EMOTION_MODEL', '../models/weights/emotion_model.onnx'),
             # ✅ 优化: 提高置信度阈值从 0.5 到 0.6，减少误检测
             'confidence_threshold': float(os.getenv('CONFIDENCE_THRESHOLD', '0.6')),
 

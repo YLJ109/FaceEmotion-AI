@@ -40,7 +40,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-full);
     font-size: 14px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text);
     box-shadow: var(--shadow);
 }
@@ -51,7 +51,7 @@
     backdrop-filter: blur(16px);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 20px;
+    /* padding: 20px; */
     transition: all var(--transition-normal);
 }
 

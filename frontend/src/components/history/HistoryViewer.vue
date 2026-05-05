@@ -76,6 +76,8 @@
                     </div>
                 </div>
             </div>
+
+
         </div>
 
         <!-- 空状态 -->
@@ -99,19 +101,22 @@
         <div v-if="!loading && historyList.length > 0" class="history-table-container">
             <el-table :data="historyList" style="width: 100%" :header-cell-style="headerCellStyle"
                 :cell-style="cellStyle" :row-class-name="tableRowClassName" @row-click="handleRowClick"
-                highlight-current-row>
+                highlight-current-row @selection-change="handleSelectionChange">
+                <!-- ✅ 新增: 多选列 -->
+                <el-table-column type="selection" width="55" align="center" fixed="left" />
+                <!-- ✅ 新增: 序号列 -->
+                <el-table-column label="ID编号" width="80" align="center">
+                    <template #default="{ $index }">
+                        <span class="index-number">{{ (currentPage - 1) * pageSize + $index + 1 }}</span>
+                    </template>
+                </el-table-column>
                 <!-- 缩略图/情绪图标列 -->
                 <el-table-column label="预览" width="100" align="center">
                     <template #default="{ row }">
                         <div class="table-thumbnail">
-                            <!-- ✅ 优化: 根据检测类型决定显示内容 -->
-                            <!-- 视频检测: 显示情绪图标（因为视频检测保存的是情绪缩略图） -->
-                            <div v-if="row.detection_type === 'video'" class="thumbnail-placeholder-small">
-                                <span class="placeholder-emoji-small">{{ getEmotionEmoji(row.dominant_emotion) }}</span>
-                            </div>
-                            <!-- 图片/批量检测: 显示原始图片缩略图 -->
-                            <img v-else-if="row.thumbnail" :src="row.thumbnail" alt="缩略图" />
-                            <!-- 无缩略图: 显示情绪图标 -->
+                            <!-- ✅ 修复: 所有检测类型都使用保存的缩略图 -->
+                            <img v-if="row.thumbnail && row.thumbnail.length > 100" :src="row.thumbnail" alt="缩略图" />
+                            <!-- 无缩略图或无效数据: 显示情绪图标 -->
                             <div v-else class="thumbnail-placeholder-small">
                                 <span class="placeholder-emoji-small">{{ getEmotionEmoji(row.dominant_emotion) }}</span>
                             </div>
@@ -171,7 +176,7 @@
                 </el-table-column>
 
                 <!-- 操作列 -->
-                <el-table-column label="操作" width="100" align="center" fixed="right">
+                <el-table-column label="操作" width="200" align="center" fixed="right">
                     <template #default="{ row }">
                         <div class="action-buttons">
                             <el-button size="small" type="primary" link @click.stop="showDetail(row)">
@@ -180,102 +185,186 @@
                                 </el-icon>
                                 详情
                             </el-button>
+                            <el-button size="small" type="danger" link @click.stop="deleteRecord(row)">
+                                <el-icon>
+                                    <Delete />
+                                </el-icon>
+                                删除
+                            </el-button>
                         </div>
                     </template>
                 </el-table-column>
             </el-table>
         </div>
 
+        <!-- 批量操作栏 -->
+        <div v-if="selectedRecords.length > 0" class="batch-actions-bar">
+            <span class="batch-info">已选择 {{ selectedRecords.length }} 条记录</span>
+            <el-button type="danger" size="small" @click="batchDelete" :icon="Delete">
+                批量删除
+            </el-button>
+            <el-button size="small" @click="clearSelection">
+                取消选择
+            </el-button>
+        </div>
+
         <!-- 分页 -->
         <div v-if="historyList.length > 0" class="pagination-container">
             <el-pagination v-model:current-page="currentPage" v-model:page-size="pageSize" :total="total"
-                :page-sizes="[12, 24, 48]" layout="total, sizes, prev, pager, next" @size-change="handleSizeChange"
+                :page-sizes="[10, 20, 50]" layout="total, sizes, prev, pager, next" @size-change="handleSizeChange"
                 @current-change="handlePageChange" />
         </div>
 
-        <!-- 详情对话框 -->
-        <el-dialog v-model="dialogVisible" title="检测详情" width="70%" :close-on-click-modal="false">
-            <div v-if="selectedItem" class="detail-content">
-                <div class="detail-left">
-                    <div class="image-preview">
-                        <!-- ✅ 优化: 智能裁剪显示人脸区域 -->
-                        <canvas v-if="selectedItem.thumbnail && selectedItem.detected_faces?.length > 0"
-                            ref="faceCropCanvas" class="face-crop-canvas"></canvas>
-                        <!-- 原始缩略图（无 bbox 数据时显示） -->
-                        <img v-else-if="selectedItem.thumbnail" :src="selectedItem.thumbnail" alt="检测图片" />
-                        <!-- 无图片时显示情绪图标 -->
-                        <div v-else class="preview-placeholder">
-                            <span class="large-emoji">{{ getEmotionEmoji(selectedItem.dominant_emotion || 'neutral')
-                            }}</span>
+        <!-- 详情对话框 - 玻璃拟态风格 -->
+        <el-dialog v-model="dialogVisible" :close-on-click-modal="false" width="80%" class="history-detail-dialog"
+            :show-close="false">
+            <div v-if="selectedItem" class="detail-content-redesign">
+                <!-- 左侧: 检测详情标题 + 图片预览 + 导出按钮 + 关闭按钮 -->
+                <div class="detail-left-redesign">
+                    <div class="detail-title-section">
+                        <h3 class="detail-main-title">检测详情</h3>
+                        <p class="detail-subtitle">{{ getTypeLabel(selectedItem?.detection_type) }} · {{
+                            formatTime(selectedItem?.created_at) }}</p>
+                    </div>
+
+                    <div class="image-preview-redesign">
+                        <!-- ✅ 修改: 所有检测类型都使用 img 标签显示缩略图 -->
+                        <img v-if="selectedItem.thumbnail && selectedItem.thumbnail.length > 100"
+                            :src="selectedItem.thumbnail" alt="检测图片" class="preview-image-redesign" />
+                        <!-- 无图片或无效图片时显示情绪图标 -->
+                        <div v-else class="preview-placeholder-redesign">
+                            <span class="large-emoji-redesign">{{ getEmotionEmoji(selectedItem.dominant_emotion ||
+                                'neutral')
+                                }}</span>
                             <p>无预览图片</p>
                         </div>
                     </div>
-                </div>
-                <div class="detail-right">
-                    <div class="detail-section">
-                        <h4>基本信息</h4>
-                        <el-descriptions :column="1" border>
-                            <el-descriptions-item label="检测类型">{{ getTypeLabel(selectedItem.detection_type)
-                            }}</el-descriptions-item>
-                            <el-descriptions-item label="来源">{{ selectedItem.source || '未知' }}</el-descriptions-item>
-                            <el-descriptions-item label="检测时间">{{ formatTime(selectedItem.created_at)
-                            }}</el-descriptions-item>
-                            <el-descriptions-item label="主导情绪">
-                                <span class="emotion-tag"
-                                    :style="{ background: getEmotionColor(selectedItem.dominant_emotion) }">
-                                    {{ getEmotionEmoji(selectedItem.dominant_emotion) }}
-                                    {{ getEmotionName(selectedItem.dominant_emotion) }}
-                                </span>
-                            </el-descriptions-item>
-                            <el-descriptions-item label="置信度">{{ ((selectedItem.confidence || 0) * 100).toFixed(1)
-                            }}%</el-descriptions-item>
-                            <el-descriptions-item label="人脸数量">{{ selectedItem.detected_faces?.length || 0
-                            }}</el-descriptions-item>
-                        </el-descriptions>
+
+                    <!-- 操作按钮: 导出JSON + 关闭 -->
+                    <div class="preview-actions-redesign">
+                        <el-button @click="exportSingleRecord(selectedItem)"
+                            class="action-btn-redesign export-btn-redesign">
+                            <el-icon>
+                                <Download />
+                            </el-icon>
+                            导出 JSON
+                        </el-button>
+                        <el-button @click="dialogVisible = false" class="action-btn-redesign close-btn-redesign">
+                            <el-icon>
+                                <Close />
+                            </el-icon>
+                            关闭
+                        </el-button>
                     </div>
+                </div>
 
-                    <div v-if="selectedItem.detected_faces?.length > 0" class="detail-section">
-                        <h4>检测到的人脸 ({{ selectedItem.detected_faces.length }})</h4>
-                        <div class="faces-list">
-                            <div v-for="(face, index) in selectedItem.detected_faces" :key="index"
-                                class="face-detail-card">
-                                <!-- 头部：序号 + 情绪图标 + 情绪名称 + 置信度 -->
-                                <div class="face-card-header">
-                                    <div class="face-title-row">
-                                        <span class="face-index-badge">人脸 {{ index + 1 }}</span>
-                                        <span class="face-emotion-display">
-                                            <span class="emotion-emoji">{{ getEmotionEmoji(face.emotion) }}</span>
-                                            <span class="emotion-name">{{ getEmotionName(face.emotion) }}</span>
-                                        </span>
+                <!-- 右侧: 检测到的人脸表格 -->
+                <div class="detail-right-redesign">
+                    <div class="faces-table-container-redesign">
+                        <h4 class="section-title-redesign">
+                            <el-icon>
+                                <UserFilled />
+                            </el-icon>
+                            检测到的人脸 ({{ selectedItem.detected_faces.length }})
+                        </h4>
+
+                        <el-table :data="selectedItem.detected_faces" class="faces-table-redesign" size="small"
+                            :header-cell-style="facesTableHeaderStyle" :cell-style="facesTableCellStyle"
+                            :row-class-name="facesTableRowClassName">
+
+                            <!-- 人脸预览列 -->
+                            <el-table-column label="预览" width="120" align="center">
+                                <template #default="{ row, $index }">
+                                    <div class="face-thumbnail-redesign">
+                                        <canvas :ref="el => setFaceCanvasRef(el, $index)"
+                                            class="face-mini-canvas-redesign"></canvas>
                                     </div>
-                                    <span class="face-confidence-badge"
-                                        :style="{ color: getEmotionColor(face.emotion) }">
-                                        {{ ((face.confidence || 0) * 100).toFixed(1) }}%
+                                </template>
+                            </el-table-column>
+
+                            <!-- 序号列 -->
+                            <el-table-column label="#" width="60" align="center">
+                                <template #default="{ $index }">
+                                    <span class="face-index-redesign">{{ $index + 1 }}</span>
+                                </template>
+                            </el-table-column>
+
+                            <!-- 情绪标签列 -->
+                            <el-table-column label="情绪" min-width="40" align="center">
+                                <template #default="{ row }">
+                                    <span class="emotion-badge-small-redesign"
+                                        :style="{ background: getEmotionColor(row.emotion) }">
+                                        {{ getEmotionEmoji(row.emotion) }}
+                                        {{ getEmotionName(row.emotion) }}
                                     </span>
-                                </div>
+                                </template>
+                            </el-table-column>
 
-                                <!-- 中部：置信度进度条 -->
-                                <div class="face-progress-section">
-                                    <el-progress
-                                        :percentage="clampPercentage(parseFloat(((face.confidence || 0) * 100).toFixed(1)))"
-                                        :color="getEmotionGradient(face.emotion)" :stroke-width="10"
-                                        :show-text="false" />
-                                </div>
+                            <!-- 置信度列 -->
+                            <el-table-column label="置信度" width="150" align="center">
+                                <template #default="{ row }">
+                                    <div class="confidence-cell-redesign">
+                                        <el-progress
+                                            :percentage="clampPercentage(parseFloat(((row.confidence || 0) * 100).toFixed(1)))"
+                                            :color="getEmotionGradient(row.emotion)" :stroke-width="8"
+                                            :show-text="true" />
+                                    </div>
+                                </template>
+                            </el-table-column>
 
-                                <!-- 底部：BBox 坐标 -->
-                                <div class="face-bbox-info">
-                                    <span class="bbox-label">BBox:</span>
-                                    <span class="bbox-coords">[{{face.bbox?.map(c => Math.round(c)).join(', ')
-                                    }}]</span>
-                                </div>
-                            </div>
-                        </div>
+                            <!-- 坐标信息列 -->
+                            <el-table-column label="坐标" width="180" align="center">
+                                <template #default="{ row }">
+                                    <span class="bbox-text-redesign">[{{row.bbox?.map(c =>
+                                        Math.round(c)).join(',')}}]</span>
+
+                                </template>
+                            </el-table-column>
+
+                            <!-- 操作列 -->
+                            <el-table-column label="操作" width="100" align="center" fixed="right">
+                                <template #default="{ row, $index }">
+                                    <el-button @click="openFaceFeedback(row, $index)" class="face-feedback-btn-redesign"
+                                        size="small" text>
+                                        <el-icon>
+                                            <Edit />
+                                        </el-icon>
+                                        反馈
+                                    </el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
                     </div>
                 </div>
             </div>
+        </el-dialog>
+
+        <!-- ✅ 新增: 反馈对话框 -->
+        <el-dialog v-model="feedbackDialogVisible" title="提交反馈" width="500px" class="feedback-dialog">
+            <div class="feedback-form">
+                <div class="feedback-info">
+                    <span class="feedback-label">记录 ID:</span>
+                    <span class="feedback-value">{{ feedbackForm.recordId }}</span>
+                </div>
+                <div v-if="feedbackForm.faceIndex !== null" class="feedback-info">
+                    <span class="feedback-label">人脸索引:</span>
+                    <span class="feedback-value">#{{ feedbackForm.faceIndex + 1 }}</span>
+                </div>
+                <el-form :model="feedbackForm" label-width="80px">
+                    <el-form-item label="正确情绪">
+                        <el-select v-model="feedbackForm.correctEmotion" placeholder="请选择正确的情绪" style="width: 100%">
+                            <el-option v-for="emotion in EMOTION_LIST" :key="emotion"
+                                :label="`${getEmotionEmoji(emotion)} ${getEmotionName(emotion)}`" :value="emotion" />
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="备注说明">
+                        <el-input v-model="feedbackForm.comment" type="textarea" :rows="3" placeholder="可选：添加额外说明" />
+                    </el-form-item>
+                </el-form>
+            </div>
             <template #footer>
-                <el-button type="primary" @click="dialogVisible = false">关闭</el-button>
-                <el-button type="primary" @click="exportSingleRecord(selectedItem)">导出 JSON</el-button>
+                <el-button @click="feedbackDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitFeedback" :loading="feedbackSubmitting">提交反馈</el-button>
             </template>
         </el-dialog>
     </div>
@@ -283,26 +372,62 @@
 
 <script setup>
 import { ref, onMounted, nextTick, watch } from 'vue'
-import { Clock, Loading, Picture, View, Download, DataAnalysis, VideoCamera, Files, Film } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotion'
+import { Clock, Loading, Picture, View, Download, DataAnalysis, VideoCamera, Files, Film, Edit, InfoFilled, UserFilled, Delete, Close } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getEmotionName, getEmotionColor, getEmotionEmoji, EMOTION_LIST } from '@/utils/emotion'
 import { API } from '@/api/config'
 
 const loading = ref(false)
 const historyList = ref([])
 const total = ref(0)
 const currentPage = ref(1)
-const pageSize = ref(12)
+const pageSize = ref(10)
 const dialogVisible = ref(false)
 const selectedItem = ref(null)
 const filterType = ref('all') // 筛选类型
-const faceCropCanvas = ref(null) // ✅ 新增: 人脸裁剪 Canvas 引用
+const faceCanvasRefs = ref([]) // ✅ 新增: 人脸表格中的 Canvas 引用数组
+const singleFaceCanvas = ref(null) // ✅ 新增: 单张人脸 Canvas 引用
 const typeCounts = ref({
     realtime: 0,
     image: 0,
     batch: 0,
     video: 0
 })
+
+// ✅ 新增: 批量选择
+const selectedRecords = ref([])
+
+// ✅ 新增: 反馈相关状态
+const feedbackDialogVisible = ref(false)
+const feedbackSubmitting = ref(false)
+const feedbackForm = ref({
+    recordId: null,
+    faceIndex: null,
+    correctEmotion: '',
+    comment: ''
+})
+
+// ✅ 新增: 人脸表格样式配置
+const facesTableHeaderStyle = {
+    background: 'transparent',
+    color: '#ffffff',
+    fontWeight: '100',
+    fontSize: '12px',
+    padding: '8px 0',
+    borderBottom: '1px solid rgba(113, 57, 255, 0.2)'
+}
+
+const facesTableCellStyle = {
+    background: 'transparent',
+    color: '#ffffff',
+    borderBottom: '1px solid rgba(156, 78, 255, 0.1)',
+    padding: '8px 0',
+    fontSize: '13px'
+}
+
+const facesTableRowClassName = ({ rowIndex }) => {
+    return rowIndex % 2 === 0 ? 'face-table-row-even' : 'face-table-row-odd'
+}
 
 // 获取历史记录
 const fetchHistory = async () => {
@@ -346,15 +471,114 @@ const setFilter = (type) => {
     fetchHistory()
 }
 
+
+
 // 显示详情
 const showDetail = (item) => {
     selectedItem.value = item
     dialogVisible.value = true
 
-    // ✅ 新增: 打开详情时自动裁剪人脸
-    nextTick(() => {
-        cropAndDisplayFace()
-    })
+    // ✅ 优化: 如果是单张人脸,裁剪单张人脸 Canvas
+    if (item.detected_faces?.length === 1) {
+        nextTick(() => {
+            cropSingleFaceThumbnail()
+        })
+    }
+}
+
+// ✅ 新增: 删除历史记录
+const deleteRecord = async (item) => {
+    try {
+        // 确认对话框
+        await ElMessageBox.confirm(
+            `确定要删除这条${getTypeLabel(item.detection_type)}记录吗？此操作不可恢复。`,
+            '删除记录',
+            {
+                confirmButtonText: '确定删除',
+                cancelButtonText: '取消',
+                type: 'warning',
+            }
+        )
+
+        // 调用后端 API
+        const response = await fetch(`${API.history}/${item.id}`, {
+            method: 'DELETE'
+        })
+
+        if (!response.ok) {
+            throw new Error('删除失败')
+        }
+
+        const result = await response.json()
+
+        if (result.status === 'success') {
+            ElMessage.success(`✅ 已成功删除记录`)
+            // 关闭详情对话框
+            dialogVisible.value = false
+            selectedItem.value = null
+            // 刷新列表
+            fetchHistory()
+        } else {
+            throw new Error(result.message || '删除失败')
+        }
+    } catch (error) {
+        if (error !== 'cancel') {
+            console.error('删除记录失败:', error)
+            ElMessage.error('删除失败: ' + error.message)
+        }
+    }
+}
+
+// ✅ 新增: 处理选择变化
+const handleSelectionChange = (selection) => {
+    selectedRecords.value = selection
+}
+
+// ✅ 新增: 批量删除
+const batchDelete = async () => {
+    if (selectedRecords.value.length === 0) {
+        ElMessage.warning('请先选择要删除的记录')
+        return
+    }
+
+    try {
+        await ElMessageBox.confirm(
+            `确定要删除选中的 ${selectedRecords.value.length} 条历史记录吗？此操作不可恢复！`,
+            '批量删除确认',
+            {
+                confirmButtonText: '删除',
+                cancelButtonText: '取消',
+                type: 'warning',
+                confirmButtonClass: 'el-button--danger'
+            }
+        )
+
+        const deletePromises = selectedRecords.value.map(record =>
+            fetch(`${API.history}/${record.id}`, { method: 'DELETE' })
+        )
+
+        const results = await Promise.all(deletePromises)
+        const successCount = results.filter(r => r.ok).length
+
+        if (successCount > 0) {
+            ElMessage.success(`✅ 成功删除 ${successCount} 条记录`)
+            // 重新加载数据
+            fetchHistory()
+            selectedRecords.value = []
+        } else {
+            ElMessage.error('删除失败')
+        }
+    } catch (error) {
+        if (error !== 'cancel') {
+            console.error('批量删除失败:', error)
+            ElMessage.error('网络错误，请稍后重试')
+        }
+    }
+}
+
+// ✅ 新增: 清空选择
+const clearSelection = () => {
+    selectedRecords.value = []
 }
 
 // 格式化时间
@@ -407,45 +631,50 @@ const getEmotionGradient = (emotion) => {
     return gradients[emotion] || ['#747D8C', '#A4B0BE']
 }
 
-// ✅ 新增: 智能裁剪并显示人脸区域
-const cropAndDisplayFace = async () => {
+// ✅ 新增: 设置人脸 Canvas 引用
+const setFaceCanvasRef = (el, index) => {
+    if (el) {
+        faceCanvasRefs.value[index] = el
+        // 等待 DOM 更新后裁剪
+        nextTick(() => {
+            cropFaceThumbnail(el, index)
+        })
+    }
+}
+
+// ✅ 新增: 裁剪人脸缩略图
+const cropFaceThumbnail = async (canvas, faceIndex) => {
     if (!selectedItem.value || !selectedItem.value.thumbnail || !selectedItem.value.detected_faces?.length) {
         return
     }
 
     try {
-        await nextTick() // 等待 DOM 更新
-
-        const canvas = faceCropCanvas.value
-        if (!canvas) {
-            console.warn('Canvas 元素未找到')
-            return
-        }
-
         const ctx = canvas.getContext('2d')
-        if (!ctx) {
-            console.warn('无法获取 Canvas 上下文')
-            return
-        }
+        if (!ctx) return
 
         // 加载原始缩略图
         const img = new Image()
-        img.crossOrigin = 'anonymous' // 处理跨域问题
+        img.crossOrigin = 'anonymous'
 
         img.onload = () => {
             try {
-                // 获取第一张人脸的 bbox: [x, y, width, height]
-                const firstFace = selectedItem.value.detected_faces[0]
-                const bbox = firstFace.bbox
+                const face = selectedItem.value.detected_faces[faceIndex]
+                const bbox = face.bbox
 
-                if (!bbox || bbox.length < 4) {
-                    console.warn('bbox 数据无效')
-                    return
+                if (!bbox || bbox.length < 4) return
+
+                let [x, y, width, height] = bbox
+
+                // ✅ 新增: 坐标验证和修正
+                if (x >= img.width || y >= img.height) {
+                    console.warn(`人脸 #${faceIndex + 1} 检测到旧格式坐标，尝试自适应裁剪`)
+                    x = img.width * 0.3
+                    y = img.height * 0.2
+                    width = img.width * 0.4
+                    height = img.height * 0.5
                 }
 
-                const [x, y, width, height] = bbox
-
-                // 计算裁剪区域（扩大 20% 以包含更多上下文）
+                // 扩大 20% 以包含更多上下文
                 const padding = 0.2
                 const expandedWidth = width * (1 + padding)
                 const expandedHeight = height * (1 + padding)
@@ -458,46 +687,106 @@ const cropAndDisplayFace = async () => {
                 const finalWidth = Math.min(expandedWidth, img.width - finalX)
                 const finalHeight = Math.min(expandedHeight, img.height - finalY)
 
-                // 设置 Canvas 尺寸（保持宽高比，最大 400x300）
-                const maxWidth = 400
-                const maxHeight = 300
-                const aspectRatio = finalWidth / finalHeight
-
-                let canvasWidth, canvasHeight
-                if (aspectRatio > maxWidth / maxHeight) {
-                    canvasWidth = maxWidth
-                    canvasHeight = maxWidth / aspectRatio
-                } else {
-                    canvasHeight = maxHeight
-                    canvasWidth = maxHeight * aspectRatio
-                }
-
-                canvas.width = canvasWidth
-                canvas.height = canvasHeight
+                // 设置 Canvas 尺寸 (60x60)
+                canvas.width = 60
+                canvas.height = 60
 
                 // 绘制裁剪后的人脸区域
                 ctx.drawImage(
                     img,
-                    finalX, finalY, finalWidth, finalHeight, // 源图片裁剪区域
-                    0, 0, canvasWidth, canvasHeight // Canvas 绘制区域
+                    finalX, finalY, finalWidth, finalHeight,
+                    0, 0, 60, 60
                 )
-
-                console.log('✅ 人脸裁剪成功:', { bbox, canvasSize: { width: canvasWidth, height: canvasHeight } })
             } catch (error) {
                 console.error('人脸裁剪失败:', error)
-                // fallback: 显示完整图片
-                canvas.style.display = 'none'
             }
         }
 
         img.onerror = () => {
             console.error('加载缩略图失败')
-            canvas.style.display = 'none'
         }
 
         img.src = selectedItem.value.thumbnail
     } catch (error) {
         console.error('人脸裁剪过程出错:', error)
+    }
+}
+
+// ✅ 新增: 裁剪单张人脸缩略图（用于单张人脸卡片）
+const cropSingleFaceThumbnail = async () => {
+    if (!selectedItem.value || !selectedItem.value.thumbnail || !selectedItem.value.detected_faces?.length) {
+        return
+    }
+
+    try {
+        await nextTick()
+
+        const canvas = singleFaceCanvas.value
+        if (!canvas) return
+
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        // 加载原始缩略图
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+
+        img.onload = () => {
+            try {
+                const face = selectedItem.value.detected_faces[0]
+                const bbox = face.bbox
+
+                if (!bbox || bbox.length < 4) return
+
+                let [x, y, width, height] = bbox
+
+                // ✅ 新增: 坐标验证和修正
+                // 如果坐标超出缩略图范围，说明是旧数据（未转换坐标）
+                // 尝试将坐标限制在缩略图范围内
+                if (x >= img.width || y >= img.height) {
+                    console.warn('检测到旧格式坐标，尝试自适应裁剪')
+                    // 对于旧数据，直接使用缩略图中心区域
+                    x = img.width * 0.3
+                    y = img.height * 0.2
+                    width = img.width * 0.4
+                    height = img.height * 0.5
+                }
+
+                // 扩大 20% 以包含更多上下文
+                const padding = 0.2
+                const expandedWidth = width * (1 + padding)
+                const expandedHeight = height * (1 + padding)
+                const expandedX = Math.max(0, x - width * padding / 2)
+                const expandedY = Math.max(0, y - height * padding / 2)
+
+                // 确保不超出图片边界
+                const finalX = Math.min(expandedX, img.width - expandedWidth)
+                const finalY = Math.min(expandedY, img.height - expandedHeight)
+                const finalWidth = Math.min(expandedWidth, img.width - finalX)
+                const finalHeight = Math.min(expandedHeight, img.height - finalY)
+
+                // 设置 Canvas 尺寸 (120x120)
+                canvas.width = 120
+                canvas.height = 120
+
+                // 绘制裁剪后的人脸区域
+                ctx.drawImage(
+                    img,
+                    finalX, finalY, finalWidth, finalHeight,
+                    0, 0, 120, 120
+                )
+            } catch (error) {
+                console.error('单张人脸裁剪失败:', error)
+            }
+        }
+
+        img.onerror = () => {
+            console.error('加载缩略图失败')
+        }
+
+        img.src = selectedItem.value.thumbnail
+    } catch (error) {
+        console.error('单张人脸裁剪过程出错:', error)
     }
 }
 
@@ -513,6 +802,60 @@ const exportSingleRecord = (item) => {
     link.click()
     URL.revokeObjectURL(url)
     ElMessage.success('✅ 已导出')
+}
+
+// ✅ 新增: 打开记录反馈
+const openFeedback = (record) => {
+    feedbackForm.value = {
+        recordId: record.id,
+        faceIndex: null,
+        correctEmotion: '',
+        comment: ''
+    }
+    feedbackDialogVisible.value = true
+}
+
+// ✅ 新增: 打开单个人脸反馈
+const openFaceFeedback = (face, index) => {
+    feedbackForm.value = {
+        recordId: selectedItem.value?.id,
+        faceIndex: index,
+        correctEmotion: '',
+        comment: `人脸 #${index + 1} 的识别结果可能需要纠正`
+    }
+    feedbackDialogVisible.value = true
+}
+
+// ✅ 新增: 提交反馈
+const submitFeedback = async () => {
+    if (!feedbackForm.value.correctEmotion) {
+        ElMessage.warning('请选择正确的情绪')
+        return
+    }
+
+    feedbackSubmitting.value = true
+    try {
+        const response = await fetch(API.feedback, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                record_id: feedbackForm.value.recordId,
+                face_index: feedbackForm.value.faceIndex,
+                correct_emotion: feedbackForm.value.correctEmotion,
+                comment: feedbackForm.value.comment
+            })
+        })
+
+        if (!response.ok) throw new Error('提交失败')
+
+        ElMessage.success('✅ 反馈已提交，感谢您的帮助！')
+        feedbackDialogVisible.value = false
+    } catch (error) {
+        console.error('提交反馈错误:', error)
+        ElMessage.error('提交失败，请重试')
+    } finally {
+        feedbackSubmitting.value = false
+    }
 }
 
 // 分页处理
@@ -536,7 +879,7 @@ const handleRowClick = (row) => {
 const headerCellStyle = {
     background: 'transparent',
     color: '#ffffff',
-    fontWeight: '600',
+    fontWeight: '100',
     fontSize: '13px',
     padding: '12px 0',
     borderBottom: '2px solid rgba(113, 57, 255, 0.2)',
@@ -563,7 +906,10 @@ onMounted(() => {
 watch(selectedItem, (newVal) => {
     if (newVal) {
         nextTick(() => {
-            cropAndDisplayFace()
+            // ✅ 优化: 如果是单张人脸，裁剪单张人脸 Canvas
+            if (newVal.detected_faces?.length === 1) {
+                cropSingleFaceThumbnail()
+            }
         })
     }
 })
@@ -638,6 +984,8 @@ watch(selectedItem, (newVal) => {
     box-shadow: 0 0 20px rgba(113, 57, 255, 0.3);
 }
 
+
+
 .filter-card-inner {
     padding: 12px 16px;
     display: flex;
@@ -664,7 +1012,7 @@ watch(selectedItem, (newVal) => {
 
 .filter-label {
     font-size: 14px;
-    /* font-weight: 600; */
+    font-weight: 100;
     color: var(--text);
     margin-bottom: 2px;
 }
@@ -746,6 +1094,14 @@ watch(selectedItem, (newVal) => {
     background: rgba(146, 78, 255, 0.5);
 }
 
+/* ✅ 新增: 序号样式 */
+.index-number {
+    font-size: 13px;
+    font-weight: 100;
+    color: var(--text-secondary);
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
 /* 表格缩略图 */
 .table-thumbnail {
     width: 50px;
@@ -814,7 +1170,7 @@ watch(selectedItem, (newVal) => {
     border: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
     border-radius: 6px;
     font-size: 12px;
-    /* font-weight: 600; */
+    font-weight: 100;
     color: var(--text);
     display: inline-block;
     white-space: nowrap;
@@ -828,10 +1184,11 @@ watch(selectedItem, (newVal) => {
 
 /* 情绪徽章 */
 .emotion-badge-table {
-    padding: 6px 12px;
+    margin-top: 2px;
+    padding: 4px 12px;
     border-radius: 8px;
     font-size: 13px;
-    /* font-weight: 600; */
+    font-weight: 100;
     color: var(--text);
     display: inline-flex;
     align-items: center;
@@ -858,7 +1215,7 @@ watch(selectedItem, (newVal) => {
 /* 人脸数量 */
 .face-count-table {
     font-size: 13px;
-    /* font-weight: 600; */
+    font-weight: 100;
     color: var(--primary-light);
 }
 
@@ -885,6 +1242,7 @@ watch(selectedItem, (newVal) => {
 
 /* 操作按钮 */
 .action-buttons {
+    margin-top: 2px;
     display: flex;
     gap: 8px;
     justify-content: center;
@@ -923,6 +1281,20 @@ watch(selectedItem, (newVal) => {
     border-color: var(--success);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(103, 194, 58, 0.3);
+}
+
+/* ✅ 新增: 删除按钮样式 */
+.action-buttons .el-button--danger.is-link {
+    background: rgba(245, 108, 108, 0.15);
+    color: var(--danger);
+    border: 1px solid rgba(245, 108, 108, 0.3);
+}
+
+.action-buttons .el-button--danger.is-link:hover {
+    background: rgba(245, 108, 108, 0.25);
+    border-color: var(--danger);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(245, 108, 108, 0.3);
 }
 
 /* 表格行样式 */
@@ -991,6 +1363,42 @@ watch(selectedItem, (newVal) => {
     flex-shrink: 0;
     border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
     margin-top: auto;
+}
+
+/* ✅ 新增: 批量操作栏样式 */
+.batch-actions-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-top: 12px;
+    animation: slideIn 0.3s ease;
+}
+
+.batch-info {
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.batch-actions-bar .el-button {
+    margin-left: 10px;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* 分页组件深色主题 */
@@ -1084,29 +1492,165 @@ watch(selectedItem, (newVal) => {
     font-size: 13px;
 }
 
-/* 详情对话框样式 */
+/* 对话框样式 - 玻璃拟态 */
+:deep(.history-detail-dialog) {
+    .el-dialog {
+        background: var(--card-bg) !important;
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-xl);
+        margin-top: 1vh !important;
+        /* 向上移动弹窗,更靠近顶部 */
+        max-height: 90vh !important;
+    }
+
+    .el-dialog__header {
+        /* ✅ 彻底隐藏header,移除空白区域 */
+        display: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+    }
+
+    /* ✅ 移除body内边距,允许内容自然延伸 */
+    .el-dialog__body {
+        padding: 0 !important;
+        overflow: visible !important;
+        max-height: none !important;
+    }
+
+    .el-dialog__footer {
+        border-top: 1px solid var(--border);
+        padding: 16px 24px;
+    }
+}
+
+/* ✅ 新增: 最小化对话框header样式 */
+.dialog-header-minimal {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.dialog-title-text {
+    font-size: 18px;
+    font-weight: 100;
+    color: var(--text);
+}
+
+/* ✅ 关闭按钮样式 */
+.dialog-close-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.dialog-close-btn:hover {
+    background: rgba(255, 77, 77, 0.2);
+    border-color: rgba(255, 77, 77, 0.4);
+    color: #ff4d4d;
+    transform: rotate(90deg);
+}
+
+.dialog-close-btn .el-icon {
+    font-size: 18px;
+}
+
+.dialog-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dialog-title {
+    font-size: 18px;
+    font-weight: 100;
+    color: var(--text);
+}
+
+.dialog-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+/* 详情内容布局 */
 .detail-content {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    /* ✅ 修复: 移除 max-height 和 overflow-y，让对话框自身管理滚动 */
-    max-height: none;
-    overflow-y: visible;
+    gap: 20px;
+    max-height: 75vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* ✅ 多人脸场景: 简化为单列布局 */
+.detail-content.multi-face-mode {
+    grid-template-columns: 1fr;
+}
+
+/* 玻璃拟态面板 */
+.glass-panel {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    box-shadow: var(--shadow-md);
+    transition: all 0.3s ease;
+}
+
+.glass-panel:hover {
+    border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+    box-shadow: var(--shadow-lg);
 }
 
 .detail-left {
     display: flex;
     flex-direction: column;
+    gap: 16px;
+}
+
+/* ✅ 新增: 左侧区域滚动条优化 */
+.detail-left::-webkit-scrollbar {
+    width: 6px;
+}
+
+.detail-left::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.detail-left::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
+.detail-left::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .image-preview {
     width: 100%;
-    /* ✅ 优化: 减小固定高度，更紧凑 */
     height: 280px;
     border-radius: var(--radius-md);
     overflow: hidden;
     background: color-mix(in srgb, var(--card-bg) 60%, transparent);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    /* ✅ 修复: 使用flexbox居中显示Canvas */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .image-preview img {
@@ -1117,8 +1661,10 @@ watch(selectedItem, (newVal) => {
 
 /* ✅ 新增: Canvas 裁剪图片样式 */
 .face-crop-canvas {
-    width: 100%;
-    height: 100%;
+    /* ✅ 修复: 不使用 100% 宽高，让Canvas保持内部尺寸 */
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
     object-fit: contain;
     border-radius: var(--radius-md);
 }
@@ -1145,201 +1691,919 @@ watch(selectedItem, (newVal) => {
     color: var(--text-secondary);
 }
 
+/* ✅ 新增: 预览操作按钮 */
+.preview-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.action-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.feedback-btn {
+    background: rgba(230, 162, 60, 0.15);
+    border: 1px solid rgba(230, 162, 60, 0.3);
+    color: var(--warning);
+}
+
+.feedback-btn:hover {
+    background: rgba(230, 162, 60, 0.25);
+    border-color: var(--warning);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(230, 162, 60, 0.3);
+}
+
+.export-btn {
+    background: rgba(113, 57, 255, 0.15);
+    border: 1px solid rgba(113, 57, 255, 0.3);
+    color: var(--primary-light);
+}
+
+.export-btn:hover {
+    background: rgba(113, 57, 255, 0.25);
+    border-color: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(113, 57, 255, 0.3);
+}
+
 .detail-right {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 16px;
 }
 
-.detail-section h4 {
-    font-size: 17px;
-    font-weight: 100;
-    margin-bottom: 12px;
+/* ===== 重新设计的布局样式 ===== */
+/* ✅ 新增: 主内容区域 - 左右分栏布局 */
+.detail-content-redesign {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    /* ✅ 移除max-height限制,允许内容自然延伸 */
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* ✅ 左侧: 固定宽度 */
+.detail-left-redesign {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    /* ✅ 左侧固定,不滚动 */
+}
+
+/* ✅ 标题区域 */
+.detail-title-section {
+    padding: 16px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.detail-main-title {
+    font-size: 20px;
+    font-weight: 700;
     color: var(--text);
+    margin: 0 0 6px 0;
 }
 
-/* 修复 el-descriptions 白色背景问题 */
-:deep(.el-descriptions) {
+.detail-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    margin: 0;
+}
+
+/* ✅ 图片预览区域 */
+.image-preview-redesign {
+    width: 100%;
+    /* ✅ 自适应高度,根据图片比例 */
+    min-height: 240px;
+    max-height: 400px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: color-mix(in srgb, var(--card-bg) 60%, transparent);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-preview-redesign img {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: contain;
+}
+
+/* ✅ 新增: 预览图片样式 */
+.preview-image-redesign {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+}
+
+/* ✅ Canvas 裁剪图片样式 */
+.face-crop-canvas-redesign {
+    display: block;
+    max-width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+}
+
+.preview-placeholder-redesign {
+    width: 100%;
+    height: 100%;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 15%, transparent),
+            color-mix(in srgb, var(--accent) 15%, transparent));
+}
+
+.large-emoji-redesign {
+    font-size: 72px;
+    filter: drop-shadow(0 0 30px rgba(113, 57, 255, 0.4));
+}
+
+.preview-placeholder-redesign p {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+/* ✅ 操作按钮区域 */
+.preview-actions-redesign {
+    display: flex;
+    gap: 12px;
+}
+
+.action-btn-redesign {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.export-btn-redesign {
+    background: rgba(113, 57, 255, 0.15);
+    border: 1px solid rgba(113, 57, 255, 0.3);
+    color: var(--primary-light);
+}
+
+.export-btn-redesign:hover {
+    background: rgba(113, 57, 255, 0.25);
+    border-color: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(113, 57, 255, 0.3);
+}
+
+/* ✅ 关闭按钮样式 */
+.close-btn-redesign {
+    background: rgba(255, 77, 77, 0.15);
+    border: 1px solid rgba(255, 77, 77, 0.3);
+    color: #ff6b6b;
+}
+
+.close-btn-redesign:hover {
+    background: rgba(255, 77, 77, 0.25);
+    border-color: #ff4d4d;
+    color: #ff4d4d;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 77, 77, 0.3);
+}
+
+/* ✅ 右侧: 自适应宽度 */
+.detail-right-redesign {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    /* ✅ 允许内容自然延伸 */
+    min-height: 400px;
+}
+
+/* ✅ 修复: 人脸表格容器 - 限制高度并允许滚动 */
+.faces-table-container-redesign {
+    padding: 20px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    /* ✅ 修复: 设置最大高度,防止溢出对话框 */
+    max-height: 60vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.section-title-redesign {
+    font-size: 16px;
+    font-weight: 100;
+    color: var(--text);
+    margin: 0 0 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-title-redesign .el-icon {
+    font-size: 18px;
+    color: var(--primary-light);
+}
+
+/* ✅ 修复: 表格样式 - 允许滚动 */
+.faces-table-redesign {
     background: transparent !important;
-    --el-descriptions-item-bordered-bg: color-mix(in srgb, var(--card-bg) 85%, transparent) !important;
+    flex: 1;
+    min-height: 0;
 }
 
-:deep(.el-descriptions__table) {
-    background: transparent !important;
-    border: none !important;
+.faces-table-redesign :deep(.el-table) {
+    /* ✅ 修复: 设置最大高度并启用滚动 */
+    max-height: calc(60vh - 100px);
+    overflow: hidden;
 }
 
-:deep(.el-descriptions__header) {
+.faces-table-redesign :deep(.el-table__body-wrapper) {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: calc(60vh - 100px) !important;
+}
+
+/* ✅ 表格滚动条样式 */
+.faces-table-redesign :deep(.el-table__body-wrapper)::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.faces-table-redesign :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.faces-table-redesign :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
+.faces-table-redesign :deep(.el-table__body-wrapper)::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ✅ 人脸预览缩略图 */
+.face-thumbnail-redesign {
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+}
+
+.face-mini-canvas-redesign {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* ✅ 序号样式 */
+.face-index-redesign {
+    font-size: 14px;
+    font-weight: 100;
+    color: var(--primary-light);
+}
+
+/* ✅ 情绪徽章 */
+.emotion-badge-small-redesign {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+}
+
+/* ✅ 置信度单元格 */
+.confidence-cell-redesign {
+    width: 100%;
+}
+
+/* ✅ 坐标文本 */
+.bbox-text-redesign {
+    font-size: 12px;
+    font-family: 'Courier New', monospace;
+    color: var(--text-secondary);
+}
+
+/* ✅ 反馈按钮 */
+.face-feedback-btn-redesign {
+    color: var(--primary-light) !important;
+}
+
+.face-feedback-btn-redesign:hover {
+    color: var(--accent) !important;
+}
+
+/* 信息卡片 */
+.info-card {
+    padding: 20px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ✅ 重构: 人脸表格容器 */
+.faces-table-container {
+    padding: 20px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+/* ✅ 新增: 自动高度版本(多人脸场景) */
+.faces-table-container.glass-panel-auto {
+    max-height: none !important;
+    overflow: visible !important;
+}
+
+/* ✅ 重构: 单人脸紧凑布局 */
+.single-face-card.compact-layout {
+    padding: 16px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+/* 紧凑情绪头部 */
+.compact-emotion-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 12px;
 }
 
-:deep(.el-descriptions__body) {
-    background: transparent !important;
+.compact-confidence {
+    font-size: 18px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-light), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
-:deep(.el-descriptions__label) {
-    background: color-mix(in srgb, var(--card-bg) 85%, transparent) !important;
-    color: var(--text-secondary) !important;
-    border: 1px solid color-mix(in srgb, var(--border) 40%, transparent) !important;
-    font-weight: 600 !important;
-    padding: 10px 12px !important;
+/* 紧凑进度条 */
+.compact-progress {
+    margin-bottom: 16px;
 }
 
-:deep(.el-descriptions__content) {
-    background: color-mix(in srgb, var(--card-bg) 70%, transparent) !important;
-    color: var(--text) !important;
-    border: 1px solid color-mix(in srgb, var(--border) 40%, transparent) !important;
-    font-weight: 500 !important;
-    padding: 10px 12px !important;
-    max-width: 300px;
+/* 紧凑信息网格 */
+.compact-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.compact-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    background: rgba(113, 57, 255, 0.05);
+    border: 1px solid rgba(113, 57, 255, 0.1);
+    border-radius: 8px;
+}
+
+.compact-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    opacity: 0.7;
+}
+
+.compact-value {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.compact-value.bbox-inline {
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 11px;
+    color: var(--primary-light);
+}
+
+/* 紧凑情绪分布 */
+.compact-emotion-dist {
+    margin-bottom: 16px;
+}
+
+.compact-section-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.compact-emotion-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.compact-emotion-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.compact-emotion-name {
+    font-size: 11px;
+    color: var(--text-secondary);
+    min-width: 70px;
+    font-weight: 500;
+}
+
+.compact-bar-progress {
+    flex: 1;
+}
+
+/* 紧凑操作按钮 */
+.compact-action {
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.compact-feedback-btn {
+    width: 100%;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 100;
+    background: linear-gradient(135deg, rgba(230, 162, 60, 0.2), rgba(230, 162, 60, 0.1));
+    border: 1px solid rgba(230, 162, 60, 0.4);
+    color: var(--warning);
+    transition: all 0.3s ease;
+}
+
+.compact-feedback-btn:hover {
+    background: linear-gradient(135deg, rgba(230, 162, 60, 0.3), rgba(230, 162, 60, 0.2));
+    border-color: var(--warning);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(230, 162, 60, 0.3);
+}
+
+/* 单张人脸内容布局 */
+.single-face-content {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 24px;
+    align-items: start;
+    margin-top: 16px;
+}
+
+/* 单张人脸预览 */
+.single-face-preview {
+    display: flex;
+    justify-content: center;
+}
+
+.face-thumbnail-large {
+    width: 160px;
+    height: 160px;
+    border-radius: 16px;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    position: relative;
+    background: linear-gradient(135deg,
+            color-mix(in srgb, var(--primary) 15%, transparent),
+            color-mix(in srgb, var(--accent) 15%, transparent));
+    border: 2px solid rgba(113, 57, 255, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
 }
 
-.emotion-tag {
-    padding: 6px 14px;
-    border-radius: 20px;
+.face-thumbnail-large:hover {
+    transform: scale(1.05);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.face-large-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* ✅ 新增: 情绪覆盖层 */
+.emotion-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+}
+
+.overlay-emoji {
+    font-size: 32px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* ✅ 新增: 单张人脸详细信息 */
+.single-face-info {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ✅ 新增: 详细信息分区 */
+.face-detail-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.detail-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detail-value-large {
+    display: flex;
+    align-items: center;
+}
+
+/* ✅ 新增: 置信度显示 */
+.confidence-display {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.confidence-value {
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-light), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.detail-progress {
+    width: 100%;
+}
+
+/* ✅ 新增: 坐标显示 */
+.bbox-display {
+    padding: 8px 12px;
+    background: rgba(113, 57, 255, 0.08);
+    border: 1px solid rgba(113, 57, 255, 0.2);
+    border-radius: 8px;
+    font-family: 'Courier New', 'Consolas', monospace;
+}
+
+.bbox-value {
+    font-size: 13px;
+    color: var(--primary-light);
+    font-weight: 100;
+    letter-spacing: 0.5px;
+}
+
+/* ✅ 新增: 情绪分布 */
+.emotion-distribution {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.emotion-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.emotion-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-width: 80px;
+    font-weight: 500;
+}
+
+.emotion-bar-progress {
+    flex: 1;
+}
+
+/* 单张人脸操作按钮 */
+.single-face-action {
+    margin-top: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.face-feedback-btn-large {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 10px;
     font-size: 14px;
+    font-weight: 100;
+    background: linear-gradient(135deg, rgba(230, 162, 60, 0.2), rgba(230, 162, 60, 0.1));
+    border: 1px solid rgba(230, 162, 60, 0.4);
+    color: var(--warning);
+    transition: all 0.3s ease;
+}
+
+.face-feedback-btn-large:hover {
+    background: linear-gradient(135deg, rgba(230, 162, 60, 0.3), rgba(230, 162, 60, 0.2));
+    border-color: var(--warning);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(230, 162, 60, 0.4);
+}
+
+.section-title {
+    font-size: 15px;
+    font-weight: 100;
+    margin: 0 0 16px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-title .el-icon {
+    color: var(--primary);
+}
+
+/* 信息网格 */
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.info-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.info-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.info-value.highlight {
+    color: var(--primary-light);
+    font-weight: 100;
+}
+
+/* 大型情绪徽章 */
+.emotion-badge-large {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 15px;
     font-weight: 100;
     color: var(--text);
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border: 1px solid color-mix(in srgb, var(--border) 30%, transparent);
 }
 
-.faces-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    /* ✅ 优化: 适当增加最大高度，支持 3-4 个人脸卡片 */
-    max-height: 300px;
-    overflow-y: auto;
-    padding-right: 4px;
-}
-
-/* ✅ 新增: 人脸列表滚动条样式 */
-.faces-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.faces-list::-webkit-scrollbar-thumb {
-    background: rgba(146, 78, 255, 0.3);
-    border-radius: 3px;
-    transition: all 0.3s ease;
-}
-
-.faces-list::-webkit-scrollbar-thumb:hover {
-    background: rgba(146, 78, 255, 0.5);
-}
-
-/* ✅ 重构: 人脸卡片容器 */
-.face-detail-card {
-    padding: 14px;
-    background: color-mix(in srgb, var(--card-bg) 70%, transparent);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    transition: all 0.25s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.face-detail-card:hover {
-    border-color: color-mix(in srgb, var(--primary) 40%, transparent);
-    box-shadow: 0 4px 12px rgba(146, 78, 255, 0.15);
-    transform: translateY(-1px);
-}
-
-/* ✅ 新增: 卡片头部 */
-.face-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.face-title-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-}
-
-/* 人脸序号标签 */
-.face-index-badge {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    background: color-mix(in srgb, var(--primary) 15%, transparent);
-    padding: 4px 10px;
-    border-radius: 12px;
-    border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
-}
-
-/* 情绪显示 */
-.face-emotion-display {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.emotion-emoji {
-    font-size: 18px;
-    line-height: 1;
-}
-
-.emotion-name {
-    color: var(--text-primary);
-}
-
-/* 置信度徽章 */
-.face-confidence-badge {
-    font-size: 16px;
-    font-weight: 700;
-    padding: 4px 12px;
-    border-radius: 16px;
-    background: color-mix(in srgb, currentColor 15%, transparent);
-    border: 1px solid currentColor;
-    line-height: 1;
-    white-space: nowrap;
-}
-
-/* ✅ 新增: 进度条区域 */
-.face-progress-section {
-    margin-bottom: 10px;
-}
-
-/* ✅ 新增: 人脸卡片进度条渐变色支持 */
-.face-detail-card .el-progress-bar__inner {
-    transition: all 0.3s ease;
-    box-shadow: 0 0 8px color-mix(in srgb, currentColor 30%, transparent);
-}
-
-/* ✅ 重构: BBox 信息 */
-.face-bbox-info {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    font-family: 'Courier New', 'Consolas', monospace;
-    padding: 6px 10px;
-    background: color-mix(in srgb, var(--card-bg) 50%, transparent);
-    border-radius: var(--radius-sm);
-    border: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
-}
-
-.bbox-label {
-    color: var(--text-tertiary);
+.confidence-inline {
+    font-size: 13px;
+    opacity: 0.8;
     font-weight: 500;
 }
 
-.bbox-coords {
+
+/* ✅ 重构: 人脸表格样式 */
+.faces-table {
+    background: transparent !important;
+    margin-top: 12px;
+}
+
+/* ✅ 新增: 表格自动高度,移除max-height限制 */
+.faces-table :deep(.el-table) {
+    max-height: none !important;
+}
+
+/* ✅ 优化: 表格滚动条样式 */
+.faces-table :deep(.el-table__body-wrapper)::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.faces-table :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+}
+
+.faces-table :deep(.el-table__body-wrapper)::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
+.faces-table :deep(.el-table__body-wrapper)::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* 人脸缩略图 */
+.face-thumbnail {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 0 auto;
+    background: linear-gradient(135deg,
+            color-mix(in srgb, var(--primary) 15%, transparent),
+            color-mix(in srgb, var(--accent) 15%, transparent));
+    border: 1px solid rgba(113, 57, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.face-mini-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 人脸序号 */
+.face-index {
+    font-size: 13px;
+    font-weight: 100;
+    color: var(--primary-light);
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* 小型情绪徽章 */
+.emotion-badge-small {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 100;
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    border: 1px solid color-mix(in srgb, var(--border) 20%, transparent);
+}
+
+/* 置信度单元格 */
+.confidence-cell {
+    padding: 0 8px;
+}
+
+/* 坐标文本 */
+.bbox-text {
+    font-size: 11px;
     color: var(--text-secondary);
+    font-family: 'Courier New', 'Consolas', monospace;
     letter-spacing: 0.5px;
+}
+
+/* 人脸反馈按钮 */
+.face-feedback-btn {
+    color: var(--warning);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.face-feedback-btn:hover {
+    background: rgba(230, 162, 60, 0.15);
+    color: var(--warning);
+    transform: translateY(-1px);
+}
+
+/* 表格行样式 */
+:deep(.face-table-row-even) {
+    background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+}
+
+:deep(.face-table-row-odd) {
+    background: color-mix(in srgb, var(--card-bg) 85%, transparent);
+}
+
+:deep(.el-table__row:hover) {
+    background: color-mix(in srgb, var(--primary) 8%, transparent) !important;
+}
+
+/* ✅ 新增: 反馈对话框样式 */
+:deep(.feedback-dialog) {
+    .el-dialog {
+        background: var(--card-bg) !important;
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+    }
+
+    .el-dialog__header {
+        border-bottom: 1px solid var(--border);
+        padding: 16px 20px;
+    }
+
+    .el-dialog__body {
+        padding: 20px;
+    }
+}
+
+.feedback-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.feedback-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+    border-radius: var(--radius-sm);
+}
+
+.feedback-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.feedback-value {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 100;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* 表单样式 */
+:deep(.el-form-item__label) {
+    color: var(--text) !important;
+    font-weight: 500;
+}
+
+:deep(.el-select) {
+    --el-select-border-color-hover: var(--primary);
+    --el-select-input-color: var(--text);
+}
+
+:deep(.el-textarea__inner) {
+    background: color-mix(in srgb, var(--card-bg) 70%, transparent) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+}
+
+:deep(.el-textarea__inner:focus) {
+    border-color: var(--primary) !important;
 }
 
 /* 对话框底部按钮样式 */

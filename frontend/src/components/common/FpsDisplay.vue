@@ -43,7 +43,7 @@ defineProps({
 .fps-unit {
     font-size: 11px;
     color: rgba(0, 217, 255, 0.6);
-    font-weight: 600;
+    font-weight: 100;
 }
 
 @keyframes pulse {

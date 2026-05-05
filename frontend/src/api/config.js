@@ -15,5 +15,6 @@ export const API = {
   historyStats: `${API_BASE_URL}/api/history/stats`,
   stats: `${API_BASE_URL}/api/stats`,
   feedback: `${API_BASE_URL}/api/feedback`,
+  feedbackHistory: `${API_BASE_URL}/api/feedback/history`, // ✅ 新增: 反馈历史
   health: `${API_BASE_URL}/api/health`,
 }

@@ -88,3 +88,21 @@ async def delete_by_type(detection_type: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{record_id}")
+async def delete_record(record_id: int):
+    """删除单条历史记录"""
+    try:
+        success = _db_manager.delete_history_record(record_id)
+        if success:
+            return {
+                "status": "success",
+                "message": "记录已成功删除"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="记录不存在")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

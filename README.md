@@ -1,991 +1,872 @@
-#  AI 情感检测系统
+# 🎭 FaceEmotion-AI
 
-> 基于深度学习的多模态实时情感识别平台，支持人脸检测、情绪分析、语音情绪识别和 AI 音乐生成
+> **智能面部情绪识别与多模态分析平台**  
+> 基于深度学习的实时情绪检测系统，支持人脸情绪识别、语音情感分析、AI 音乐生成与自适应学习
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
-[![Vue.js](https://img.shields.io/badge/Vue.js-3.x-green.svg)](https://vuejs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-teal.svg)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
-
----
-
-## 📑 目录
-
-- [项目简介](#-项目简介)
-- [核心功能](#-核心功能)
-- [技术栈](#-技术栈)
-- [系统架构](#-系统架构)
-- [快速开始](#-快速开始)
-- [详细配置](#-详细配置)
-- [API 文档](#-api-文档)
-- [前端组件](#-前端组件)
-- [数据库设计](#-数据库设计)
-- [性能优化](#-性能优化)
-- [常见问题](#-常见问题)
-- [开发规范](#-开发规范)
-- [部署指南](#-部署指南)
-- [贡献指南](#-贡献指南)
-- [许可证](#-许可证)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![Vue](https://img.shields.io/badge/Vue.js-3.x-brightgreen.svg)](https://vuejs.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
 ## 📖 项目简介
 
-**AI 情感检测系统**是一个基于深度学习的全栈情感识别平台，集成了：
+FaceEmotion-AI 是一个全栈 AI 情绪识别系统，结合了计算机视觉、深度学习和前端可视化技术。系统能够实时检测和分析面部情绪，并提供智能化的情绪反馈与音乐推荐。
 
-- **人脸检测与情绪识别**：使用 Caffe SSD + ONNX 模型，支持 GPU 加速
-- **语音情绪分析**：通过 AudioWorklet 实时采集音频，分析声学特征
-- **多模态融合**：结合视觉和语音情绪，提供更准确的情感判断
-- **AI 音乐生成**：根据情绪状态实时生成对应的背景音乐
-- **实时流媒体**：WebSocket 实现毫秒级数据传输
-- **历史记录与统计**：完整的检测记录和数据分析看板
+###  核心功能
 
-### 应用场景
+- 🎯 **实时情绪检测**：基于摄像头的实时面部情绪识别，支持多张人脸同时检测
+- 🖼️ **图片/视频批量处理**：支持上传图片或视频进行批量情绪分析
+- 🎵 **AI 音乐生成**：根据检测到的情绪自动生成匹配的背景音乐
+-  **自适应学习**：系统能够通过用户反馈不断优化识别准确率
+-  **数据分析看板**：可视化的情绪趋势分析与用户行为统计
+- 🎨 **多主题切换**：支持深色/浅色主题，Overwatch/禅意等多种 UI 风格
+-  **响应式设计**：完美适配桌面端和移动端
 
--  **实时情感监控**：视频会议、在线教育、远程医疗
-- 📊 **情绪数据分析**：用户行为研究、市场调研、心理学实验
-- 🎵 **个性化音乐推荐**：根据情绪状态播放对应音乐
-- 🎮 **游戏交互**：情感驱动的游戏体验
+### 🚀 技术亮点
 
----
-
-##  核心功能
-
-### 1. 实时人脸检测
-
-| 功能 | 说明 |
-|------|------|
-| 多模型支持 | Caffe SSD（高精度）+ ONNX RFB（高速度） |
-| GPU 加速 | CUDA + TensorRT 支持 |
-| 实时渲染 | Canvas 绘制检测框和情绪标签 |
-| 多人脸识别 | 支持同时检测多张人脸 |
-| 自适应阈值 | 动态调整置信度阈值 |
-
-### 2. 情绪分类
-
-| 情绪类型 | Emoji | 说明 |
-|----------|-------|------|
-| 😊 Happy | 快乐 | 高兴、愉悦 |
-|  Sad | 悲伤 | 难过、沮丧 |
-| 😠 Angry | 愤怒 | 生气、恼怒 |
-| 😨 Fear | 恐惧 | 害怕、担心 |
-|  Surprise | 惊讶 | 惊奇、意外 |
-| 🤢 Disgust | 厌恶 | 反感、讨厌 |
-| 😐 Neutral | 中性 | 平静、无表情 |
-
-### 3. 语音情绪分析
-
-- **AudioWorklet 采集**：低延迟音频流处理
-- **声学特征提取**：
-  - 音高（Pitch）
-  - 能量（Energy）
-  - 语速（Speaking Rate）
-  - 有声/无声检测（VAD）
-- **情绪分类**：基于音频特征的情绪识别
-- **多模态融合**：结合视觉和语音情绪
-
-### 4. AI 音乐生成
-
-- **情绪驱动**：根据情绪状态选择音乐风格
-- **实时生成**：基于 Web Audio API 合成音乐
-- **交叉淡入淡出**：平滑过渡不同情绪的音乐
-- **多音轨混合**：旋律、和声、节奏层独立控制
-
-### 5. 检测模式
-
-| 模式 | 说明 |
-|------|------|
-| 实时检测 | 摄像头实时视频流分析 |
-| 图片检测 | 单张图片情绪识别 |
-| 批量检测 | 多张图片批量处理 |
-| 视频检测 | 视频文件关键帧分析 |
-
-### 6. 数据管理
-
-- **历史记录**：保存所有检测记录
-- **数据统计**：情绪分布、趋势分析
-- **数据导出**：CSV/JSON 格式导出
-- **类型筛选**：按检测类型过滤记录
+- **高性能推理**：ONNX Runtime + GPU 加速，实时检测 FPS > 30
+- **模型与代码分离**：创新的架构设计，模型文件独立管理
+- **智能帧率控制**：动态调整检测频率，平衡性能与精度
+- **WebSocket 实时通信**：低延迟的数据传输与状态同步
+- **Docker 容器化**：一键部署，跨平台兼容
 
 ---
 
-## 🛠 技术栈
-
-### 后端技术
-
-| 技术 | 版本 | 用途 |
-|------|------|------|
-| Python | 3.10+ | 主要开发语言 |
-| FastAPI | 0.100+ | Web 框架 |
-| Uvicorn | 0.23+ | ASGI 服务器 |
-| OpenCV | 4.8+ | 图像处理 |
-| ONNX Runtime | 1.15+ | 模型推理 |
-| SQLite | 3.x | 数据库 |
-| WebSocket | - | 实时通信 |
+## 🛠️ 技术栈
 
 ### 前端技术
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| Vue.js | 3.x | 前端框架 |
-| Vite | 4.x | 构建工具 |
-| Element Plus | 2.x | UI 组件库 |
-| Chart.js | 4.x | 数据可视化 |
-| Web Audio API | - | 音频处理 |
-| Canvas API | - | 视频渲染 |
+| [Vue 3](https://vuejs.org/) | 3.x | 核心框架（Composition API） |
+| [Vite](https://vitejs.dev/) | 5.x | 构建工具与开发服务器 |
+| [Element Plus](https://element-plus.org/) | 2.x | UI 组件库 |
+| [Pinia](https://pinia.vuejs.org/) | 2.x | 状态管理 |
+| [Axios](https://axios-http.com/) | 1.x | HTTP 客户端 |
+| [ECharts](https://echarts.apache.org/) | 5.x | 数据可视化图表 |
+| [Web Audio API](https://developer.mozilla.org/) | 原生 | 音频采集与处理 |
 
-### 模型与技术
+### 后端技术
 
-| 模型 | 格式 | 用途 |
+| 技术 | 版本 | 用途 |
 |------|------|------|
-| Caffe SSD | .caffemodel | 人脸检测（高精度） |
-| ONNX RFB | .onnx | 人脸检测（高速度） |
-| Emotion Classifier | .onnx | 情绪分类 |
-| TensorRT | - | GPU 加速 |
-| FP16 | - | 半精度推理 |
+| [FastAPI](https://fastapi.tiangolo.com/) | 0.100+ | Web 框架 |
+| [Uvicorn](https://www.uvicorn.org/) | 0.23+ | ASGI 服务器 |
+| [OpenCV](https://opencv.org/) | 4.x | 图像处理与人脸检测 |
+| [ONNX Runtime](https://onnxruntime.ai/) | 1.x | 模型推理引擎 |
+| [PyTorch](https://pytorch.org/) | 2.x | 深度学习框架 |
+| [SQLAlchemy](https://www.sqlalchemy.org/) | 2.x | ORM 数据库管理 |
+| [WebSockets](https://websockets.readthedocs.io/) | 11.x | 实时通信 |
+
+### AI 模型
+
+| 模型 | 类型 | 用途 | 大小 |
+|------|------|------|------|
+| `pytorch_final_3060.pth` | PyTorch | 情绪分类主模型 | 26.5 MB |
+| `emotion_model.onnx` | ONNX | 情绪分类（推理优化） | 8.7 MB |
+| `res10_300x300_ssd_iter_140000_fp16.caffemodel` | Caffe | 人脸检测（高精度） | 5.2 MB |
+| `version-RFB-320.onnx` | ONNX | 人脸检测（快速） | 1.2 MB |
+| `wav2vec2` | Transformer | 语音情感识别 | 645 MB |
 
 ---
 
-## 🏗 系统架构
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        前端 (Vue.js)                         │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ 实时检测 │  │ 图片检测 │  │ 批量检测 │  │ 视频检测 │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│       │             │             │             │           │
-│  ┌────┴─────────────┴─────────────┴─────────────┴─────┐   │
-│  │              WebSocket 实时通信                      │   │
-│  └─────────────────────┬───────────────────────────────┘   │
-│       ┌────────────────┴────────────────┐                  │
-│       │    AudioWorklet (音频采集)       │                  │
-│       └────────────────┬────────────────┘                  │
-────────────────────────┼──────────────────────────────────┘
-                         │ WebSocket / HTTP
-┌────────────────────────┼──────────────────────────────────┐
-│                        后端 (FastAPI)                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ 人脸检测 │  │ 情绪分类 │  │ 语音分析 │  │ 音乐生成 │   │
-│  │  模块    │  │  模块    │  │  模块    │  │  模块    │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│       │             │             │             │           │
-│  ┌────┴─────────────┴─────────────┴─────────────┴─────┐   │
-│  │           ONNX Runtime (GPU 加速)                    │   │
-│  └─────────────────────┬───────────────────────────────┘   │
-│                         │                                  │
-│  ┌─────────────────────┴───────────────────────────────┐   │
-│  │              SQLite 数据库                            │   │
-│  │  • 检测历史记录                                      │   │
-│  │  • 用户反馈                                          │   │
-│  │  • 统计数据                                          │   │
-│  └─────────────────────────────────────────────────────┘   │
-─────────────────────────────────────────────────────────────┘
-```
-
-### 目录结构
+## 📁 项目结构
 
 ```
 FaceEmotion-AI/
-├── backend/                    # 后端服务
-│   ├── api/                    # API 路由
-│   │   ├── detection.py        # 检测接口
-│   │   ├── history.py          # 历史记录接口
-│   │   ├── websocket.py        # WebSocket 处理
-│   │   └── analytics.py        # 数据分析接口
-│   ├── models/                 # AI 模型
-│   │   ├── detector.py         # 人脸检测器
-│   │   ├── emotion_classifier_onnx.py  # 情绪分类器
-│   │   ├── face_detector_onnx.py       # ONNX 人脸检测
-│   │   └── *.caffemodel        # Caffe 模型文件
-│   ├── multimodal/             # 多模态模块
-│   │   └── voice_analyzer.py   # 语音分析器
-│   ├── music/                  # 音乐生成
-│   │   └── music_generator.py  # 音乐生成器
-│   ├── adaptation/             # 自适应学习
-│   │   └── active_learner.py   # 主动学习
-│   ├── optimizer/              # 性能优化
-│   │   └── dynamic_inference.py # 动态推理
-│   ├── analytics/              # 数据分析
-│   │   └── user_analytics.py   # 用户分析
-│   ├── database.py             # 数据库管理
-│   ├── config.py               # 配置文件
-│   ├── constants.py            # 常量定义
-│   ├── app.py                  # 应用入口
-│   └── requirements.txt        # Python 依赖
+├──  models/                          # 🎯 AI 模型文件（新架构）
+│   ├── 📁 weights/                     # 模型权重文件
+│   │   ├── pytorch_final_3060.pth
+│   │   ├── emotion_model.onnx
+│   │   ├── version-RFB-320.onnx
+│   │   └── res10_300x300_ssd_iter_140000_fp16.caffemodel
+│   ├──  configs/                     # 模型配置文件
+│   │   ├── deploy.prototxt
+│   │   └── haarcascade_frontalface_default.xml
+│   └── 📁 docs/                        # 模型文档
+│       └── MODEL_MIGRATION_GUIDE.md
 │
-├── frontend/                   # 前端应用
-│   ├── src/
-│   │   ├── api/                # API 配置
-│   │   │   ├── config.js       # API 地址
-│   │   │   ── websocket.js    # WebSocket 客户端
-│   │   ├── components/         # Vue 组件
-│   │   │   ├── detection/      # 检测组件
-│   │   │   │   ├── RealtimeDetector.vue   # 实时检测
-│   │   │   │   ├── ImageDetector.vue      # 图片检测
-│   │   │   │   ├── BatchDetector.vue      # 批量检测
-│   │   │   │   └── VideoDetector.vue      # 视频检测
-│   │   │   ├── HistoryViewer.vue          # 历史记录
-│   │   │   ├── AnalyticsDashboard.vue     # 数据看板
-│   │   │   ├── EmotionSVG.vue             # 情绪图标
-│   │   │   └── FpsDisplay.vue             # FPS 显示
-│   │   ├── utils/              # 工具函数
-│   │   │   ├── emotion.js      # 情绪工具
-│   │   │   ├── canvas.js       # Canvas 工具
-│   │   │   ├── audioCapture.js # 音频采集
-│   │   │   ├── audioEngine.js  # 音频引擎
-│   │   │   └── analytics.js    # 分析工具
-│   │   ├── stores/             # 状态管理
-│   │   │   └── theme.js        # 主题状态
-│   │   ├── themes/             # 主题配置
-│   │   │   └── index.js        # 主题定义
-│   │   ├── styles/             # 样式文件
-│   │   │   └── element-overwatch.css  # Element Plus 主题
-│   │   ├── App.vue             # 根组件
-│   │   ── main.js             # 入口文件
-│   ├── public/                 # 静态资源
-│   ├── index.html              # HTML 模板
-│   ├── vite.config.js          # Vite 配置
-│   └── package.json            # 前端依赖
+├── 📁 backend/                         # 🔧 后端服务
+│   ├── 📁 api/                         # API 路由层
+│   │   ├── __init__.py
+│   │   ├── detection.py                # 检测接口
+│   │   ├── history.py                  # 历史记录接口
+│   │   └── analytics.py                # 数据分析接口
+│   ├── 📁 models/                      # Python 模型代码
+│   │   ├── detector.py                 # 人脸检测器
+│   │   ├── emotion_classifier.py       # 情绪分类器
+│   │   ├── emotion_classifier_onnx.py  # ONNX 分类器
+│   │   └── face_detector_onnx.py       # ONNX 人脸检测
+│   ├──  adaptation/                  # 自适应学习模块
+│   │   ├── active_learner.py
+│   │   └── enhanced_learner.py
+│   ├──  analytics/                   # 数据分析模块
+│   │   └── user_analytics.py
+│   ├── 📁 multimodal/                  # 多模态分析
+│   │   └── voice_analyzer.py
+│   ├── 📁 music/                       # AI 音乐生成
+│   │   ── music_generator.py
+│   ├── 📁 optimizer/                   # 性能优化器
+│   │   └── dynamic_inference.py
+│   ├── 📁 data/                        # 数据目录
+│   │   ├── emotion.db                  # 主数据库
+│   │   ├── face_emotion.db             # 人脸数据库
+│   │   ├── screenshots/                # 截图缓存
+│   │   └── uploads/                    # 上传文件
+│   ├── 📁 scripts/                     # 工具脚本
+│   │   └── convert_to_onnx.py          # 模型转换
+│   ├── app.py                          # 🚀 应用入口
+│   ├── config.py                       # 配置管理器
+│   ├── config.json                     # 配置文件
+│   ├── constants.py                    # 常量定义
+│   ├── database.py                     # 数据库管理
+│   ├── requirements.txt                # Python 依赖
+│   └── Dockerfile                      # Docker 配置
 │
-├── .env.example                # 环境变量示例
-├── docker-compose.yml          # Docker 配置
-└── README.md                   # 项目文档
+├── 📁 frontend/                        # 🎨 前端应用
+│   ├── 📁 src/
+│   │   ├── 📁 api/                     # API 客户端层
+│   │   │   ├── http.js                 # Axios 封装
+│   │   │   ├── websocket.js            # WebSocket 客户端
+│   │   │   └── modules/                # 业务 API 模块
+│   │   │       ├── detection.js
+│   │   │       ├── history.js
+│   │   │       ├── analytics.js
+│   │   │       └── system.js
+│   │   ├── 📁 components/              # Vue 组件
+│   │   │   ├── 📁 common/              # 通用组件
+│   │   │   │   ├── EmotionSVG.vue
+│   │   │   │   ├── FpsDisplay.vue
+│   │   │   │   └── ThemeSelector.vue
+│   │   │   ├── 📁 detection/           # 检测组件
+│   │   │   │   ├── RealtimeDetector.vue
+│   │   │   │   ├── ImageDetector.vue
+│   │   │   │   ├── VideoDetector.vue
+│   │   │   │   └── BatchDetector.vue
+│   │   │   ├── 📁 layout/              # 布局组件
+│   │   │   │   ├── AppHeader.vue
+│   │   │   │   └── AppSidebar.vue
+│   │   │   ├── 📁 analytics/           # 分析组件
+│   │   │   │   └── AnalyticsDashboard.vue
+│   │   │   └── 📁 feedback/            # 反馈组件
+│   │   │       ├── EmotionFeedback.vue
+│   │   │       └── HistoryViewer.vue
+│   │   ├── 📁 stores/                  # Pinia 状态管理
+│   │   │   ├── theme.js
+│   │   │   ├── audio.js
+│   │   │   └── analytics.js
+│   │   ├── 📁 utils/                   # 工具函数
+│   │   │   ├── emotion.js
+│   │   │   ├── audioCapture.js
+│   │   │   ├── canvas.js
+│   │   │   └── analytics.js
+│   │   ├── 📁 styles/                  # 样式文件
+│   │   │   ├── global.css
+│   │   │   ├── element-overwatch.css
+│   │   │   └── components.css
+│   │   ├── 📁 themes/                  # 主题配置
+│   │   │   └── index.js
+│   │   ├── App.vue                     # 根组件
+│   │   └── main.js                     # 入口文件
+│   ├── 📁 public/                      # 静态资源
+│   ├── 📁 data/                        # 前端数据缓存
+│   ├── index.html                      # HTML 入口
+│   ├── vite.config.js                  # Vite 配置
+│   ├── package.json                    # Node 依赖
+│   ├── nginx.conf                      # Nginx 配置
+│   └── Dockerfile                      # Docker 配置
+│
+├── 📁 wav2vac2/                        # 🎤 语音模型（可选）
+│   ├── model.safetensors
+│   ├── config.json
+│   └── preprocessor_config.json
+│
+├── .gitignore                          # Git 忽略规则
+├── docker-compose.yml                  # Docker Compose 配置
+└── README.md                           # 项目文档
+```
+
+### 📌 架构说明
+
+#### 模型与代码分离架构
+
+本项目采用**模型文件与代码分离**的创新架构：
+
+- **`models/weights/`**：存放所有模型权重文件（`.pth`, `.onnx`, `.caffemodel`）
+- **`models/configs/`**：存放模型配置文件（`.prototxt`, `.xml`）
+- **`backend/models/`**：仅保留 Python 模型代码，不含权重文件
+
+**优势**：
+- ✅ Git 仓库体积小（不追踪大文件）
+- ✅ 模型文件独立管理，便于版本控制
+- ✅ 支持多环境模型切换（开发/生产）
+- ✅ 便于模型更新与热替换
+
+---
+
+## 🚀 环境准备
+
+### 系统要求
+
+| 组件 | 最低要求 | 推荐配置 |
+|------|---------|---------|
+| **操作系统** | Windows 10+ / macOS / Linux | Windows 11 / Ubuntu 22.04 |
+| **Python** | 3.10+ | 3.12 |
+| **Node.js** | 18+ | 20 LTS |
+| **GPU**（可选） | - | NVIDIA RTX 3060+（6GB+ 显存） |
+| **内存** | 8 GB | 16 GB+ |
+| **磁盘空间** | 5 GB | 10 GB+（含模型文件） |
+
+### 1️⃣ 安装 Python 环境
+
+#### Windows PowerShell
+
+```powershell
+# 1. 克隆项目
+git clone https://github.com/your-username/FaceEmotion-AI.git
+cd FaceEmotion-AI
+
+# 2. 创建虚拟环境
+python -m venv .venv
+
+# 3. 激活虚拟环境
+.\.venv\Scripts\Activate.ps1
+
+# 4. 安装后端依赖
+cd backend
+pip install -r requirements.txt
+```
+
+#### macOS / Linux
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/your-username/FaceEmotion-AI.git
+cd FaceEmotion-AI
+
+# 2. 创建虚拟环境
+python3 -m venv .venv
+
+# 3. 激活虚拟环境
+source .venv/bin/activate
+
+# 4. 安装后端依赖
+cd backend
+pip install -r requirements.txt
+```
+
+### 2️⃣ 安装 Node.js 环境
+
+```bash
+# 进入前端目录
+cd frontend
+
+# 安装依赖
+npm install
+
+# 或使用 yarn
+yarn install
+```
+
+### 3️⃣ 模型文件准备
+
+⚠️ **重要**：由于模型文件较大（约 42 MB），**不会包含在 Git 仓库中**。
+
+#### 获取模型文件
+
+1. **从项目维护者处下载**
+   - 联系项目作者获取模型文件包
+   - 或使用提供的下载链接
+
+2. **下载后放置位置**
+   ```
+   models/
+   ├── weights/
+   │   ├── pytorch_final_3060.pth          (26.5 MB)
+   │   ├── emotion_model.onnx              (8.7 MB)
+   │   ├── version-RFB-320.onnx            (1.2 MB)
+   │   └── res10_300x300_ssd_iter_140000_fp16.caffemodel (5.2 MB)
+   └── configs/
+       ├── deploy.prototxt                 (29.2 KB)
+       └── haarcascade_frontalface_default.xml (908.3 KB)
+   ```
+
+3. **详细指南**
+   
+   查看完整迁移指南：[models/docs/MODEL_MIGRATION_GUIDE.md](models/docs/MODEL_MIGRATION_GUIDE.md)
+
+### 4️⃣ （可选）语音模型
+
+如需启用语音情绪识别功能，需额外下载 wav2vec2 模型：
+
+```bash
+# 模型将自动下载到 wav2vac2/ 目录
+cd backend
+python download_wav2vec2.py
+```
+
+⚠️ **注意**：语音模型较大（645 MB），默认不启用。
+
+---
+
+## ⚡ 快速启动
+
+### 方式一：开发模式启动
+
+#### 1. 启动后端服务
+
+```powershell
+# Windows PowerShell
+cd backend
+.\.venv\Scripts\python.exe app.py
+```
+
+```bash
+# macOS / Linux
+cd backend
+source .venv/bin/activate
+python app.py
+```
+
+**成功输出示例**：
+```
+2026-05-06 00:28:02 | INFO    | __main__ - 🚀 AI情感检测系统 V3.0.0 启动中...
+2026-05-06 00:28:02 | INFO    | __main__ - ✅ GPU: NVIDIA GeForce RTX 3060 Laptop GPU (6.0 GB)
+2026-05-06 00:28:02 | INFO    | __main__ - ✅ 人脸检测器加载成功
+2026-05-06 00:28:02 | INFO    | __main__ - ✅ ONNX情感分类器加载成功
+2026-05-06 00:28:02 | INFO    | __main__ - ✅ 数据库初始化完成
+2026-05-06 00:28:02 | INFO    | uvicorn.error - Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000
+```
+
+#### 2. 启动前端服务
+
+```bash
+# 打开新终端
+cd frontend
+
+# 启动开发服务器
+npm run dev
+
+# 或
+yarn dev
+```
+
+**成功输出示例**：
+```
+VITE v5.0.0  ready in 500 ms
+
+➜  Local:   http://localhost:5173/
+➜  Network: http://192.168.1.100:5173/
+➜  press h + enter to show help
+```
+
+#### 3. 访问应用
+
+打开浏览器访问：http://localhost:5173
+
+---
+
+### 方式二：Docker 一键部署
+
+#### 前置要求
+
+- 已安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- （可选）已安装 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/)
+
+#### 启动命令
+
+```bash
+# 1. 构建并启动所有服务
+docker-compose up --build -d
+
+# 2. 查看服务状态
+docker-compose ps
+
+# 3. 查看日志
+docker-compose logs -f
+
+# 4. 停止服务
+docker-compose down
+```
+
+#### 访问地址
+
+- **前端**：http://localhost:80
+- **后端 API**：http://localhost:8000
+- **API 文档**：http://localhost:8000/docs
+
+#### Docker 配置说明
+
+编辑 `docker-compose.yml` 可自定义配置：
+
+```yaml
+services:
+  backend:
+    environment:
+      - USE_GPU=true              # 启用 GPU（需 NVIDIA Container Toolkit）
+      - LOG_LEVEL=info            # 日志级别
+      - MAX_WORKERS=4             # 工作线程数
+    volumes:
+      - ./models:/app/models      # 挂载模型文件
+      - ./backend/data:/app/data  # 持久化数据
 ```
 
 ---
 
-## 🚀 快速开始
+## 🎯 功能特性
 
-### 环境要求
+### 1.  实时情绪检测
 
-- **Python**: 3.10 或更高版本
-- **Node.js**: 18.x 或更高版本
-- **GPU** (可选): NVIDIA GPU with CUDA 支持
-- **操作系统**: Windows / Linux / macOS
+- **多张人脸检测**：支持同时检测多张人脸（最多 10 张）
+- **实时预览**：Canvas 绘制检测框与情绪标签
+- **性能监控**：实时显示 FPS、延迟、跳帧率等指标
+- **智能优化**：动态调整检测频率，保持流畅体验
 
-### 安装步骤
+**使用步骤**：
+1. 选择"实时检测"模式
+2. 允许摄像头权限
+3. 系统自动开始检测
+4. 查看实时情绪分析结果
 
-#### 1. 克隆项目
+### 2. ️ 图片检测
 
-```bash
-git clone https://github.com/yourusername/FaceEmotion-AI.git
-cd FaceEmotion-AI
+- **单张图片分析**：上传图片进行情绪识别
+- **多张批量处理**：支持同时上传多张图片
+- **检测框显示/隐藏**：可切换显示情绪标签
+- **结果导出**：支持 JSON/CSV 格式导出
+
+### 3. 🎬 视频检测
+
+- **视频文件上传**：支持 MP4、AVI 等常见格式
+- **逐帧分析**：自动提取关键帧进行情绪检测
+- **时间轴展示**：情绪变化趋势可视化
+- **进度条控制**：可暂停/继续/跳转
+
+### 4.  批量检测
+
+- **多文件上传**：支持图片和视频混合上传
+- **异步处理**：后台批量处理，不阻塞 UI
+- **进度追踪**：实时显示处理进度
+- **统一结果**：整合所有检测结果
+
+### 5. 📊 数据分析看板
+
+- **情绪趋势图**：最近 7 天情绪变化趋势
+- **情绪分布**：各类情绪占比饼图
+- **转换矩阵**：情绪转换热力图
+- **用户统计**：使用时长、检测次数等
+
+### 6.  AI 自适应学习
+
+- **用户反馈**：纠正错误的情绪识别结果
+- **主动学习**：系统自动收集困难样本
+- **模型微调**：定期使用新数据优化模型
+- **场景适应**：根据使用场景自动调整
+
+### 7. 🎵 AI 音乐生成
+
+- **情绪匹配**：根据情绪自动生成背景音乐
+- **风格多样**：支持古典、爵士、电子等多种风格
+- **实时切换**：情绪变化时自动切换音乐
+- **音量控制**：可调节背景音乐音量
+
+### 8. 🎨 主题切换
+
+- **深色/浅色模式**：支持自动/手动切换
+- **多种主题**：Overwatch、禅意、赛博朋克等
+- **记忆偏好**：自动保存用户主题选择
+- **全局适配**：所有组件统一主题风格
+
+---
+
+## ⚙️ 配置说明
+
+### 后端配置 (`backend/config.json`)
+
+```json
+{
+  // 服务器配置
+  "host": "0.0.0.0",                  // 监听地址
+  "port": 8000,                       // 监听端口
+  "debug": false,                     // 调试模式
+  
+  // AI 模型配置
+  "use_gpu": true,                    // 启用 GPU 加速
+  "model_path": "../models/weights/pytorch_final_3060.pth",  // 情绪模型路径
+  "face_detector_model": "../models/weights/res10_300x300_ssd_iter_140000_fp16.caffemodel",  // 人脸检测模型
+  "emotion_model": "../models/weights/emotion_model.onnx",   // ONNX 情绪模型
+  "use_onnx_face_detector": false,    // 使用 ONNX 人脸检测器
+  "confidence_threshold": 0.6,        // 置信度阈值（0.0-1.0）
+  
+  // 性能配置
+  "max_workers": 4,                   // 工作线程数
+  "send_width": 160,                  // 发送图像宽度
+  "send_height": 120,                 // 发送图像高度
+  "frame_skip_threshold": 2,          // 跳帧阈值
+  "ema_alpha": 0.15,                  // EMA 平滑系数
+  
+  // WebSocket 配置
+  "ws_max_connections": 10,           // 最大连接数
+  "ws_heartbeat_interval": 30,        // 心跳间隔（秒）
+  
+  // 数据库配置
+  "database_url": "sqlite:///./data/emotion.db",
+  "db_pool_size": 5,
+  "db_max_overflow": 10
+}
 ```
 
-#### 2. 后端安装
+### 环境变量 (`.env`)
 
-```bash
-cd backend
-
-# 创建虚拟环境
-python -m venv venv
-
-# 激活虚拟环境
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 下载模型文件
-# 将模型文件放置在 backend/models/ 目录：
-# - res10_300x300_ssd_iter_140000_fp16.caffemodel
-# - deploy.prototxt
-# - emotion_model.onnx
-# - version-RFB-320.onnx (可选)
-```
-
-#### 3. 前端安装
-
-```bash
-cd ../frontend
-
-# 安装依赖
-npm install
-```
-
-#### 4. 配置环境变量
-
-```bash
-# 复制环境变量示例文件
-cd backend
-cp .env.example .env
-
-# 编辑 .env 文件，配置你的参数
-```
-
-**.env 配置示例**：
+创建 `backend/.env` 文件覆盖默认配置：
 
 ```bash
 # 服务器配置
 HOST=0.0.0.0
 PORT=8000
-DEBUG=true
-
-# 模型配置
-FACE_DETECTOR_MODEL=./models/res10_300x300_ssd_iter_140000_fp16.caffemodel
-USE_ONNX_FACE_DETECTOR=false
-EMOTION_MODEL_PATH=./models/emotion_model.onnx
-CONFIDENCE_THRESHOLD=0.6
+DEBUG=false
+LOG_LEVEL=info
 
 # GPU 配置
 USE_GPU=true
-GPU_DEVICE=0
-TENSORRT_CACHE=true
-USE_FP16=true
+
+# 模型路径（可选，覆盖 config.json）
+MODEL_PATH=../models/weights/pytorch_final_3060.pth
+FACE_DETECTOR_MODEL=../models/weights/res10_300x300_ssd_iter_140000_fp16.caffemodel
+EMOTION_MODEL=../models/weights/emotion_model.onnx
+
+# 性能配置
+MAX_WORKERS=4
+SEND_WIDTH=160
+SEND_HEIGHT=120
+EMA_ALPHA=0.15
 
 # 数据库配置
-DATABASE_PATH=./data/emotion.db
-
-# 其他配置
-MAX_FACES=10
-FRAME_SKIP=2
+DATABASE_URL=sqlite:///./data/emotion.db
 ```
 
-#### 5. 启动服务
-
-**启动后端**：
+### 前端配置 (`frontend/.env`)
 
 ```bash
-cd backend
-python app.py
-```
+# API 地址
+VITE_API_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000/ws/stream
 
-后端服务将在 `http://localhost:8000` 启动。
+# 功能开关
+VITE_ENABLE_GPU=true
+VITE_ENABLE_AUDIO=false
+VITE_ENABLE_ANALYTICS=true
 
-**启动前端**：
+# 性能配置
+VITE_MAX_FPS=30
+VITE_SEND_WIDTH=160
+VITE_SEND_HEIGHT=120
+VITE_EMA_ALPHA=0.15
 
-```bash
-cd frontend
-npm run dev
-```
-
-前端服务将在 `http://localhost:5173` 启动。
-
-#### 6. 访问应用
-
-打开浏览器访问 `http://localhost:5173`
-
----
-
-## ️ 详细配置
-
-### 后端配置
-
-#### 模型选择
-
-在 `backend/config.py` 中可以配置使用的模型：
-
-```python
-# 使用 Caffe SSD（高精度，推荐）
-'face_detector_model': './models/res10_300x300_ssd_iter_140000_fp16.caffemodel',
-'use_onnx_face_detector': False,
-
-# 使用 ONNX RFB（高速度）
-# 'face_detector_model': './models/version-RFB-320.onnx',
-# 'use_onnx_face_detector': True,
-```
-
-#### GPU 加速
-
-启用 GPU 加速以获得最佳性能：
-
-```python
-'use_gpu': True,
-'gpu_device': 0,  # GPU 设备 ID
-'tensorrt_cache': True,  # 使用 TensorRT 缓存
-'use_fp16': True,  # 使用半精度推理
-```
-
-#### 性能调优
-
-```python
-# 置信度阈值（过滤低置信度的检测结果）
-'confidence_threshold': 0.6,
-
-# 最大检测人脸数
-'max_faces': 10,
-
-# 跳帧数（每 N 帧检测一次）
-'frame_skip': 2,
-```
-
-### 前端配置
-
-#### API 地址配置
-
-在 `frontend/src/api/config.js` 中配置：
-
-```javascript
-export const API = {
-  baseURL: 'http://localhost:8000/api',
-  wsURL: 'ws://localhost:8000/ws/stream',
-  // ... 其他 API 端点
-}
-```
-
-#### 主题配置
-
-在 `frontend/src/themes/index.js` 中自定义主题：
-
-```javascript
-export const themes = {
-  overwatch: {
-    name: 'Overwatch',
-    primary: '#7139FF',
-    // ... 主题颜色
-  },
-  // ... 其他主题
-}
+# UI 配置
+VITE_APP_TITLE=FaceEmotion-AI
+VITE_DEFAULT_THEME=zen
 ```
 
 ---
 
-## 📡 API 文档
+## ❓ 常见问题 (FAQ)
 
-### REST API
+### Q1: 启动时报错 "ONNX模型不存在"
 
-#### 1. 单张图片检测
-
+**错误信息**：
 ```
-POST /api/detect/image
-Content-Type: multipart/form-data
-
-文件: file (图片文件)
-
-响应:
-{
-  "status": "success",
-  "faces": [
-    {
-      "bbox": [x, y, width, height],
-      "emotion": "happy",
-      "confidence": 0.95,
-      "emotions": {
-        "happy": 0.95,
-        "sad": 0.02,
-        ...
-      }
-    }
-  ]
-}
+RuntimeError: ONNX模型不存在: D:\front-back\FaceEmotion-AI\backend\models\emotion_model.onnx
 ```
-
-#### 2. 批量图片检测
-
-```
-POST /api/detect/batch
-Content-Type: multipart/form-data
-
-文件: files (多张图片)
-
-响应:
-{
-  "status": "success",
-  "results": [
-    {
-      "filename": "image1.jpg",
-      "faces": [...]
-    },
-    ...
-  ]
-}
-```
-
-#### 3. 视频检测
-
-```
-POST /api/detect/video
-Content-Type: multipart/form-data
-
-文件: file (视频文件)
-
-响应:
-{
-  "status": "success",
-  "video_info": {
-    "duration": 10.5,
-    "fps": 30.0,
-    "total_frames": 315,
-    "key_frames_count": 10
-  },
-  "key_frames": [
-    {
-      "frame": 0,
-      "timestamp": 0.0,
-      "faces": [...]
-    },
-    ...
-  ]
-}
-```
-
-#### 4. 获取历史记录
-
-```
-GET /api/history?limit=20&offset=0&type=all
-
-响应:
-{
-  "data": [...],
-  "total": 100,
-  "type_counts": {
-    "realtime": 50,
-    "image": 20,
-    "batch": 10,
-    "video": 20
-  }
-}
-```
-
-### WebSocket API
-
-#### 实时视频流
-
-```javascript
-// 连接 WebSocket
-const ws = new WebSocket('ws://localhost:8000/ws/stream')
-
-// 发送视频帧
-ws.send(videoFrameBlob)
-
-// 接收检测结果
-ws.onmessage = (event) => {
-  const data = JSON.parse(event.data)
-  console.log('检测结果:', data)
-  // data.faces: 人脸数据
-  // data.voice_scores: 语音情绪分数
-  // data.is_fused: 是否多模态融合
-}
-```
-
-**数据格式**：
-
-```json
-{
-  "faces": [
-    {
-      "bbox": [x, y, width, height],
-      "emotion": "happy",
-      "confidence": 0.95,
-      "emotions": { ... }
-    }
-  ],
-  "voice_scores": {
-    "angry": 0.0,
-    "disgust": 0.0,
-    "fear": 0.0,
-    "happy": 0.8,
-    "neutral": 0.2,
-    "sad": 0.0,
-    "surprise": 0.0
-  },
-  "is_fused": true,
-  "fps": 30.5
-}
-```
-
----
-
-## 🧩 前端组件
-
-### 检测组件
-
-#### RealtimeDetector.vue
-
-实时摄像头检测组件，核心功能：
-
-- 摄像头画面采集
-- WebSocket 实时通信
-- Canvas 检测框绘制
-- 情绪标签显示
-- 语音情绪分析
-- 多模态融合指示
-
-**关键配置**：
-
-```vue
-<RealtimeDetector
-  :show-voice-analysis="true"
-  :show-fps="true"
-  :ema-alpha="0.3"
-/>
-```
-
-#### ImageDetector.vue
-
-单张图片检测组件：
-
-- 图片上传
-- 人脸检测
-- 情绪分类
-- 结果展示
-
-#### BatchDetector.vue
-
-批量图片检测组件：
-
-- 多文件上传
-- 进度显示
-- 批量处理
-- 结果汇总
-
-#### VideoDetector.vue
-
-视频文件检测组件：
-
-- 视频上传
-- 关键帧提取
-- 帧间插值
-- 时间轴显示
-- 结果导出
-
-### 其他组件
-
-#### HistoryViewer.vue
-
-历史记录查看器：
-
-- 分页显示
-- 类型筛选
-- 详情查看
-- 数据导出
-
-#### AnalyticsDashboard.vue
-
-数据分析看板：
-
-- 情绪分布图表
-- 趋势分析
-- 统计卡片
-- 时间筛选
-
----
-
-## 💾 数据库设计
-
-### 检测历史记录表 (detection_history)
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INTEGER | 主键 |
-| timestamp | DATETIME | 检测时间 |
-| detection_type | TEXT | 检测类型 (realtime/image/batch/video) |
-| source | TEXT | 来源 |
-| image_path | TEXT | 图片路径 |
-| image_type | TEXT | 图片类型 |
-| thumbnail | TEXT | 缩略图 (Base64) |
-| results | TEXT | 检测结果 (JSON) |
-| detected_faces | TEXT | 检测到的人脸 (JSON) |
-| dominant_emotion | TEXT | 主导情绪 |
-| confidence | FLOAT | 置信度 |
-
-### 用户反馈表 (user_feedback)
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INTEGER | 主键 |
-| timestamp | DATETIME | 反馈时间 |
-| emotion | TEXT | 原始情绪 |
-| predicted_emotion | TEXT | 预测情绪 |
-| correct_emotion | TEXT | 正确情绪 |
-| feedback_type | TEXT | 反馈类型 |
-| notes | TEXT | 备注 |
-
-### 分析统计表 (analytics)
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| id | INTEGER | 主键 |
-| timestamp | DATETIME | 统计时间 |
-| metric_type | TEXT | 指标类型 |
-| metric_value | FLOAT | 指标值 |
-| metadata | TEXT | 元数据 (JSON) |
-
----
-
-## ⚡ 性能优化
-
-### 已实施的优化
-
-#### 1. GPU 加速
-
-- **CUDA**: 使用 NVIDIA GPU 加速模型推理
-- **TensorRT**: 模型优化和缓存
-- **FP16**: 半精度推理，速度提升 2 倍
-
-#### 2. 模型优化
-
-- **Caffe SSD**: 高精度人脸检测（准确率 >99%）
-- **ONNX Runtime**: 跨平台推理引擎
-- **模型缓存**: 避免重复加载
-
-#### 3. 前端优化
-
-- **Canvas 渲染**: 高效的视频帧绘制
-- **帧率控制**: 可配置的跳帧策略
-- **WebSocket 优化**: 二进制数据传输
-- **EMA 平滑**: 情绪过渡更流畅
-
-#### 4. 数据库优化
-
-- **索引优化**: 查询性能提升
-- **分页查询**: 避免大量数据传输
-- **JSON 压缩**: 减少存储空间
-
-### 性能指标
-
-| 指标 | 数值 | 说明 |
-|------|------|------|
-| 人脸检测 FPS | 30-60 | GPU 加速 |
-| 情绪分类延迟 | <50ms | ONNX 推理 |
-| WebSocket 延迟 | <100ms | 实时传输 |
-| 模型加载时间 | <2s | 缓存优化 |
-| 数据库查询 | <10ms | 索引优化 |
-
----
-
-## ❓ 常见问题
-
-### 1. 人脸检测不准确
-
-**问题**：检测框不准确或出现多个框
 
 **解决方案**：
-- 提高置信度阈值：修改 `config.py` 中的 `confidence_threshold`
-- 调整 NMS 阈值：在 `face_detector_onnx.py` 中修改
-- 使用 Caffe SSD 模型：准确率更高
-
-### 2. GPU 未启用
-
-**问题**：系统使用 CPU 而非 GPU
-
-**解决方案**：
-- 检查 CUDA 是否正确安装
-- 确认 `USE_GPU=true` 在 `.env` 中
-- 检查 GPU 设备 ID 是否正确
-
-### 3. WebSocket 连接失败
-
-**问题**：前端无法连接 WebSocket
-
-**解决方案**：
-- 检查后端服务是否启动
-- 确认防火墙未阻止 8000 端口
-- 检查 `API.wsURL` 配置是否正确
-
-### 4. 语音情绪分析不工作
-
-**问题**：语音情绪分数全为 0
-
-**解决方案**：
-- 检查麦克风权限
-- 确认 AudioWorklet 加载成功
-- 检查音频采样率（应为 16000Hz）
-
-### 5. 历史记录数据显示为空
-
-**问题**：视频检测记录的关键字段为空
-
-**解决方案**：
-- 确保后端版本 >= v3.0.0
-- 检查数据库迁移是否完成
-- 重新进行视频检测（旧数据可能不兼容）
+1. 确认模型文件已放置在正确位置：
+   ```
+   models/weights/emotion_model.onnx  ✅
+   ```
+2. 检查 `backend/config.json` 中的路径配置：
+   ```json
+   "emotion_model": "../models/weights/emotion_model.onnx"
+   ```
+3. 确保从 `backend/` 目录启动服务（相对路径基于此）
 
 ---
 
-## 📝 开发规范
+### Q2: 端口 8000 已被占用
 
-### 代码规范
-
-#### Python (后端)
-
-- 遵循 PEP 8 规范
-- 使用类型注解
-- 添加文档字符串
-- 日志记录使用 logger
-
-```python
-def detect_faces(frame: np.ndarray, threshold: float = 0.6) -> List[Dict]:
-    """检测人脸
-    
-    Args:
-        frame: 输入图像
-        threshold: 置信度阈值
-        
-    Returns:
-        人脸列表
-    """
-    pass
+**错误信息**：
+```
+Error: [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8000)
 ```
 
-#### JavaScript (前端)
+**解决方案**：
+```powershell
+# Windows：查找占用端口的进程
+netstat -ano | findstr :8000
 
-- 使用 Vue 3 Composition API
-- 组件命名使用 PascalCase
-- 变量命名使用 camelCase
-- 添加必要的注释
+# 终止进程（替换 PID）
+taskkill /PID <PID> /F
 
-```javascript
-// ✅ 好的命名
-const dominantEmotion = ref('neutral')
-const calculateAverage = (values) => { ... }
-
-// ❌ 不好的命名
-const a = ref('')
-const func1 = (x) => { ... }
+# 或修改 config.json 中的端口
+"port": 8001
 ```
-
-### Git 提交规范
-
-使用语义化提交信息：
-
-```
-feat: 添加语音情绪分析功能
-fix: 修复人脸检测框闪烁问题
-docs: 更新 API 文档
-style: 优化 UI 样式
-refactor: 重构数据库模块
-test: 添加单元测试
-chore: 更新依赖版本
-```
-
-### 分支管理
-
-- `main`: 主分支，稳定版本
-- `develop`: 开发分支
-- `feature/xxx`: 功能分支
-- `hotfix/xxx`: 紧急修复分支
 
 ---
 
-## 🚢 部署指南
+### Q3: 前端无法连接后端
 
-### Docker 部署
+**现象**：前端显示 "网络连接失败"
 
-#### 1. 构建镜像
+**解决方案**：
+1. 检查后端是否正常运行：
+   ```bash
+   curl http://localhost:8000/health
+   ```
+2. 确认前端配置正确：
+   ```bash
+   # frontend/.env
+   VITE_API_URL=http://localhost:8000
+   ```
+3. 检查 CORS 配置：
+   ```json
+   // backend/config.json
+   "cors_origins": ["http://localhost:5173", "http://localhost:80"]
+   ```
 
+---
+
+### Q4: GPU 未启用，使用 CPU 推理
+
+**现象**：日志显示 "⚠️ 人脸检测器使用 CPU"
+
+**解决方案**：
+1. 确认已安装 CUDA 版本的 PyTorch：
+   ```bash
+   python -c "import torch; print(torch.cuda.is_available())"
+   ```
+2. 检查配置：
+   ```json
+   "use_gpu": true
+   ```
+3. 安装 GPU 版本依赖：
+   ```bash
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+   ```
+
+---
+
+### Q5: 依赖安装失败
+
+**常见错误**：
+```
+ERROR: Could not find a version that satisfies the requirement onnxruntime-gpu
+```
+
+**解决方案**：
 ```bash
-docker-compose build
+# 方法 1：使用 CPU 版本
+pip install onnxruntime
+
+# 方法 2：指定 Python 版本
+pip install --only-binary :all: onnxruntime-gpu
+
+# 方法 3：使用 conda
+conda install -c conda-forge onnxruntime-gpu
 ```
 
-#### 2. 启动服务
+---
 
-```bash
-docker-compose up -d
+### Q6: 摄像头无法访问
+
+**现象**：实时检测显示黑屏
+
+**解决方案**：
+1. 检查摄像头权限：
+   - Windows：设置 > 隐私 > 摄像头
+   - macOS：系统偏好设置 > 安全性与隐私 > 摄像头
+2. 修改摄像头索引：
+   ```json
+   // backend/config.json
+   "camera_index": 0  // 尝试 0, 1, 2
+   ```
+3. 测试摄像头：
+   ```python
+   import cv2
+   cap = cv2.VideoCapture(0)
+   print(cap.isOpened())
+   ```
+
+---
+
+### Q7: Docker 部署时模型文件未加载
+
+**现象**：容器启动时报错 "模型文件不存在"
+
+**解决方案**：
+修改 `docker-compose.yml`：
+```yaml
+services:
+  backend:
+    volumes:
+      - ./models:/app/models      # ✅ 挂载模型目录
+      - ./backend/data:/app/data
 ```
 
-#### 3. 查看日志
-
-```bash
-docker-compose logs -f
+或使用 Dockerfile 复制：
+```dockerfile
+COPY ../models /app/models
 ```
 
-#### 4. 停止服务
+---
 
-```bash
-docker-compose down
+### Q8: 数据库锁定错误
+
+**错误信息**：
+```
+sqlite3.OperationalError: database is locked
 ```
 
-### 生产环境部署
-
-#### 后端部署 (使用 Gunicorn)
-
-```bash
-# 安装 Gunicorn
-pip install gunicorn
-
-# 启动服务
-gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
-```
-
-#### 前端部署 (使用 Nginx)
-
-1. 构建前端：
-
-```bash
-npm run build
-```
-
-2. Nginx 配置：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    root /var/www/face-emotion-ai/frontend/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location /ws {
-        proxy_pass http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
+**解决方案**：
+1. 增加连接池大小：
+   ```json
+   "db_pool_size": 10,
+   "db_max_overflow": 20
+   ```
+2. 清理旧进程：
+   ```bash
+   # Windows
+   taskkill /F /IM python.exe
+   
+   # Linux
+   pkill -f app.py
+   ```
+3. 删除锁定文件：
+   ```bash
+   rm backend/data/emotion.db-journal
+   ```
 
 ---
 
 ## 🤝 贡献指南
 
-欢迎贡献代码、报告问题或提出建议！
+### 代码规范
 
-### 贡献步骤
+#### Python 代码
 
-1. **Fork 项目**
-2. **创建功能分支** (`git checkout -b feature/AmazingFeature`)
-3. **提交更改** (`git commit -m 'feat: Add AmazingFeature'`)
-4. **推送到分支** (`git push origin feature/AmazingFeature`)
-5. **创建 Pull Request**
+- 遵循 [PEP 8](https://peps.python.org/pep-0008/) 风格指南
+- 使用类型注解（Type Hints）
+- 函数和类添加文档字符串（Docstrings）
+- 使用 `black` 格式化代码：
+  ```bash
+  black backend/
+  ```
 
-### 贡献要求
+#### Vue 代码
 
-- 代码符合项目规范
-- 添加必要的测试
-- 更新相关文档
-- 通过 CI/CD 检查
+- 使用 Composition API
+- 组件命名使用 PascalCase（如 `RealtimeDetector.vue`）
+- Props 和 Emits 明确声明类型
+- 使用 ESLint + Prettier：
+  ```bash
+  npm run lint
+  npm run format
+  ```
+
+### Git 工作流
+
+```bash
+# 1. Fork 项目
+# 2. 创建功能分支
+git checkout -b feat/your-feature-name
+
+# 3. 提交代码
+git add .
+git commit -m "feat: add your feature description"
+
+# 4. 推送分支
+git push origin feat/your-feature-name
+
+# 5. 创建 Pull Request
+```
+
+### 提交信息规范
+
+遵循 [Conventional Commits](https://www.conventionalcommits.org/)：
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Type 类型**：
+- `feat`: 新功能
+- `fix`: Bug 修复
+- `docs`: 文档更新
+- `style`: 代码格式（不影响功能）
+- `refactor`: 重构
+- `test`: 测试相关
+- `chore`: 构建/工具链相关
+
+**示例**：
+```
+feat(detection): add multi-face support for real-time detection
+
+fix(api): resolve CORS error on WebSocket connection
+
+docs(readme): update installation guide with Docker steps
+```
 
 ---
 
-##  许可证
+## 📄 许可证
 
-本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
+本项目采用 [MIT License](LICENSE) 开源协议。
+
+```
+Copyright (c) 2026 FaceEmotion-AI Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software...
+```
 
 ---
 
 ## 🙏 致谢
 
-- **OpenCV**: 图像处理库
-- **ONNX**: 模型格式和运行时
-- **FastAPI**: 高性能 Web 框架
-- **Vue.js**: 渐进式 JavaScript 框架
-- **Element Plus**: Vue 3 UI 组件库
-
-
----
-
-## 📊 项目统计
-
-![GitHub stars](https://img.shields.io/github/stars/YLJ109/FaceEmotion-AI?style=social)
-![GitHub forks](https://img.shields.io/github/forks/YLJ109/FaceEmotion-AI?style=social)
-![GitHub issues](https://img.shields.io/github/issues/YLJ109/FaceEmotion-AI)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/YLJ109/FaceEmotion-AI)
+- [FastAPI](https://fastapi.tiangolo.com/) - 优秀的 Python Web 框架
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
+- [OpenCV](https://opencv.org/) - 计算机视觉库
+- [ONNX Runtime](https://onnxruntime.ai/) - 跨平台推理引擎
+- [Element Plus](https://element-plus.org/) - Vue 3 组件库
+- [ECharts](https://echarts.apache.org/) - 数据可视化库
 
 ---
 
-**Made with ❤️ by Your Team**
+## 📬 联系方式
+
+- **项目地址**：https://github.com/YLJ109/FaceEmotion-AI
+- **问题反馈**：[GitHub Issues](https://github.com/YLJ109/FaceEmotion-AI/issues)
+- **邮箱**：2869563610@qq.com
+
+---
+
+## ⭐ Star History
+
+如果这个项目对你有帮助，请给它一个 Star ⭐
+
+[![Star History Chart](https://api.star-history.com/svg?repos=YLJ109/FaceEmotion-AI&type=Date)](https://star-history.com/#YLJ109/FaceEmotion-AI&Date)
+
+---
+
+**最后更新**: 2026-05-06  
+**版本**: V1.9.0  
+**维护者**: FaceEmotion-AI Team

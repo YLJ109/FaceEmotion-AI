@@ -34,6 +34,51 @@
                         </svg>
                         <span class="btn-label">停止</span>
                     </button>
+
+                    <!-- ✅ 新增: 功能按钮分隔线 -->
+                    <div class="ctrl-divider"></div>
+
+                    <!-- ✅ 新增: 情感识别按钮 -->
+                    <el-tooltip content="情感识别" placement="top">
+                        <button @click="toggleEmotionDetection" class="ctrl-btn ctrl-feature"
+                            :class="{ 'ctrl-feature-active': isEmotionDetectionOn }" title="情感识别">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                                <path d="M2 17l10 5 10-5" />
+                                <path d="M2 12l10 5 10-5" />
+                            </svg>
+                        </button>
+                    </el-tooltip>
+
+                    <!-- ✅ 新增: 反馈识别结果按钮（静态快照） -->
+                    <el-tooltip content="反馈识别结果" placement="top" v-if="currentEmotion">
+                        <button @click="openFeedbackWithSnapshot" class="ctrl-btn ctrl-feature" title="反馈识别结果">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                            </svg>
+                        </button>
+                    </el-tooltip>
+
+                    <!-- ✅ 新增: 保存到历史档案按钮 -->
+                    <el-tooltip content="保存到历史档案" placement="top">
+                        <button @click="saveToHistoryManual" class="ctrl-btn ctrl-feature" :disabled="isSaving"
+                            :class="{ 'ctrl-saving': isSaving }" title="保存到历史档案">
+                            <svg v-if="!isSaving" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                <polyline points="17 21 17 13 7 13 7 21" />
+                                <polyline points="7 3 7 8 15 8" />
+                            </svg>
+                            <!-- 加载动画 -->
+                            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="saving-spinner">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                            </svg>
+                        </button>
+                    </el-tooltip>
                 </div>
 
                 <!-- 启动摄像头按钮 -->
@@ -64,19 +109,6 @@
                         </el-icon></span>
                     <span>实时分析</span>
                 </h3>
-                <div class="panel-controls">
-                    <el-tooltip content="情感识别" placement="top">
-                        <el-button :icon="MagicStick" :type="isEmotionDetectionOn ? 'primary' : 'default'"
-                            @click="toggleEmotionDetection" circle size="small" />
-                    </el-tooltip>
-                    <el-tooltip content="麦克风输入" placement="top">
-                        <el-button :icon="Microphone" :class="['mic-button', { 'mic-active': isMicOn }]"
-                            @click="toggleMicrophone" circle size="small" />
-                    </el-tooltip>
-                    <el-tooltip content="反馈识别结果" placement="top" v-if="currentEmotion">
-                        <el-button :icon="Edit" @click="showFeedback = true" circle size="small" />
-                    </el-tooltip>
-                </div>
             </div>
 
             <!-- 检测到人脸 -->
@@ -89,17 +121,7 @@
                 <!-- <div class="emotion-name">{{ getEmotionName(currentEmotion) }}</div>
                 <div class="emotion-confidence">{{ (currentConfidence * 100).toFixed(1) }}%</div> -->
 
-                <!-- ✅ 修改: 移除 hasVoiceData 条件，避免闪烁 -->
-                <div v-if="isMicOn" class="voice-indicator">
-                    <span class="voice-icon"></span>
-                    <span class="voice-text">{{ isFused ? '多模态融合' : '仅视觉检测' }}</span>
-                    <span class="voice-badge">{{ isFused ? '语音+视觉' : '仅视觉' }}</span>
 
-                    <!-- ✅ 新增: 音频活动指示器 -->
-                    <div class="audio-activity-bar">
-                        <div class="audio-activity-fill" :style="{ width: `${audioActivityLevel * 100}%` }"></div>
-                    </div>
-                </div>
 
                 <!-- ✅ 移除: 情绪纠正按钮 -->
                 <!-- <el-popover trigger="click" placement="bottom" width="200">
@@ -142,30 +164,7 @@
                     </transition-group>
                 </div>
 
-                <!-- ✅ 修改: 移除 hasVoiceData 条件，避免闪烁 -->
-                <div v-if="isMicOn" class="voice-emotion-section">
-                    <div class="voice-emotion-title">
-                        <span class="voice-icon-small">🎤</span>
-                        <span>语音情绪分析</span>
-                    </div>
-                    <div class="confidence-bars voice-bars">
-                        <!-- ✅ 修改: 按照 emotionList 顺序显示，保持与上方一致 -->
-                        <div v-for="emotion in emotionList" :key="emotion" class="confidence-bar-item voice-bar-item">
-                            <span class="bar-label">
-                                <EmotionSVG :emotion="emotion" size="small" :animated="false" />
-                                {{ getEmotionName(emotion) }}
-                            </span>
-                            <div class="bar-track">
-                                <div class="bar-fill voice-fill" :style="{
-                                    width: `${(voiceScores[emotion] || 0) * 100}%`,
-                                    background: getEmotionColor(emotion),
-                                    boxShadow: `0 0 8px ${getEmotionColor(emotion)}`
-                                }"></div>
-                            </div>
-                            <span class="bar-value">{{ ((voiceScores[emotion] || 0) * 100).toFixed(0) }}%</span>
-                        </div>
-                    </div>
-                </div>
+
             </div>
 
             <!-- 等待状态 -->
@@ -180,15 +179,15 @@
         <PerformanceMonitor :fps="fps" :latency="perfLatency" :skip-rate="perfSkipRate" :gpu-memory="perfGpuMemory"
             :detect-interval="perfDetectInterval" :http-latency="perfHttpLatency" :error-rate="perfErrorRate" />
 
-        <!-- ✅ 新增: 情绪反馈对话框 -->
-        <EmotionFeedback v-model:visible="showFeedback" :predicted-emotion="currentEmotion"
-            :predicted-confidence="currentConfidence" @submitted="handleFeedbackSubmitted" />
+        <!-- ✅ 新增: 情绪反馈对话框（静态快照） -->
+        <EmotionFeedback v-model:visible="showFeedback" :snapshot="feedbackSnapshot"
+            @submitted="handleFeedbackSubmitted" />
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, reactive, computed } from 'vue'
-import { VideoCamera, VideoPlay, MagicStick, Microphone, Edit } from '@element-plus/icons-vue'
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, reactive, computed } from 'vue'
+import { VideoCamera, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
 import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotion'
@@ -197,10 +196,14 @@ import wsManager from '@/api/websocket'
 import EmotionSVG from '@/components/common/EmotionSVG.vue'
 import { logFeatureUsage } from '@/utils/analytics'
 import httpMonitor from '@/utils/httpMonitor'
-import AudioCapture from '@/utils/audioCapture'
 import { API } from '@/api/config'
 import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
 import EmotionFeedback from '@/components/feedback/EmotionFeedback.vue'
+
+// ✅ 新增: 组件名称,用于 keep-alive 缓存
+defineOptions({
+    name: 'RealtimeDetector'
+})
 
 const themeStore = useThemeStore()
 const videoElement = ref(null)
@@ -211,48 +214,15 @@ const isEmotionDetectionOn = ref(true)
 const currentEmotion = ref(null)
 const currentConfidence = ref(0)
 const showFeedback = ref(false)  // ✅ 新增: 反馈对话框显示状态
-// const hasVoiceData = ref(false)  // ✅ 已移除: 未使用的变量
-const isFused = ref(false)  // ✅ 新增: 标记是否是多模态融合结果
-const emotionScores = ref({})
-const voiceScores = ref({})  // ✅ 新增: 语音情绪分数
-const visionScores = ref({})  // ✅ 新增: 视觉情绪分数（融合前）
-
-// ✅ 修复: 暴露 voiceScores 为响应式变量
-const exposedVoiceScores = computed(() => voiceScores.value)
-const currentFaces = ref([])
-const fps = ref(0)
-// ✅ 新增: 麦克风控制
-const isMicOn = ref(false)
-const audioActivityLevel = ref(0)  // ✅ 新增: 音频活动级别 (0-1)
-let lastAudioSendTime = 0  // ✅ 新增: 上次发送音频的时间
-const audioCapture = new AudioCapture({
-    sampleRate: 16000,
-    compressionEnabled: false,  // 禁用音频压缩，直接发送原始PCM16数据
-    bufferSize: 16000,  // ✅ 优化: 1 秒缓冲（16kHz * 1.0 = 16000 样本），提高识别准确率
-    onAudioData: (pcmData) => {
-        // ✅ 修复: 通过 WebSocket 发送批量音频数据
-        if (wsManager.isConnected && pcmData.byteLength > 0) {
-            try {
-                // 添加类型标识，避免与视频帧混淆
-                // 格式: [type(1B)] + [audio_data]
-                const typeByte = new Uint8Array([0x02]) // 0x01=video, 0x02=audio
-                const combined = new Uint8Array(typeByte.length + pcmData.byteLength)
-                combined.set(typeByte, 0)
-                combined.set(new Uint8Array(pcmData), typeByte.length)
-                wsManager.sendBinary(combined.buffer)
-
-                // ✅ 优化: 更新音频活动指示器（使用平滑算法）
-                const int16View = new Int16Array(pcmData)
-                const volume = int16View.reduce((sum, val) => sum + Math.abs(val), 0) / int16View.length
-                // 使用 EMA 平滑，避免跳动
-                audioActivityLevel.value = audioActivityLevel.value * 0.7 + Math.min(1, volume / 5000) * 0.3
-                lastAudioSendTime = performance.now()
-            } catch (error) {
-                console.error(' 发送批量音频数据失败:', error)
-            }
-        }
-    }
+const isSaving = ref(false)  // ✅ 新增: 保存状态标记
+const feedbackSnapshot = ref({  // ✅ 新增: 反馈快照数据
+    image: null,
+    bbox: null,
+    emotion: null,
+    confidence: 0,
+    timestamp: null
 })
+const emotionScores = ref({})
 // ✅ 修复: 情绪列表（7种情绪，calm 合并到 neutral）
 const emotionList = ['happy', 'sad', 'angry', 'surprised', 'fearful', 'disgust', 'neutral']
 
@@ -262,6 +232,8 @@ const sortedEmotionScores = computed(() => {
         .map(([emotion, score]) => ({ emotion, score }))
         .sort((a, b) => b.score - a.score)  // 降序排序
 })
+const currentFaces = ref([])
+const fps = ref(0)
 // ✅ 新增: 性能监控数据
 const perfLatency = ref(0)
 const perfSkipRate = ref(0)
@@ -279,6 +251,34 @@ const SEND_RESOLUTIONS = {
 }
 let currentResolution = SEND_RESOLUTIONS.medium
 let lastAdjustTime = 0
+let lastSaveTime = 0  // ✅ 新增: 上次保存时间戳,防止重复保存
+const SAVE_COOLDOWN = 2000  // ✅ 新增: 保存冷却时间(2秒)
+
+// ✅ 新增: 动态调整分辨率函数
+const adjustResolution = () => {
+    const currentFps = fps.value
+    let newResolution = currentResolution
+
+    if (currentFps < 10) {
+        newResolution = SEND_RESOLUTIONS.low
+    } else if (currentFps >= 10 && currentFps <= 20) {
+        newResolution = SEND_RESOLUTIONS.medium
+    } else {
+        newResolution = SEND_RESOLUTIONS.high
+    }
+
+    // 只在分辨率变化时更新
+    if (newResolution.width !== currentResolution.width || newResolution.height !== currentResolution.height) {
+        console.log(`📊 调整分辨率: ${currentResolution.width}x${currentResolution.height} -> ${newResolution.width}x${newResolution.height}`)
+        currentResolution = newResolution
+
+        // 重新初始化发送 Canvas
+        if (sendCanvas) {
+            sendCanvas.width = currentResolution.width
+            sendCanvas.height = currentResolution.height
+        }
+    }
+}
 
 let stream = null
 let animationId = null
@@ -332,39 +332,23 @@ onMounted(() => {
         perfHttpLatency.value = stats.averageLatency
         perfErrorRate.value = stats.errorRate
     }, 2000)
-
-    // ✅ 新增: 音频活动指示器衰减定时器（每100ms衰减一次）
-    const audioActivityInterval = setInterval(() => {
-        if (isMicOn.value && audioActivityLevel.value > 0) {
-            // 如果超过 500ms 没有新的音频数据，快速衰减
-            if (performance.now() - lastAudioSendTime > 500) {
-                audioActivityLevel.value *= 0.7  // 快速衰减
-                if (audioActivityLevel.value < 0.01) {
-                    audioActivityLevel.value = 0
-                }
-            } else {
-                audioActivityLevel.value *= 0.95  // 慢速衰减
-            }
-        }
-    }, 100)
-
-    // 组件卸载时清除定时器
-    onUnmounted(() => {
-        clearInterval(httpMonitorInterval)
-        clearInterval(audioActivityInterval)
-    })
 })
 
 onUnmounted(() => {
     stopCamera()
     // ✅ 优化: 清理 Canvas 防止内存泄漏
     cleanupCanvas()
+})
 
-    // ✅ 新增: 清理防抖定时器
-    if (saveHistoryDebounceTimer) {
-        clearTimeout(saveHistoryDebounceTimer)
-        saveHistoryDebounceTimer = null
-    }
+// ✅ 新增: keep-alive 缓存时的生命周期
+onDeactivated(() => {
+    console.log(' 实时检测组件被缓存，停止摄像头')
+    stopCamera()
+})
+
+onActivated(() => {
+    console.log(' 实时检测组件被激活，恢复状态')
+    // 注意: 不自动启动摄像头,由用户手动点击“启动摄像头”按钮
 })
 
 // ✅ 新增: Canvas 清理函数
@@ -423,68 +407,6 @@ const stopCamera = () => {
 
 const toggleCamera = () => { isCameraOn.value ? stopCamera() : startCamera() }
 const toggleEmotionDetection = () => { isEmotionDetectionOn.value = !isEmotionDetectionOn.value }
-
-// ✅ 新增: 动态分辨率调整
-const adjustResolution = () => {
-    const avgFps = fps.value
-    let newResolution = currentResolution
-
-    if (avgFps < 10 && currentResolution !== SEND_RESOLUTIONS.low) {
-        newResolution = SEND_RESOLUTIONS.low
-        console.log('📉 检测到FPS过低,降低分辨率以提升性能')
-    } else if (avgFps >= 10 && avgFps <= 20 && currentResolution !== SEND_RESOLUTIONS.medium) {
-        newResolution = SEND_RESOLUTIONS.medium
-        console.log('⚖️ FPS适中,使用标准分辨率')
-    } else if (avgFps > 20 && currentResolution !== SEND_RESOLUTIONS.high) {
-        newResolution = SEND_RESOLUTIONS.high
-        console.log('📈 FPS良好,提高分辨率以提升精度')
-    }
-
-    if (newResolution !== currentResolution) {
-        currentResolution = newResolution
-        // 重新初始化sendCanvas
-        sendCanvas = null
-        initSendCanvas()
-    }
-}
-
-// ✅ 新增: 麦克风控制
-const toggleMicrophone = async () => {
-    if (isMicOn.value) {
-        audioCapture.stop()
-        isMicOn.value = false
-        ElMessage({
-            message: '🎤 麦克风已关闭',
-            type: 'info',
-            duration: 2000
-        })
-    } else {
-        // ✅ 优化: 先检查WebSocket连接状态
-        if (!wsManager.isConnected) {
-            ElMessage.warning('⚠️ WebSocket未连接，无法使用麦克风功能')
-            return
-        }
-
-        // ✅ 优化: 异步启动，避免阻塞检测
-        try {
-            const success = await audioCapture.start()
-            if (success) {
-                isMicOn.value = true
-                ElMessage({
-                    message: '✅ 麦克风已开启 | 多模态语音情绪融合分析中...',
-                    type: 'success',
-                    duration: 3000,
-                    showClose: true
-                })
-            } else {
-                ElMessage.error('❌ 无法访问麦克风，请检查权限设置')
-            }
-        } catch (error) {
-            console.error('麦克风启动失败:', error)
-            ElMessage.error('❌ 麦克风启动失败，请重试')
-        }
-    }
-}
 
 // ✅ 新增: 提交情绪纠正反馈
 const submitFeedback = async (correctEmotion) => {
@@ -727,16 +649,10 @@ const startRendering = () => {
 
 // === WebSocket 消息处理 (含 EMA + 自适应质量) ===
 
-// ✅ 新增: 防抖保存历史记录（避免频繁调用）
-let saveHistoryDebounceTimer = null
-const SAVE_HISTORY_INTERVAL = 5000  // 每 5 秒保存一次
-
 const handleWsMessage = (data) => {
     if (data.type !== 'result') return
 
-    // ✅ 已移除: hasVoiceData.value = data.has_voice_data || false （未使用）
 
-    updateInferenceFps()  // 统计 AI 推理帧率
 
     // ✅ 新增: 更新性能监控数据
     const processTime = data.process_time
@@ -763,21 +679,13 @@ const handleWsMessage = (data) => {
 
     awaitingResult = false
 
-    // 接收语音情绪分数（无论是否检测到人脸都更新）
-    if (data.voice_scores) {
-        voiceScores.value = data.voice_scores
-    }
-
     // 过滤掉低置信度的缓存结果（置信度 < 0.6 视为无效）
     const validFaces = data.faces?.filter(face => face.confidence >= 0.6 && !face._cached) || []
 
     if (validFaces.length) {
         const rawScores = validFaces[0].scores
 
-        // ✅ 新增: 接收视觉情绪分数（融合前）
-        if (validFaces[0].vision_scores) {
-            visionScores.value = validFaces[0].vision_scores
-        }
+
 
         if (Object.keys(_emaScores).length === 0) {
             Object.keys(rawScores).forEach(k => { _emaScores[k] = rawScores[k] })
@@ -797,8 +705,7 @@ const handleWsMessage = (data) => {
         _lastGoodScores = { ..._emaScores }
         _consecutiveEmpty = 0
 
-        // ✅ 新增: 检查是否是多模态融合结果
-        isFused.value = validFaces[0].is_fused || false
+
 
         if (rtt < 100) {
             // quickly restore after a slow frame
@@ -813,20 +720,6 @@ const handleWsMessage = (data) => {
 
         // ✅ 优化: 移除延迟,立即触发主题更新(防抖在 themeStore 内部处理)
         themeStore.updateThemeByEmotion(smoothedEmotion)
-
-        // ✅ 新增: 自动保存历史记录（防抖：每 5 秒保存一次）
-        if (!_analyticsLogged) {
-            _analyticsLogged = true
-            logFeatureUsage('实时检测', { emotion: smoothedEmotion })
-        }
-
-        // 触发防抖保存
-        if (saveHistoryDebounceTimer) {
-            clearTimeout(saveHistoryDebounceTimer)
-        }
-        saveHistoryDebounceTimer = setTimeout(() => {
-            saveRealtimeToHistory(smoothedEmotion, smoothedConf, validFaces)
-        }, SAVE_HISTORY_INTERVAL)
     } else {
         // 没有检测到有效人脸
         _consecutiveEmpty++
@@ -886,49 +779,245 @@ const takeScreenshot = () => {
     }
 }
 
+// ✅ 新增: 打开反馈对话框并捕获静态快照
+const openFeedbackWithSnapshot = () => {
+    const canvas = canvasElement.value
+    if (!canvas || !currentEmotion.value) {
+        ElMessage.warning('⚠️ 请先确保已检测到人脸')
+        return
+    }
+
+    try {
+        // 1. 截取当前 Canvas 帧（包含人脸框和标签）
+        const imageData = canvas.toDataURL('image/jpeg', 0.9)
+
+        // 2. 获取当前检测数据
+        const currentFace = currentFaces.value[0]
+
+        // 3. 存储快照数据
+        feedbackSnapshot.value = {
+            image: imageData,
+            bbox: currentFace?.bbox || null,
+            emotion: currentEmotion.value,
+            confidence: currentConfidence.value,
+            timestamp: Date.now()
+        }
+
+        console.log('📸 静态快照已捕获:', {
+            emotion: feedbackSnapshot.value.emotion,
+            confidence: feedbackSnapshot.value.confidence,
+            bbox: feedbackSnapshot.value.bbox,
+            timestamp: new Date(feedbackSnapshot.value.timestamp).toLocaleString()
+        })
+
+        // 4. 打开反馈对话框
+        showFeedback.value = true
+    } catch (error) {
+        console.error('❌ 捕获快照失败:', error)
+        ElMessage.error('❌ 截图失败，请重试')
+    }
+}
+
+// ✅ 新增: 手动保存到历史档案
+const saveToHistoryManual = async () => {
+    console.log(' 用户点击保存按钮')
+
+    // 检查是否有可保存的数据
+    if (!currentEmotion.value || !currentConfidence.value || currentFaces.value.length === 0) {
+        ElMessage.warning('⚠️ 暂无可保存的检测数据')
+        return
+    }
+
+    // 防止重复点击
+    if (isSaving.value) {
+        console.log('️ 正在保存中，忽略重复点击')
+        return
+    }
+
+    try {
+        isSaving.value = true
+        console.log(' 开始手动保存历史记录...')
+
+        await saveRealtimeToHistory(
+            currentEmotion.value,
+            currentConfidence.value,
+            currentFaces.value
+        )
+
+        ElMessage.success('✅ 已保存到历史档案')
+        console.log('✅ 手动保存成功')
+    } catch (error) {
+        console.error(' 手动保存失败:', error)
+        ElMessage.error('❌ 保存失败，请重试')
+    } finally {
+        // 延迟重置状态，让用户看到加载动画
+        setTimeout(() => {
+            isSaving.value = false
+            console.log(' 保存锁已释放')
+        }, 500)
+    }
+}
+
 // ✅ 新增: 处理反馈提交成功
 const handleFeedbackSubmitted = () => {
-    // 反馈提交后，可以在这里添加一些额外逻辑
-    // 比如记录反馈统计、显示学习进度等
+    // 反馈提交后，清除快照数据
+    feedbackSnapshot.value = {
+        image: null,
+        bbox: null,
+        emotion: null,
+        confidence: 0,
+        timestamp: null
+    }
     console.log('✅ 用户反馈已提交，系统将自动学习优化')
 }
 
 // ✅ 新增: 保存实时检测历史记录
 const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     try {
+        // ✅ 新增: 防止重复保存(2秒冷却时间)
+        const now = Date.now()
+        const timeSinceLastSave = now - lastSaveTime
+        console.log(`⏱️ 距离上次保存: ${timeSinceLastSave}ms`)
+
+        if (timeSinceLastSave < SAVE_COOLDOWN) {
+            console.log('ℹ️ 保存过于频繁,已跳过(冷却中)')
+            ElMessage.warning('⚠️ 请勿重复保存')
+            return
+        }
+        lastSaveTime = now
+        console.log('📝 开始执行保存操作...')
+
+        // ✅ 修复: 增加更严格的检查
+        if (!isCameraOn.value) {
+            console.log('ℹ️ 摄像头已关闭，跳过保存历史记录')
+            return
+        }
+
         const canvas = canvasElement.value
         if (!canvas) {
             console.warn('⚠️ Canvas 元素未找到，无法保存历史记录')
             return
         }
 
-        // 截取当前 Canvas 帧作为缩略图（压缩到 320x240）
+        // ✅ 新增: 检查 Canvas 是否有有效尺寸
+        if (canvas.width === 0 || canvas.height === 0) {
+            console.warn('⚠️ Canvas 尺寸为 0，无法保存历史记录')
+            return
+        }
+
+        console.log(' 开始保存实时检测历史记录...', {
+            emotion,
+            confidence,
+            canvasSize: `${canvas.width}x${canvas.height}`,
+            facesCount: faces.length
+        })
+
+        // ✅ 终极修复: 不再保存全局坐标，而是直接裁剪人脸区域
         const thumbnailCanvas = document.createElement('canvas')
         const thumbCtx = thumbnailCanvas.getContext('2d')
         thumbnailCanvas.width = 320
         thumbnailCanvas.height = 240
 
-        // 保持宽高比
-        const scale = Math.min(320 / canvas.width, 240 / canvas.height)
-        const scaledWidth = canvas.width * scale
-        const scaledHeight = canvas.height * scale
-        const offsetX = (320 - scaledWidth) / 2
-        const offsetY = (240 - scaledHeight) / 2
+        console.log('🖼️ 缩略图生成开始:', {
+            sourceCanvasSize: `${canvas.width}x${canvas.height}`,
+            facesCount: faces.length
+        })
 
-        thumbCtx.fillStyle = '#000'  // 黑色背景
-        thumbCtx.fillRect(0, 0, 320, 240)
-        thumbCtx.drawImage(canvas, offsetX, offsetY, scaledWidth, scaledHeight)
+        let savedFaces = []
 
-        // 转换为 JPEG 格式（质量 0.7）
-        const thumbnail = thumbnailCanvas.toDataURL('image/jpeg', 0.7)
+        if (faces.length > 0 && faces[0].bbox) {
+            // ✅ 核心重构: 裁剪人脸区域并填充整个320x240
+            const bbox = Array.from(faces[0].bbox)
+            let [x, y, w, h] = bbox
 
-        // 构建保存数据
+            console.log('📍 原始人脸bbox:', bbox, '(来自发送Canvas坐标系)')
+
+            // ✅ 关键: bbox来自发送Canvas,需转换到显示Canvas坐标
+            const scaleX = canvas.width / currentResolution.width
+            const scaleY = canvas.height / currentResolution.height
+
+            const displayX = x * scaleX
+            const displayY = y * scaleY
+            const displayW = w * scaleX
+            const displayH = h * scaleY
+
+            console.log('✅ 转换到显示Canvas的bbox:', [displayX, displayY, displayW, displayH])
+
+            // 添加20%边距
+            const padding = 0.2
+            const padX = Math.max(0, displayX - displayW * padding)
+            const padY = Math.max(0, displayY - displayH * padding)
+            const padW = displayW * (1 + padding * 2)
+            const padH = displayH * (1 + padding * 2)
+
+            // 验证裁剪区域有效性
+            if (padW <= 0 || padH <= 0) {
+                console.error('❌ 裁剪区域尺寸无效,使用默认完整帧')
+                thumbCtx.drawImage(canvas, 0, 0, 320, 240)
+                savedFaces = [{
+                    ...faces[0],
+                    bbox: [80, 60, 160, 120]
+                }]
+            } else {
+                // ✅ 将裁剪区域直接填充到320x240(无黑边)
+                thumbCtx.drawImage(
+                    canvas,
+                    padX, padY, padW, padH,  // 源图像裁剪区域
+                    0, 0, 320, 240  // 目标区域(填满整个缩略图)
+                )
+
+                console.log('✅ 人脸区域已裁剪并填充缩略图')
+
+                // ✅ bbox设置为缩略图中的中心区域(80%大小)
+                savedFaces = [{
+                    ...faces[0],
+                    bbox: [32, 24, 256, 192]  // 320x240的80%中心区域
+                }]
+
+                console.log(' 保存到数据库的bbox (320x240坐标系):', savedFaces[0].bbox)
+            }
+
+            // 保存其他人脸(使用相同逻辑)
+            for (let i = 1; i < faces.length; i++) {
+                if (faces[i].bbox) {
+                    savedFaces.push({
+                        ...faces[i],
+                        bbox: [32, 24, 256, 192]
+                    })
+                }
+            }
+        } else {
+            // 无人脸：保存完整帧（居中缩放）
+            console.log('⚠️ 未检测到人脸，保存完整帧')
+            const sourceWidth = canvas.width || 640
+            const sourceHeight = canvas.height || 480
+            const scale = Math.min(320 / sourceWidth, 240 / sourceHeight)
+            const scaledWidth = sourceWidth * scale
+            const scaledHeight = sourceHeight * scale
+            const offsetX = (320 - scaledWidth) / 2
+            const offsetY = (240 - scaledHeight) / 2
+
+            thumbCtx.drawImage(
+                canvas,
+                0, 0, sourceWidth, sourceHeight,
+                offsetX, offsetY, scaledWidth, scaledHeight
+            )
+        }
+
+        const thumbnail = thumbnailCanvas.toDataURL('image/jpeg', 0.8)
+        console.log('📦 缩略图生成完成:', {
+            dataLength: thumbnail.length,
+            expectedRange: '8000-15000 bytes',
+            isEmpty: thumbnail.length < 5000
+        })
+
+        // ✅ 构建保存数据（使用已转换坐标的savedFaces）
         const historyData = {
             detection_type: 'realtime',
             results: [{
                 emotion: emotion,
                 confidence: confidence,
-                bbox: faces[0]?.bbox || [0, 0, 0, 0]
+                bbox: savedFaces.length > 0 ? savedFaces[0].bbox : [0, 0, 0, 0]
             }],
             source: '摄像头实时检测',
             image_path: '',
@@ -936,12 +1025,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
             thumbnail: thumbnail,
             dominant_emotion: emotion,
             confidence: confidence,
-            detected_faces: faces.map(face => ({
-                bbox: face.bbox,
-                emotion: face.emotion,
-                confidence: face.confidence,
-                scores: face.scores
-            }))
+            detected_faces: savedFaces  // ✅ bbox已是320x240坐标系
         }
 
         // 调用保存接口
@@ -954,7 +1038,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
         if (response.ok) {
             console.log('✅ 实时检测历史记录已保存')
         } else {
-            console.warn('⚠️ 保存历史记录失败:', response.statusText)
+            console.warn('️ 保存历史记录失败:', response.statusText)
         }
     } catch (error) {
         console.error('❌ 保存实时检测历史记录失败:', error)
@@ -1022,7 +1106,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     padding: 5px 12px;
     border-radius: 8px;
     font-size: 11px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     z-index: 10;
     display: flex;
     align-items: center;
@@ -1136,7 +1220,75 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 .btn-label {
     font-size: 12px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
+}
+
+/* ✅ 新增: 功能按钮分隔线 */
+.ctrl-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 0 4px;
+}
+
+/* ✅ 新增: 功能按钮样式 */
+.ctrl-feature {
+    background: color-mix(in srgb, var(--primary) 8%, transparent) !important;
+    color: var(--text-secondary) !important;
+}
+
+.ctrl-feature:hover {
+    background: color-mix(in srgb, var(--primary) 18%, transparent) !important;
+    color: var(--text) !important;
+}
+
+/* ✅ 新增: 功能按钮激活状态 */
+.ctrl-feature-active {
+    background: linear-gradient(135deg, var(--primary), #9B59B6) !important;
+    color: var(--text) !important;
+    box-shadow: 0 0 12px rgba(113, 57, 255, 0.6), 0 0 20px rgba(113, 57, 255, 0.3) !important;
+}
+
+.ctrl-feature-active:hover {
+    box-shadow: 0 0 16px rgba(113, 57, 255, 0.8), 0 0 24px rgba(113, 57, 255, 0.4) !important;
+}
+
+/* ✅ 新增: 麦克风按钮脉冲动画 */
+.ctrl-feature-active.mic-active {
+    animation: ctrlMicPulse 2s ease-in-out infinite;
+}
+
+@keyframes ctrlMicPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 12px rgba(113, 57, 255, 0.6), 0 0 20px rgba(113, 57, 255, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 16px rgba(113, 57, 255, 0.8), 0 0 28px rgba(113, 57, 255, 0.4);
+    }
+}
+
+/* ✅ 新增: 保存按钮加载状态 */
+.ctrl-saving {
+    opacity: 0.7;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.saving-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .camera-start-overlay {
@@ -1181,12 +1333,11 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 .emotion-panel {
     height: 100%;
     padding: 16px;
-    /* ✅ 修复: 移除 overflow-y，让内部元素管理滚动 */
-    overflow-y: visible;
+    /* ✅ 修复: 面板自身不滚动，让内部元素管理滚动 */
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    /* ✅ 优化: 减小最小高度，避免内容少时出现大片空白 */
-    min-height: 350px;
+    /* ✅ 移除: min-height，让高度完全自适应内容 */
 }
 
 .panel-header {
@@ -1226,10 +1377,13 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     flex-direction: column;
     align-items: center;
     gap: 6px;
+    /* ✅ 修复: 仅在内容溢出时显示滚动条，隐藏滚动条轨道 */
     overflow-y: auto;
+    overflow-x: hidden;
     animation: fadeIn 0.3s ease;
-    /* ✅ 优化: 动态最大高度，根据视口调整 */
-    max-height: calc(100vh - 280px);
+    /* ✅ 优化: 使用相对高度而非视口高度，避免超出父容器 */
+    min-height: 0;
+    max-height: 100%;
 }
 
 /* ✅ 新增: 情绪显示区域滚动条样式 */
@@ -1244,6 +1398,11 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 .emotion-display::-webkit-scrollbar-thumb:hover {
     background: rgba(146, 78, 255, 0.5);
+}
+
+/* ✅ 新增: 内容未溢出时隐藏滚动条轨道 */
+.emotion-display::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .emotion-icon-large {
@@ -1289,7 +1448,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 .voice-text {
     font-size: 13px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text);
     flex: 1;
 }
@@ -1361,7 +1520,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 .feedback-title {
     font-size: 13px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text);
     margin: 0 0 10px 0;
     text-align: center;
@@ -1381,9 +1540,8 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     /* gap: 6px; */
     margin-top: 12px;
     flex-shrink: 0;
-    /* ✅ 优化: 减小最大高度，更紧凑 */
-    max-height: 250px;
-    overflow-y: auto;
+    /* ✅ 修复: 移除 overflow-y，避免未溢出时显示滚动条 */
+    overflow-y: visible;
 }
 
 /* ✅ 新增: 置信度条容器滚动条样式 */
@@ -1398,6 +1556,11 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 .confidence-bars::-webkit-scrollbar-thumb:hover {
     background: rgba(146, 78, 255, 0.5);
+}
+
+/* ✅ 新增: 内容未溢出时隐藏滚动条轨道 */
+.confidence-bars::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 /* ✅ 新增: 情绪排序丝滑动画 */
@@ -1440,7 +1603,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     display: flex;
     align-items: center;
     gap: 3px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -1533,6 +1696,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     /* background-image: repeating-linear-gradient(...) */
 }
 
+/* 无人脸提示 */
 .no-detection {
     flex: 1;
     display: flex;
@@ -1541,6 +1705,8 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     justify-content: center;
     gap: 10px;
     color: var(--text-secondary);
+    /* ✅ 新增: 确保等待状态占据剩余空间 */
+    min-height: 0;
 }
 
 .status-hint {
@@ -1589,50 +1755,6 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     }
 }
 
-/* 麦克风按钮样式 */
-.mic-button {
-    background: rgba(13, 6, 27, 0.5) !important;
-    border: 1px solid rgba(156, 78, 255, 0.2) !important;
-    color: var(--text) !important;
-    transition: all 0.3s ease !important;
-}
-
-/* 圆形按钮样式 - 保持正圆形 */
-:deep(.el-button.is-circle) {
-    border-radius: 50% !important;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.mic-button:hover {
-    background: rgba(113, 57, 255, 0.15) !important;
-    border-color: var(--primary) !important;
-    color: var(--primary-light) !important;
-    transform: translateY(-1px);
-}
-
-.mic-button.mic-active {
-    background: linear-gradient(135deg, var(--primary), #9B59B6) !important;
-    border: none !important;
-    color: var(--text) !important;
-    box-shadow: 0 0 12px rgba(113, 57, 255, 0.6), 0 0 20px rgba(113, 57, 255, 0.3) !important;
-    animation: micPulse 2s ease-in-out infinite;
-}
-
-.mic-button.mic-active:hover {
-    box-shadow: 0 0 16px rgba(113, 57, 255, 0.8), 0 0 24px rgba(113, 57, 255, 0.4) !important;
-}
-
-@keyframes micPulse {
-
-    0%,
-    100% {
-        box-shadow: 0 0 12px rgba(113, 57, 255, 0.6), 0 0 20px rgba(113, 57, 255, 0.3);
-    }
-
-    50% {
-        box-shadow: 0 0 16px rgba(113, 57, 255, 0.8), 0 0 28px rgba(113, 57, 255, 0.4);
-    }
-}
+/* 移除: 面板控制按钮样式（已迁移到视频控制栏） */
+/* .panel-controls 相关样式已删除 */
 </style>

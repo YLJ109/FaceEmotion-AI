@@ -46,7 +46,7 @@
                                 size="large">
                                 {{ detecting ? '检测中...' : '开始检测' }}
                             </el-button>
-                            <el-button @click="reset" round size="large">重新选择</el-button>
+                            <el-button type="primary" @click="reset" round size="large">重新选择</el-button>
                             <el-button v-if="detectionResult" @click="toggleDetectionBoxes" round size="large"
                                 :type="showDetectionBoxes ? 'warning' : 'info'">
                                 {{ showDetectionBoxes ? '隐藏框' : '显示框' }}
@@ -85,7 +85,7 @@
                                     'neutral') }}</div>
                                 <div class="emotion-confidence">{{ (detectionResult.faces[0].confidence *
                                     100).toFixed(1)
-                                    }}%
+                                }}%
                                 </div>
                                 <div class="face-count">1 张人脸</div>
 
@@ -182,11 +182,15 @@
                 </el-card>
             </div>
         </div>
+
+        <!-- ✅ 新增: 性能监控面板 -->
+        <PerformanceMonitor :fps="perfFps" :latency="perfLatency" :skip-rate="perfSkipRate" :gpu-memory="perfGpuMemory"
+            :detect-interval="perfDetectInterval" :http-latency="perfHttpLatency" :error-rate="perfErrorRate" />
     </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { UploadFilled, Aim, Document, Edit } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
@@ -195,6 +199,14 @@ import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotio
 import { API } from '@/api/config'
 import EmotionSVG from '@/components/common/EmotionSVG.vue'
 import { logFeatureUsage } from '@/utils/analytics'
+import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
+import generativeAudio from '@/utils/generativeAudio'
+import wsManager from '@/api/websocket'
+
+// ✅ 新增: 组件名称,用于 keep-alive 缓存
+defineOptions({
+    name: 'ImageDetector'
+})
 
 const themeStore = useThemeStore()
 const previewUrl = ref(null)
@@ -206,6 +218,15 @@ const showDetectionBoxes = ref(true) // 控制是否显示检测框
 const fileName = ref('') // 文件名
 // ✅ 新增: 情绪列表
 const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+
+// ✅ 新增: 性能监控数据
+const perfFps = ref(0)
+const perfLatency = ref(0)
+const perfSkipRate = ref(0)
+const perfGpuMemory = ref(0)
+const perfDetectInterval = ref(1)
+const perfHttpLatency = ref(0)
+const perfErrorRate = ref(0)
 
 const handleFileChange = (file) => {
     selectedFile.value = file.raw
@@ -263,12 +284,20 @@ const drawImagePreview = () => {
 const detectImage = async () => {
     if (!selectedFile.value) { ElMessage.warning('请先选择图片'); return }
     detecting.value = true
+    const startTime = performance.now()
+
     try {
         const formData = new FormData()
         formData.append('file', selectedFile.value)
         const response = await fetch(API.detectImage, { method: 'POST', body: formData })
         if (!response.ok) throw new Error('检测失败')
         const result = await response.json()
+
+        // ✅ 新增: 计算 HTTP 延迟
+        const endTime = performance.now()
+        perfHttpLatency.value = endTime - startTime
+        perfLatency.value = perfHttpLatency.value
+
         detectionResult.value = result
 
         // 绘制带框的结果（默认显示）
@@ -279,10 +308,27 @@ const detectImage = async () => {
         logFeatureUsage('图片检测', { emotion, faces: result.faces?.length || 0 })
         ElMessage.success('✅ 检测完成')
 
+        // ✅ 新增: 更新性能监控数据
+        perfFps.value = 1000 / perfHttpLatency.value  // 基于HTTP延迟估算FPS
+        perfSkipRate.value = 0  // 图片检测无跳帧
+        perfGpuMemory.value = 0  // 图片检测不直接监控GPU
+
+        // ✅ 新增: 传递情绪数据到音乐引擎
+        if (result.faces?.length > 0 && result.music_params) {
+            // 通过 WebSocket 发送情绪数据，触发全局音乐更新
+            wsManager.emit('image_result', {
+                type: 'result',
+                music_params: result.music_params,
+                emotion: emotion,
+                confidence: result.faces[0].confidence || 0
+            })
+        }
+
         // 保存到历史记录
         await saveToHistory(result, previewUrl.value)
     } catch (error) {
         console.error('检测错误:', error)
+        perfErrorRate.value += 1  // 记录错误
         ElMessage.error('检测失败: ' + error.message)
     } finally { detecting.value = false }
 }
@@ -526,8 +572,8 @@ const submitFeedback = async (correctEmotion) => {
 .upload-area {
     margin-bottom: 12px;
     /* ✅ 优化: 减小固定高度，更紧凑 */
-    min-height: 500px;
-    height: 500px;
+    min-height: 730px;
+    height: 730px;
     display: flex;
     flex-direction: column;
 }
@@ -640,9 +686,13 @@ const submitFeedback = async (correctEmotion) => {
 
 .canvas-container canvas {
     width: 100%;
-    height: 100%;
+    max-height: calc(100vh - 280px);
+    min-height: 400px;
+    border-radius: 10px;
+    background: #000;
     display: block;
-    border-radius: 8px;
+    position: relative;
+    z-index: 1;
 }
 
 .action-buttons {
@@ -693,7 +743,7 @@ const submitFeedback = async (correctEmotion) => {
     overflow-y: auto;
     animation: fadeIn 0.3s ease;
     /* ✅ 新增: 设置最大高度，超出后滚动 */
-    max-height: calc(100vh - 250px);
+    max-height: calc(100vh - 280px);
 }
 
 /* ✅ 新增: 情绪显示区域滚动条样式 */
@@ -756,7 +806,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .feedback-title {
     font-size: 13px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text);
     margin: 0 0 10px 0;
     text-align: center;
@@ -772,7 +822,7 @@ const submitFeedback = async (correctEmotion) => {
 .face-count {
     font-size: 11px;
     color: var(--text-secondary);
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     flex-shrink: 0;
 }
 
@@ -799,7 +849,7 @@ const submitFeedback = async (correctEmotion) => {
     display: flex;
     align-items: center;
     gap: 3px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -843,7 +893,7 @@ const submitFeedback = async (correctEmotion) => {
     overflow-y: auto;
     animation: fadeIn 0.3s ease;
     /* ✅ 新增: 设置最大高度，超出后滚动 */
-    max-height: calc(100vh - 250px);
+    max-height: calc(100vh - 280px);
 }
 
 /* ✅ 新增: 多人脸显示区域滚动条样式 */
@@ -881,7 +931,7 @@ const submitFeedback = async (correctEmotion) => {
 .faces-summary {
     font-size: 11px;
     color: var(--text-secondary);
-    /* font-weight: 600; */
+    /* font-weight: 100; */
 }
 
 .faces-list {
@@ -891,7 +941,7 @@ const submitFeedback = async (correctEmotion) => {
     flex: 1;
     overflow-y: auto;
     /* ✅ 新增: 设置最大高度，避免过高 */
-    max-height: 400px;
+    /* max-height: 400px; */
 }
 
 /* ✅ 新增: 人脸列表滚动条样式 */
@@ -1012,7 +1062,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .mini-bar-label {
     font-size: 9px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text-secondary);
     white-space: nowrap;
     overflow: hidden;

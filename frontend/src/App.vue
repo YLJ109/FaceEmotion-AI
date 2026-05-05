@@ -12,10 +12,12 @@
 
         <!-- 内容区 -->
         <main class="content-area">
-          <!-- ✅ 使用 RouterView 渲染所有页面 -->
+          <!-- ✅ 使用 keep-alive 缓存检测组件,避免切换时丢失状态 -->
           <RouterView v-slot="{ Component }">
             <transition name="page-fade" mode="out-in">
-              <component :is="Component" :key="$route.fullPath" />
+              <keep-alive :include="['ImageDetector', 'RealtimeDetector', 'VideoDetector', 'BatchDetector']">
+                <component :is="Component" :key="$route.fullPath" />
+              </keep-alive>
             </transition>
           </RouterView>
         </main>

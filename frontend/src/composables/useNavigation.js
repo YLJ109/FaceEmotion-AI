@@ -24,7 +24,8 @@ const NAVIGATION_CONFIG = {
 
     // 记录模式分组
     record: [
-        { key: 'history', label: '历史档案', icon: 'Clock', path: '/history' }
+        { key: 'history', label: '历史档案', icon: 'Clock', path: '/history' },
+        { key: 'feedback-history', label: '反馈历史', icon: 'DocumentChecked', path: '/feedback-history' }
     ],
 
     // 管理分组

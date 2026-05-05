@@ -298,7 +298,7 @@ onUnmounted(() => {
     gap: 6px;
     font-size: 12px;
     color: var(--text-secondary);
-    /* font-weight: 600; */
+    /* font-weight: 100; */
 }
 
 .metric-icon {

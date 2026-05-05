@@ -147,7 +147,7 @@ const selectTheme = (name) => themeStore.setTheme(name)
     font-size: 12px;
     color: var(--text-secondary);
     margin-bottom: 8px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     text-transform: uppercase;
     letter-spacing: 1px;
 }
@@ -192,7 +192,7 @@ const selectTheme = (name) => themeStore.setTheme(name)
 
 .name {
     font-size: 11px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     color: var(--text-secondary);
 }
 

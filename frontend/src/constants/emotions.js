@@ -26,12 +26,12 @@ export const EMOTION_EMOJI = {
     angry: '😠',
     surprise: '😲',
     surprised: '😲',    // 兼容 surprised 标签
-    fear: '',
-    fearful: '😨',      // 兼容 fearful 标签
+    fear: '😰',
+    fearful: '😰',      // 兼容 fearful 标签
     disgust: '🤢',
     disgusted: '🤢',    // 兼容 disgusted 标签
-    neutral: '',
-    calm: '😌'          // calm 表情
+    neutral: '😐',          // 平静表情（中性）
+    calm: '😌'              // calm 表情
 }
 
 // 情绪颜色映射（与主题配色统一）

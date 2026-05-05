@@ -13,6 +13,7 @@ const AnalyticsDashboard = () => import('@/components/analytics/AnalyticsDashboa
 const HistoryViewer = () => import('@/components/history/HistoryViewer.vue')
 const ThemePage = () => import('@/components/pages/ThemePage.vue')
 const SettingsPage = () => import('@/components/pages/SettingsPage.vue')
+const FeedbackHistory = () => import('@/components/feedback/FeedbackHistory.vue') // ✅ 新增: 反馈历史页面
 
 const routes = [
     {
@@ -99,6 +100,16 @@ const routes = [
             title: '系统设置',
             icon: 'Setting',
             group: 'manage'
+        }
+    },
+    {
+        path: '/feedback-history',
+        name: 'FeedbackHistory',
+        component: FeedbackHistory,
+        meta: {
+            title: '反馈历史',
+            icon: 'DocumentChecked',
+            group: 'record'
         }
     }
 ]

@@ -66,7 +66,10 @@ class DatabaseManager:
                 predicted_emotion TEXT,
                 correct_emotion TEXT,
                 feedback_type TEXT,
-                notes TEXT
+                notes TEXT,
+                confidence REAL,
+                bbox TEXT,
+                snapshot TEXT
             )
         ''')
 
@@ -286,14 +289,17 @@ class DatabaseManager:
     def save_feedback(self, feedback: Dict):
         """保存用户反馈"""
         self._execute('''
-            INSERT INTO user_feedback (emotion, predicted_emotion, correct_emotion, feedback_type, notes)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO user_feedback (emotion, predicted_emotion, correct_emotion, feedback_type, notes, confidence, bbox, snapshot)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             feedback.get('emotion'),
             feedback.get('predicted_emotion'),
             feedback.get('correct_emotion'),
             feedback.get('feedback_type'),
-            feedback.get('notes', '')
+            feedback.get('notes', ''),
+            feedback.get('confidence'),
+            feedback.get('bbox') and str(feedback.get('bbox')) or None,
+            feedback.get('snapshot')
         ))
 
     def _normalize_faces(self, faces: List[Dict]) -> List[Dict]:
@@ -451,6 +457,124 @@ class DatabaseManager:
         )
         self._conn.commit()
         return cursor.rowcount
+
+    def get_feedback_history(self, limit: int = 50, offset: int = 0, emotion_filter: str = None, start_date: str = None, end_date: str = None):
+        """获取反馈历史记录
+
+        Args:
+            limit: 返回记录数量限制
+            offset: 偏移量
+            emotion_filter: 情绪过滤（predicted_emotion 或 correct_emotion）
+            start_date: 开始日期 (YYYY-MM-DD)
+            end_date: 结束日期 (YYYY-MM-DD)
+
+        Returns:
+            反馈记录列表
+        """
+        query = 'SELECT * FROM user_feedback WHERE 1=1'
+        params = []
+
+        if emotion_filter:
+            query += ' AND (predicted_emotion = ? OR correct_emotion = ?)'
+            params.extend([emotion_filter, emotion_filter])
+
+        if start_date:
+            query += ' AND timestamp >= ?'
+            params.append(start_date)
+
+        if end_date:
+            query += ' AND timestamp <= ?'
+            params.append(end_date + ' 23:59:59')
+
+        query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?'
+        params.extend([limit, offset])
+
+        cursor = self._execute(query, tuple(params))
+        columns = [desc[0] for desc in cursor.description]
+        results = []
+
+        for row in cursor.fetchall():
+            record = dict(zip(columns, row))
+            # 解析 bbox 字符串为列表
+            if record.get('bbox'):
+                try:
+                    import ast
+                    record['bbox'] = ast.literal_eval(record['bbox'])
+                except:
+                    record['bbox'] = None
+            results.append(record)
+
+        return results
+
+    def get_feedback_count(self, emotion_filter: str = None, start_date: str = None, end_date: str = None):
+        """获取反馈记录总数
+
+        Args:
+            emotion_filter: 情绪过滤
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            记录总数
+        """
+        query = 'SELECT COUNT(*) as count FROM user_feedback WHERE 1=1'
+        params = []
+
+        if emotion_filter:
+            query += ' AND (predicted_emotion = ? OR correct_emotion = ?)'
+            params.extend([emotion_filter, emotion_filter])
+
+        if start_date:
+            query += ' AND timestamp >= ?'
+            params.append(start_date)
+
+        if end_date:
+            query += ' AND timestamp <= ?'
+            params.append(end_date + ' 23:59:59')
+
+        cursor = self._execute(query, tuple(params))
+        return cursor.fetchone()['count']
+
+    def delete_feedback(self, feedback_id: int) -> bool:
+        """删除指定 ID 的反馈记录
+
+        Args:
+            feedback_id: 反馈记录 ID
+
+        Returns:
+            是否删除成功
+        """
+        try:
+            cursor = self._execute(
+                'DELETE FROM user_feedback WHERE id = ?',
+                (feedback_id,)
+            )
+            return cursor.rowcount > 0
+        except Exception as e:
+            logger.error(f'删除反馈记录失败: {e}')
+            return False
+
+    def delete_history_record(self, record_id: int) -> bool:
+        """删除指定 ID 的历史记录
+
+        Args:
+            record_id: 历史记录 ID
+
+        Returns:
+            是否删除成功
+        """
+        try:
+            cursor = self._execute(
+                'DELETE FROM detection_history WHERE id = ?',
+                (record_id,)
+            )
+            deleted = cursor.rowcount > 0
+            if deleted:
+                logger.info(f'✅ 已删除历史记录 ID={record_id}')
+            return deleted
+        except Exception as e:
+            logger.error(f'删除历史记录失败: {e}')
+            return False
 
     def close(self):
         """关闭数据库连接"""

@@ -37,7 +37,7 @@
                                 :icon="VideoPlay2">
                                 {{ processing ? '处理中...' : '开始分析' }}
                             </el-button>
-                            <el-button @click="reset" round size="large">重新选择</el-button>
+                            <el-button type="primary" @click="reset" round size="large">重新选择</el-button>
                         </div>
                         <div v-if="processing" class="floating-progress">
                             <div class="floating-progress-card">
@@ -84,7 +84,7 @@
                                 <el-card class="stat-card glass-card-inner">
                                     <div class="stat-value">
                                         <span class="dominant-emoji-large">{{ getEmotionEmoji(dominantEmotion) || '😐'
-                                        }}</span>
+                                            }}</span>
                                     </div>
                                     <div class="stat-label">主导情绪</div>
                                     <div class="stat-desc">{{ getEmotionName(dominantEmotion) }}</div>
@@ -122,21 +122,20 @@
                                         <span class="frame-emoji">{{ getEmotionEmoji(segment.dominantEmotion) }}</span>
                                         <span class="frame-time">{{ segment.startTime.toFixed(1) }}s-{{
                                             segment.endTime.toFixed(1)
-                                            }}s</span>
+                                        }}s</span>
                                     </div>
                                     <div class="frame-count">{{ segment.count }}帧</div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="export-buttons">
-                            <el-button size="small" @click="exportJSON" round>导出 JSON</el-button>
-                            <el-button size="small" @click="exportCSV" round>导出 CSV</el-button>
-                        </div>
                     </div>
                 </el-card>
             </div>
         </div>
+
+        <!-- ✅ 新增: 性能监控面板 -->
+        <PerformanceMonitor :fps="perfFps" :latency="perfLatency" :skip-rate="perfSkipRate" :gpu-memory="perfGpuMemory"
+            :detect-interval="perfDetectInterval" :http-latency="perfHttpLatency" :error-rate="perfErrorRate" />
     </div>
 </template>
 
@@ -149,6 +148,14 @@ import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotio
 import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
 import { API } from '@/api/config'
 import { logFeatureUsage } from '@/utils/analytics'
+import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
+import generativeAudio from '@/utils/generativeAudio'
+import wsManager from '@/api/websocket'
+
+// ✅ 新增: 组件名称,用于 keep-alive 缓存
+defineOptions({
+    name: 'VideoDetector'
+})
 
 const themeStore = useThemeStore()
 const videoUrl = ref(null)
@@ -160,6 +167,15 @@ const progress = ref(0)
 const statusText = ref('')
 const results = ref([])
 const totalFrames = ref(0)
+
+// ✅ 新增: 性能监控数据
+const perfFps = ref(0)
+const perfLatency = ref(0)
+const perfSkipRate = ref(0)
+const perfGpuMemory = ref(0)
+const perfDetectInterval = ref(1)
+const perfHttpLatency = ref(0)
+const perfErrorRate = ref(0)
 
 // 视频播放状态
 let animationFrameId = null
@@ -486,6 +502,8 @@ const startDetection = async () => {
     processing.value = true; progress.value = 0
     statusText.value = '正在上传...'; results.value = []
 
+    const startTime = performance.now()
+
     try {
         const formData = new FormData()
         formData.append('file', selectedFile.value)
@@ -510,6 +528,42 @@ const startDetection = async () => {
             // 使用真实的检测结果
             results.value = data.key_frames || []
 
+            // ✅ 新增: 计算性能指标
+            const endTime = performance.now()
+            const totalTime = endTime - startTime
+            perfHttpLatency.value = totalTime  // HTTP总延迟
+            perfLatency.value = totalTime / (results.value.length || 1)  // 平均每帧延迟
+            perfFps.value = results.value.length / (totalTime / 1000)  // FPS
+            perfSkipRate.value = 0  // 视频检测无跳帧
+            perfGpuMemory.value = 0  // 不直接监控GPU
+            perfErrorRate.value = 0
+
+            // ✅ 新增: 传递情绪数据到音乐引擎（使用第一帧的情绪）
+            if (results.value.length > 0 && results.value[0].faces?.length > 0) {
+                const firstFrame = results.value[0]
+                const emotion = firstFrame.faces[0].emotion
+                const confidence = firstFrame.faces[0].confidence || 0
+
+                // 如果后端返回了 music_params，直接使用；否则构造默认值
+                const musicParams = firstFrame.music_params || {
+                    bpm: 100,
+                    root_note: 60,
+                    melody: [60, 64, 67],
+                    waveform: 'sine',
+                    filter_cutoff: 2000,
+                    reverb_mix: 0.3,
+                    volume: 0.5,
+                    emotion: emotion
+                }
+
+                wsManager.emit('video_result', {
+                    type: 'result',
+                    music_params: musicParams,
+                    emotion: emotion,
+                    confidence: confidence
+                })
+            }
+
             // 立即绘制一次检测框（如果视频正在播放）
             await nextTick()
             drawDetectionBoxes()
@@ -518,8 +572,17 @@ const startDetection = async () => {
             logFeatureUsage('视频检测', { frames: totalFrames.value })
             ElMessage.success(`✅ 视频分析完成！提取 ${results.value.length} 个关键帧`)
 
-            // 保存到历史记录
-            await saveToHistory(data.key_frames || [])
+            // ✅ 修复: 立即关闭进度提示框
+            processing.value = false
+
+            // ✅ 修复: 恢复await,确保历史记录保存成功
+            try {
+                await saveToHistory(data.key_frames || [])
+                console.log('✅ 历史记录保存完成')
+            } catch (error) {
+                console.error('保存历史记录失败:', error)
+                ElMessage.warning('⚠️ 视频分析完成，但保存历史记录失败')
+            }
         } else {
             throw new Error(data.detail || data.message || '视频检测失败')
         }
@@ -534,29 +597,14 @@ const reset = () => {
     progress.value = 0; if (videoRef.value) videoRef.value.pause()
 }
 
-const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(results.value, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a'); link.href = url; link.download = `video_${Date.now()}.json`; link.click()
-    URL.revokeObjectURL(url); ElMessage.success('✅ 已导出JSON')
-}
-
-const exportCSV = () => {
-    let csv = 'Frame,Has_Face,Emotion,Confidence\n'
-    results.value.forEach(r => {
-        const hasFace = r.faces && r.faces.length > 0
-        const face = hasFace ? r.faces[0] : null
-        csv += `${r.frame},${hasFace},${face ? face.emotion : 'N/A'},${face ? (face.confidence * 100).toFixed(1) : 0}\n`
-    })
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a'); link.href = url; link.download = `video_${Date.now()}.csv`; link.click()
-    URL.revokeObjectURL(url); ElMessage.success('✅ 已导出CSV')
-}
-
 // 保存视频检测到历史记录
 const saveToHistory = async (keyFrames) => {
     try {
+        console.log('🔍 开始保存视频历史记录', {
+            keyFramesCount: keyFrames.length,
+            firstFrame: keyFrames[0]
+        })
+
         // ✅ 优化: 每个人脸单独保存为一条记录
         let savedCount = 0
         const allFaces = []
@@ -568,38 +616,139 @@ const saveToHistory = async (keyFrames) => {
                     allFaces.push({
                         ...face,
                         frame: kf.frame,
-                        timestamp: kf.timestamp || 0
+                        timestamp: kf.timestamp || 0,
+                        videoTime: kf.timestamp // 记录视频时间戳用于截取帧
                     })
                 })
             }
         })
 
+        console.log(`📊 共收集到 ${allFaces.length} 张人脸`)
+
+        // ✅ 新增: 从视频中截取帧并裁剪人脸的辅助函数
+        const extractFaceThumbnail = async (face, videoElement) => {
+            return new Promise((resolve) => {
+                console.log(`🎬 开始裁剪人脸 (时间: ${face.videoTime || 0}s)`)
+
+                // 创建一个临时video元素
+                const tempVideo = document.createElement('video')
+                tempVideo.src = videoUrl.value
+                tempVideo.muted = true  // 静音避免音频问题
+                tempVideo.preload = 'auto'
+
+                // ✅ 修复: 先等待元数据加载完成
+                tempVideo.onloadedmetadata = () => {
+                    console.log(`📹 视频元数据加载完成: ${tempVideo.videoWidth}x${tempVideo.videoHeight}`)
+                    // 设置时间戳,触发seeked事件
+                    tempVideo.currentTime = face.videoTime || 0
+                }
+
+                tempVideo.onseeked = () => {
+                    console.log(`✅ 视频帧定位成功 (${face.videoTime || 0}s)`)
+                    try {
+                        // 创建canvas并绘制视频帧
+                        const canvas = document.createElement('canvas')
+                        const ctx = canvas.getContext('2d')
+
+                        // 设置canvas尺寸为视频帧大小
+                        canvas.width = tempVideo.videoWidth
+                        canvas.height = tempVideo.videoHeight
+
+                        // 绘制当前帧
+                        ctx.drawImage(tempVideo, 0, 0)
+
+                        // 获取人脸bbox坐标
+                        const [x, y, w, h] = face.bbox
+
+                        // 裁剪人脸区域(添加20%的边距)
+                        const margin = 0.2
+                        const cropX = Math.max(0, x - w * margin)
+                        const cropY = Math.max(0, y - h * margin)
+                        const cropW = w * (1 + 2 * margin)
+                        const cropH = h * (1 + 2 * margin)
+
+                        // 创建裁剪后的canvas
+                        const cropCanvas = document.createElement('canvas')
+                        cropCanvas.width = cropW
+                        cropCanvas.height = cropH
+                        const cropCtx = cropCanvas.getContext('2d')
+
+                        // 绘制裁剪后的人脸区域
+                        cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
+
+                        // 转换为Base64
+                        const thumbnail = cropCanvas.toDataURL('image/jpeg', 0.8)
+                        console.log(`✅ 人脸裁剪完成, Base64长度: ${thumbnail.length}`)
+                        resolve(thumbnail)
+                    } catch (error) {
+                        console.error('❌ 裁剪人脸失败:', error)
+                        // 失败时返回渐变背景+emoji
+                        resolve(generateFallbackThumbnail(face.emotion))
+                    } finally {
+                        // 清理临时video
+                        tempVideo.remove()
+                    }
+                }
+
+                tempVideo.onerror = (e) => {
+                    console.error('❌ 加载视频帧失败:', e)
+                    resolve(generateFallbackThumbnail(face.emotion))
+                }
+
+                // ✅ 修复: 添加超时保护(5秒)
+                setTimeout(() => {
+                    console.warn('⚠️ 视频帧裁剪超时,使用降级缩略图')
+                    resolve(generateFallbackThumbnail(face.emotion))
+                    tempVideo.remove()
+                }, 5000)
+            })
+        }
+
+        // ✅ 新增: 生成降级缩略图(渐变背景+emoji)
+        const generateFallbackThumbnail = (emotion) => {
+            const canvas = document.createElement('canvas')
+            canvas.width = 200
+            canvas.height = 150
+            const ctx = canvas.getContext('2d')
+
+            // 绘制渐变背景
+            const gradient = ctx.createLinearGradient(0, 0, 200, 150)
+            gradient.addColorStop(0, '#1a1a2e')
+            gradient.addColorStop(1, '#16213e')
+            ctx.fillStyle = gradient
+            ctx.fillRect(0, 0, 200, 150)
+
+            // 绘制情绪图标
+            ctx.font = '48px Arial'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillStyle = '#ffffff'
+            ctx.fillText(getEmotionEmoji(emotion), 100, 75)
+
+            return canvas.toDataURL('image/jpeg', 0.8)
+        }
+
         // 每个人脸保存一条记录
-        for (const face of allFaces) {
+        for (let i = 0; i < allFaces.length; i++) {
+            const face = allFaces[i]
             try {
-                // 生成缩略图（使用canvas生成简单的缩略图）
-                const canvas = document.createElement('canvas')
-                canvas.width = 200
-                canvas.height = 150
-                const ctx = canvas.getContext('2d')
+                console.log(`💾 正在保存第 ${i + 1}/${allFaces.length} 张人脸...`)
 
-                // 绘制渐变背景
-                const gradient = ctx.createLinearGradient(0, 0, 200, 150)
-                gradient.addColorStop(0, '#1a1a2e')
-                gradient.addColorStop(1, '#16213e')
-                ctx.fillStyle = gradient
-                ctx.fillRect(0, 0, 200, 150)
+                // ✅ 修复: 从视频帧中裁剪真实的人脸缩略图
+                const videoElement = videoRef.value
+                let thumbnail
 
-                // 绘制情绪图标
-                ctx.font = '48px Arial'
-                ctx.textAlign = 'center'
-                ctx.textBaseline = 'middle'
-                ctx.fillStyle = '#ffffff'
-                ctx.fillText(getEmotionEmoji(face.emotion), 100, 75)
+                if (videoElement && face.videoTime !== undefined) {
+                    console.log(`🎬 正在从视频帧裁剪人脸 (时间: ${face.videoTime}s)`)
+                    thumbnail = await extractFaceThumbnail(face, videoElement)
+                } else {
+                    console.log(`⚠️ 无法获取视频帧，使用降级缩略图`)
+                    // 降级方案: 使用渐变背景+emoji
+                    thumbnail = generateFallbackThumbnail(face.emotion)
+                }
 
-                const thumbnail = canvas.toDataURL('image/jpeg', 0.8)
-
-                await fetch(API.historySave, {
+                console.log(` 正在发送API请求...`)
+                const response = await fetch(API.historySave, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -614,9 +763,15 @@ const saveToHistory = async (keyFrames) => {
                         detected_faces: [face]  // 只包含当前人脸
                     })
                 })
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                }
+
                 savedCount++
+                console.log(`✅ 第 ${i + 1} 张人脸保存成功`)
             } catch (error) {
-                console.error('保存单个人脸历史记录失败:', error)
+                console.error(`❌ 保存第 ${i + 1} 张人脸失败:`, error)
             }
         }
 
@@ -687,8 +842,10 @@ const saveToHistory = async (keyFrames) => {
 }
 
 .right-panel .el-card__body {
-    flex: 1;
-    overflow-y: auto;
+    flex: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: none !important;
 }
 
 /* ✅ 新增: 右侧面板滚动条样式 */
@@ -699,10 +856,15 @@ const saveToHistory = async (keyFrames) => {
 .right-panel .el-card__body::-webkit-scrollbar-thumb {
     background: rgba(146, 78, 255, 0.3);
     border-radius: 3px;
+    transition: background 0.2s ease;
 }
 
 .right-panel .el-card__body::-webkit-scrollbar-thumb:hover {
     background: rgba(146, 78, 255, 0.5);
+}
+
+.right-panel .el-card__body::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .result-card {
@@ -754,7 +916,7 @@ const saveToHistory = async (keyFrames) => {
 
 .badge {
     font-size: 10px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     padding: 2px 8px;
     border-radius: 20px;
     background: linear-gradient(135deg, #F99E1A, #FF6B35);
@@ -766,8 +928,8 @@ const saveToHistory = async (keyFrames) => {
 .upload-area {
     margin-bottom: 12px;
     /* ✅ 优化: 减小固定高度，更紧凑 */
-    min-height: 500px;
-    height: 500px;
+    min-height: 730px;
+    height: 730px;
     display: flex;
     flex-direction: column;
 }
@@ -897,7 +1059,7 @@ const saveToHistory = async (keyFrames) => {
     margin: 0;
     color: var(--text);
     font-size: 14px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     text-align: center;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
@@ -905,7 +1067,31 @@ const saveToHistory = async (keyFrames) => {
 .results-section {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
+    /* ✅ 修复: 添加高度限制和滚动 */
+    max-height: calc(100vh - 210px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+/* ✅ 新增: 结果区域滚动条样式 */
+.results-section::-webkit-scrollbar {
+    width: 6px;
+}
+
+.results-section::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.3);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+}
+
+.results-section::-webkit-scrollbar-thumb:hover {
+    background: rgba(146, 78, 255, 0.5);
+}
+
+.results-section::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .stats-cards {
@@ -951,14 +1137,14 @@ const saveToHistory = async (keyFrames) => {
 
 .stat-desc {
     font-size: 13px;
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     margin-top: 4px;
     color: var(--text);
 }
 
 .emotion-distribution {
-    margin-bottom: 12px;
-    max-height: 200px;
+    margin-bottom: 6px;
+    min-height: 185px;
     overflow-y: auto;
 }
 
@@ -1071,7 +1257,7 @@ const saveToHistory = async (keyFrames) => {
 .frame-number {
     font-size: 11px;
     color: var(--text-secondary);
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     line-height: 1.2;
 }
 
@@ -1090,7 +1276,7 @@ const saveToHistory = async (keyFrames) => {
 .frame-time {
     font-size: 10px;
     color: var(--text-secondary);
-    /* font-weight: 600; */
+    /* font-weight: 100; */
     line-height: 1.2;
 }
 

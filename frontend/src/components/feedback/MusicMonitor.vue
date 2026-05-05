@@ -311,7 +311,7 @@ onMounted(() => {
 .status-label {
     font-size: 13px;
     color: var(--text-secondary);
-    /* font-weight: 600; */
+    /* font-weight: 100; */
 }
 
 .status-value {
@@ -349,7 +349,7 @@ onMounted(() => {
     gap: 6px;
     font-size: 12px;
     color: var(--text-secondary);
-    /* font-weight: 600; */
+    /* font-weight: 100; */
 }
 
 .metric-icon {

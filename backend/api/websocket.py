@@ -16,7 +16,6 @@ from config import ConfigManager
 from database import DatabaseManager
 from adaptation.active_learner import AdaptiveLearner
 from music.generative_music import MusicGenerator
-from multimodal.voice_analyzer_wav2vec2 import Wav2Vec2VoiceAnalyzer  # ✅ 使用 wav2vec2 模型
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,16 +28,6 @@ _emotion_model = None
 _adaptive_learner = None
 _shared_executor = None
 _music_generator = None
-_voice_analyzer = None
-
-# ✅ 新增: 全局状态存储(用于多模态融合)
-global_state = {
-    'voice_scores': None,
-    'voice_features': None
-}
-
-# ✅ 新增: 语音推理防抖锁（防止并发推理）
-_voice_inference_lock = asyncio.Lock()
 
 
 def init_ws_router(
@@ -47,27 +36,17 @@ def init_ws_router(
     face_detector,
     emotion_model,
     adaptive_learner: AdaptiveLearner,
-    executor: concurrent.futures.ThreadPoolExecutor,
-    voice_analyzer=None  # ✅ 修改: 改为可选参数
+    executor: concurrent.futures.ThreadPoolExecutor
 ):
     """初始化路由依赖"""
-    global _config_manager, _db_manager, _face_detector, _emotion_model, _adaptive_learner, _shared_executor, _music_generator, _voice_analyzer
+    global _config_manager, _db_manager, _face_detector, _emotion_model, _adaptive_learner, _shared_executor, _music_generator
     _config_manager = config_manager
     _db_manager = db_manager
     _face_detector = face_detector
     _emotion_model = emotion_model
     _adaptive_learner = adaptive_learner
     _shared_executor = executor
-
-    # ✅ 修改: 使用 wav2vec2 语音分析器
-    if voice_analyzer is None:
-        _voice_analyzer = Wav2Vec2VoiceAnalyzer()
-        print("✅ 已启用 wav2vec2 语音情绪识别模型（本地）")
-    else:
-        _voice_analyzer = voice_analyzer
-
     _music_generator = MusicGenerator()
-    # ✅ 优化: 移除全局阈值变量，改为动态从 config_manager 读取
     logger.info(
         f"✅ WebSocket 处理器已初始化 | 置信度阈值: {config_manager.config.get('confidence_threshold', 0.6)}")
 
@@ -109,76 +88,16 @@ async def websocket_endpoint(websocket: WebSocket):
     async def receiver():
         """接收帧数据"""
         nonlocal last_pong
-        audio_buffer = bytearray()  # ✅ 恢复: 音频数据缓冲区
-
-        async def run_voice_inference():
-            """异步执行 wav2vec2 推理（带锁保护）"""
-            async with _voice_inference_lock:
-                try:
-                    loop = asyncio.get_event_loop()
-                    voice_scores = await loop.run_in_executor(
-                        _shared_executor,
-                        _voice_analyzer.predict_emotion
-                    )
-
-                    if voice_scores and len(voice_scores) > 0:
-                        async with global_state_lock:
-                            global_state['voice_scores'] = voice_scores
-                            global_state['voice_features'] = {
-                                'has_voice': 1.0,
-                                'energy_mean': 0.05
-                            }
-                except Exception as e:
-                    print(f"❌ wav2vec2 推理失败: {e}")
-                    import traceback
-                    traceback.print_exc()
-
         try:
             while not stop_event.is_set():
                 msg = await websocket.receive()
                 if "bytes" in msg and msg["bytes"]:
                     data = msg["bytes"]
 
-                    # ✅ 修复: 检查数据类型标识
-                    if len(data) >= 1:
-                        type_byte = data[0]
-
-                        # 0x01 = 视频帧 (向后兼容：如果没有标识，默认是视频)
-                        # 0x02 = 音频数据
-                        if type_byte == 0x02:
-                            try:
-                                audio_data = data[1:]  # 移除类型标识字节
-
-                                # wav2vec2 方案的音频处理逻辑
-                                _voice_analyzer.add_audio_chunk(audio_data)
-
-                                # 异步触发 wav2vec2 推理，不再阻塞消息循环
-                                # 增加到 1 秒缓冲区（16000 样本），提高识别准确率
-                                # 只在有有效语音时才触发推理
-                                if len(_voice_analyzer._audio_buffer) >= 16000:
-                                    # 计算音频能量，检测是否有有效语音
-                                    audio_energy = _voice_analyzer.get_audio_energy()
-
-                                    if audio_energy > 0.05:  # 阈值：有有效声音
-                                        # 检查是否已有推理任务在执行
-                                        if not _voice_inference_lock.locked():
-                                            # 关键: 创建后台任务，不等待完成
-                                            asyncio.create_task(
-                                                run_voice_inference())
-                            except Exception as e:
-                                print(f"❌ 处理音频数据失败: {e}")
-                                import traceback
-                                traceback.print_exc()
-
-                            continue
-                        elif type_byte == 0x01 or len(data) < 4:
-                            # 向后兼容：旧格式或无标识，当作视频帧
-                            pass
-
-                    # 视频帧处理（原有逻辑）
+                    # 视频帧处理
                     if len(data) >= 4:
                         # 检查是否有类型标识
-                        offset = 1 if data[0] in [0x01, 0x02] else 0
+                        offset = 1 if data[0] == 0x01 else 0
 
                         w = int(data[offset]) | (int(data[offset + 1]) << 8)
                         h = int(data[offset + 2]
@@ -394,70 +313,11 @@ async def websocket_endpoint(websocket: WebSocket):
                         'bbox': [int(x), int(y), int(w), int(h)],
                         'emotion': calibrated_emotion,
                         'confidence': float(calibrated_conf),
-                        'scores': {k: float(v) for k, v in calibrated_scores.items()},
-                        'is_fused': False  # ✅ 新增: 默认标记为未融合
+                        'scores': {k: float(v) for k, v in calibrated_scores.items()}
                     })
 
                 dominant_emotion = max(results, key=lambda x: x['confidence'])[
                     'emotion'] if results else None
-
-                # ✅ 新增: 多模态融合(如果有语音情绪数据)
-                voice_scores = None  # 默认无语音数据
-                async with global_state_lock:
-                    voice_scores = global_state.get('voice_scores')
-                    # 不在这里清除，让前端也能接收到语音数据
-
-                    if voice_scores and results:
-                        try:
-                            # ✅ 优化: 动态计算融合权重（根据语音质量）
-                            voice_features = global_state.get(
-                                'voice_features', {})
-                            energy_mean = voice_features.get('energy_mean', 0)
-
-                            # 根据能量均值动态调整权重（能量越高，语音越清晰）
-                            if energy_mean < 0.01:
-                                voice_weight = 0.1  # 噪声大，降低权重
-                            elif energy_mean < 0.05:
-                                voice_weight = 0.3  # 中等质量
-                            else:
-                                voice_weight = 0.5  # 高质量，提高权重
-
-                            # 对每个人脸进行多模态融合
-                            for face_result in results:
-                                face_scores = face_result.get('scores', {})
-                                if face_scores:
-                                    # ✅ 新增: 保存原始视觉情绪分数
-                                    face_result['vision_scores'] = {
-                                        k: float(v) for k, v in face_scores.items()}
-
-                                    # 融合视觉和语音情绪（使用动态权重）
-                                    fused_scores = _voice_analyzer.fuse_scores(
-                                        face_scores, voice_scores, voice_weight=voice_weight
-                                    )
-                                    # 更新融合后的情绪和置信度
-                                    fused_emotion = max(
-                                        fused_scores, key=fused_scores.get)
-                                    fused_confidence = fused_scores[fused_emotion]
-
-                                    face_result['scores'] = {
-                                        k: float(v) for k, v in fused_scores.items()}
-                                    face_result['emotion'] = fused_emotion
-                                    face_result['confidence'] = float(
-                                        fused_confidence)
-                                    face_result['is_fused'] = True  # 标记已融合
-
-                            # 重新计算主导情绪
-                            dominant_emotion = max(results, key=lambda x: x['confidence'])[
-                                'emotion']
-
-                            # ✅ 关闭调试日志
-                            # if _last_voice_emotion:
-                            #     print(
-                            #         f" 🔊 多模态融合: 视觉={face_result.get('emotion')}({face_result.get('confidence', 0):.2f}) + "
-                            #         f"语音={_last_voice_emotion}({_last_voice_confidence:.2f}) → "
-                            #         f"融合={dominant_emotion}({results[0]['confidence']:.2f})")
-                        except Exception as e:
-                            print(f"⚠️ 多模态融合失败: {e}")
 
                 response = {
                     'type': 'result',
@@ -465,15 +325,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     'dominant_emotion': dominant_emotion,
                     'timestamp': datetime.now().isoformat(),
                     'process_time': time.time(),
-                    'gpu_memory': get_gpu_memory_usage(),
-                    'has_voice_data': bool(voice_scores),  # 标记是否有语音数据
-                    # 返回语音情绪分数
-                    'voice_scores': {k: float(v) for k, v in voice_scores.items()} if voice_scores else None
+                    'gpu_memory': get_gpu_memory_usage()
                 }
-
-                # ✅ 关键: 返回后清除缓存的语音数据（避免重复返回）
-                async with global_state_lock:
-                    global_state['voice_scores'] = None
 
                 # ✅ 深度优化: 结果缓存防抖(避免重复发送相似结果)
                 should_send = True
@@ -519,14 +372,15 @@ async def websocket_endpoint(websocket: WebSocket):
                     except asyncio.QueueEmpty:
                         pass
 
-                if results:
-                    _save_counter += 1
-                    if _save_counter % 30 == 0:
-                        try:
-                            _db_manager.save_detection_result(
-                                'realtime', results, source='实时摄像头检测')
-                        except Exception:
-                            pass
+                # ✅ 修复: 移除后端的自动保存逻辑,由前端手动触发保存
+                # if results:
+                #     _save_counter += 1
+                #     if _save_counter % 30 == 0:
+                #         try:
+                #             _db_manager.save_detection_result(
+                #                 'realtime', results, source='实时摄像头检测')
+                #         except Exception:
+                #             pass
 
         except (WebSocketDisconnect, RuntimeError):
             stop_event.set()

@@ -155,16 +155,18 @@ let charts = {}
 // 统计卡片数据
 const statCards = computed(() => {
   const s = stats.value
+  // ✅ 获取当前主题颜色
+  const colors = getThemeColors()
   // ✅ 修复: 平均置信度为 0 时也显示，而不是显示 '-'
   const avgConfidence = s.avg_confidence !== undefined && s.avg_confidence !== null
     ? (s.avg_confidence * 100).toFixed(1) + '%'
     : '-'
 
   return [
-    { label: '总检测次数', value: s.total_records || 0, color: '#A259FF', bg: 'rgba(162,89,255,0.12)' },
-    { label: '情绪种类', value: sortedEmotions.value.length, color: '#0ABDE3', bg: 'rgba(10,189,227,0.12)' },
-    { label: '主导情绪', value: dominantEmotion.value, color: '#F99E1A', bg: 'rgba(249,158,26,0.12)' },
-    { label: '平均置信度', value: avgConfidence, color: '#26DE81', bg: 'rgba(38,222,129,0.12)' },
+    { label: '总检测次数', value: s.total_records || 0, color: colors.accent, bg: hexToRgba(colors.accent, 0.12) },
+    { label: '情绪种类', value: sortedEmotions.value.length, color: colors.secondary, bg: hexToRgba(colors.secondary, 0.12) },
+    { label: '主导情绪', value: dominantEmotion.value, color: colors.warning, bg: hexToRgba(colors.warning, 0.12) },
+    { label: '平均置信度', value: avgConfidence, color: colors.success, bg: hexToRgba(colors.success, 0.12) },
   ]
 })
 
@@ -337,10 +339,16 @@ function renderEmotionTrendChart() {
     animationEasing: 'cubicOut',
     tooltip: {
       trigger: 'axis',
-      backgroundColor: hexToRgba(textColor, 0.9),
-      borderColor: hexToRgba(primaryColor, 0.3),
-      borderWidth: 1,
+      // ✅ 修复: 使用 cardBg 主题变量，降低透明度实现玻璃拟态
+      backgroundColor: hexToRgba(colors.cardBg, 0.92),
+      borderColor: hexToRgba(primaryColor, 0.5),
+      borderWidth: 1.5,
       textStyle: { color: textColor, fontSize: 13 },
+      // ✅ 增强阴影和圆角
+      padding: [10, 14],
+      borderRadius: 8,
+      shadowBlur: 10,
+      shadowColor: 'rgba(0, 0, 0, 0.3)',
       axisPointer: {
         type: 'cross',
         lineStyle: { color: hexToRgba(primaryColor, 0.4) },
@@ -405,10 +413,16 @@ function renderEmotionDistChart() {
     tooltip: {
       trigger: 'item',
       formatter: '{b}: {c}次 ({d}%)',
-      backgroundColor: hexToRgba(textColor, 0.9),
-      borderColor: hexToRgba(primaryColor, 0.3),
-      borderWidth: 1,
-      textStyle: { color: textColor, fontSize: 13 }
+      // ✅ 修复: 使用 cardBg 主题变量
+      backgroundColor: hexToRgba(colors.cardBg, 0.92),
+      borderColor: hexToRgba(primaryColor, 0.5),
+      borderWidth: 1.5,
+      textStyle: { color: textColor, fontSize: 13 },
+      // ✅ 增强阴影和圆角
+      padding: [10, 14],
+      borderRadius: 8,
+      shadowBlur: 10,
+      shadowColor: 'rgba(0, 0, 0, 0.3)'
     },
     legend: {
       orient: 'vertical',
@@ -500,10 +514,16 @@ function renderTypeDistChart() {
     tooltip: {
       trigger: 'item',
       formatter: '{b}: {c}次 ({d}%)',
-      backgroundColor: hexToRgba(textColor, 0.9),
-      borderColor: hexToRgba(primaryColor, 0.3),
-      borderWidth: 1,
-      textStyle: { color: textColor, fontSize: 13 }
+      // ✅ 修复: 使用 cardBg 主题变量
+      backgroundColor: hexToRgba(colors.cardBg, 0.92),
+      borderColor: hexToRgba(primaryColor, 0.5),
+      borderWidth: 1.5,
+      textStyle: { color: textColor, fontSize: 13 },
+      // ✅ 增强阴影和圆角
+      padding: [10, 14],
+      borderRadius: 8,
+      shadowBlur: 10,
+      shadowColor: 'rgba(0, 0, 0, 0.3)'
     },
     legend: {
       orient: 'vertical',
@@ -585,10 +605,16 @@ function renderConfidenceChart() {
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
-      backgroundColor: hexToRgba(textColor, 0.9),
-      borderColor: hexToRgba(primaryColor, 0.3),
-      borderWidth: 1,
-      textStyle: { color: textColor, fontSize: 13 }
+      // ✅ 修复: 使用 cardBg 主题变量
+      backgroundColor: hexToRgba(colors.cardBg, 0.92),
+      borderColor: hexToRgba(primaryColor, 0.5),
+      borderWidth: 1.5,
+      textStyle: { color: textColor, fontSize: 13 },
+      // ✅ 增强阴影和圆角
+      padding: [10, 14],
+      borderRadius: 8,
+      shadowBlur: 10,
+      shadowColor: 'rgba(0, 0, 0, 0.3)'
     },
     grid: { left: 55, right: 20, top: 20, bottom: 35 },
     xAxis: {
@@ -747,10 +773,16 @@ async function renderFaceCountChart() {
       trigger: 'item',
       triggerOn: 'mousemove',
       formatter: '{a} → {b}: {c}次',
-      backgroundColor: hexToRgba(textColor, 0.9),
-      borderColor: hexToRgba(primaryColor, 0.3),
-      borderWidth: 1,
-      textStyle: { color: textColor, fontSize: 13 }
+      // ✅ 修复: 使用 cardBg 主题变量
+      backgroundColor: hexToRgba(colors.cardBg, 0.92),
+      borderColor: hexToRgba(primaryColor, 0.5),
+      borderWidth: 1.5,
+      textStyle: { color: textColor, fontSize: 13 },
+      // ✅ 增强阴影和圆角
+      padding: [10, 14],
+      borderRadius: 8,
+      shadowBlur: 10,
+      shadowColor: 'rgba(0, 0, 0, 0.3)'
     },
     series: [{
       type: 'sankey',
@@ -851,10 +883,16 @@ function renderTypeTrendChart() {
         type: 'cross',
         label: { backgroundColor: hexToRgba(textColor, 0.6) }
       },
-      backgroundColor: hexToRgba(textColor, 0.9),
-      borderColor: hexToRgba(primaryColor, 0.3),
-      borderWidth: 1,
-      textStyle: { color: textColor, fontSize: 13 }
+      // ✅ 修复: 使用 cardBg 主题变量
+      backgroundColor: hexToRgba(colors.cardBg, 0.92),
+      borderColor: hexToRgba(primaryColor, 0.5),
+      borderWidth: 1.5,
+      textStyle: { color: textColor, fontSize: 13 },
+      // ✅ 增强阴影和圆角
+      padding: [10, 14],
+      borderRadius: 8,
+      shadowBlur: 10,
+      shadowColor: 'rgba(0, 0, 0, 0.3)'
     },
     legend: {
       data: types.map(t => typeMap[t]?.name || t),
@@ -1019,12 +1057,15 @@ onUnmounted(() => {
 }
 
 .stat-card {
+  /* ✅ 修复: 使用主题变量，支持所有主题切换 */
   background: var(--card-bg);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   transition: all 0.3s ease;
   overflow: hidden;
+  /* ✅ 防止黑色背景残留 */
+  box-shadow: none;
 }
 
 .stat-card:hover {
@@ -1080,12 +1121,15 @@ onUnmounted(() => {
 }
 
 .chart-card {
+  /* ✅ 修复: 使用主题变量，支持所有主题切换 */
   background: var(--card-bg);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
   transition: all 0.3s ease;
+  /* ✅ 防止黑色背景残留 */
+  box-shadow: none;
 }
 
 .chart-card:hover {
@@ -1116,6 +1160,8 @@ onUnmounted(() => {
 .chart-body {
   height: 300px;
   padding: 10px 14px 14px;
+  /* ✅ 修复: 确保图表容器背景透明 */
+  background: transparent !important;
 }
 
 /* ===== 响应式 ===== */
