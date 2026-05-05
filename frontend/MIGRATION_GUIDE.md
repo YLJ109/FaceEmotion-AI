@@ -47,16 +47,14 @@ src/components/
 │   └── index.js
 │
 ├── monitor/                ✅ 新增: 监控类组件
-│   ├── PerformanceMonitor.vue
-│   └── index.js
+│   └── PerformanceMonitor.vue  ✅ 直接导入，无 index.js
 │
 ├── history/                ✅ 新增: 历史记录组件
-│   ├── HistoryViewer.vue
-│   └── index.js
+│   └── HistoryViewer.vue   ✅ 直接导入，无 index.js
 │
 ├── detection/              ✅ 保持不变
 ├── layout/                 ✅ 保持不变
-├── analytics/              ✅ 保持不变
+├── analytics/              ✅ 仅 AnalyticsDashboard.vue，无 index.js
 └── pages/                  ✅ 保持不变
 ```
 
@@ -227,7 +225,7 @@ const trendData = await getEmotionTrend({ days: 7 })
 
 #### 样式导入顺序
 
-```css
+```
 /* 1. CSS Reset */
 @import './reset.css';
 
@@ -371,18 +369,72 @@ git pull origin main
 
 ---
 
-## 📊 迁移统计
+### 5. 组件目录简化（阶段 5 - 完成）✅
+
+#### 优化策略
+
+**问题诊断**：
+-  8 个 index.js 文件，部分目录只有 1 个组件
+- ❌ 导入路径不一致（有的用 index.js，有的直接导入）
+- ❌ `.vue` 扩展名冗余（Vite 自动解析）
+
+**优化原则**：
+- ✅ **单组件目录** → 删除 index.js，直接导入
+- ✅ **多组件目录** → 保留 index.js，支持批量导入
+- ✅ **统一命名** → 移除 `.vue` 扩展名（Vite 自动解析）
+
+#### 删除的 index.js（单组件目录）
+
+| 目录 | 组件数量 | 操作 | 导入方式 |
+|------|----------|------|----------|
+| history | 1 个 | 🗑️ 删除 | `import HistoryViewer from '@/components/history/HistoryViewer'` |
+| monitor | 1 个 | ️ 删除 | `import PerformanceMonitor from '@/components/monitor/PerformanceMonitor'` |
+| analytics | 1 个 | 🗑️ 删除 | `import AnalyticsDashboard from '@/components/analytics/AnalyticsDashboard'` |
+
+#### 保留的 index.js（多组件目录）
+
+| 目录 | 组件数量 | 保留原因 | 导入示例 |
+|------|----------|----------|----------|
+| common | 4 个 | ✅ 支持批量导入 | `import { EmotionSVG, FpsDisplay } from '@/components/common'` |
+| detection | 4 个 | ✅ 支持批量导入 | `import { RealtimeDetector, ImageDetector } from '@/components/detection'` |
+| feedback | 2 个 | ✅ 支持批量导入 | `import { MusicMonitor, EmotionFeedback } from '@/components/feedback'` |
+| layout | 2 个 | ✅ 支持批量导入 | `import { AppHeader, AppSidebar } from '@/components/layout'` |
+| pages | 2 个 | ✅ 支持批量导入 | `import { ThemePage, SettingsPage } from '@/components/pages'` |
+
+#### 修改的导入路径
+
+| 原路径 | 新路径 | 影响文件 |
+|--------|--------|----------|
+| `@/components/detection/RealtimeDetector.vue` | `@/components/detection/RealtimeDetector` | `router/index.js`（8 处） |
+| `@/components/feedback/MusicMonitor.vue` | `@/components/feedback/MusicMonitor` | `App.vue` |
+| `@/components/common/EmotionSVG.vue` | `@/components/common/EmotionSVG` | `EmotionFeedback.vue` |
+
+#### 一致性检查
+
+| 层级 | 导出策略 | 说明 |
+|------|----------|------|
+| **API 层** | ✅ 保留 index.js | 聚合多个模块 + HTTP 客户端，有价值 |
+| **常量层** | ✅ 保留 index.js | 聚合 emotions + detection，有价值 |
+| **组件层** | ✅ 混合策略 | 单组件直接导入，多组件用 index.js |
+| **Stores** | ❌ 无 index.js | 每个 store 独立，直接导入 |
+
+**结论**：✅ 各层导出策略合理，符合各自特点
+
+---
+
+##  迁移统计
 
 | 项目 | 数量 |
 |------|------|
 | 移动的组件文件 | 8 个 |
 | 新增的目录 | 10 个（4个组件子目录 + 2个常量文件 + 4个 API 模块） |
 | 新增的代码文件 | 14 个（4个 index.js + 3个常量文件 + 5个 API 文件 + 2个样式文件） |
-| 修改的导入路径 | 3 处 |
-| 重构的文件 | 3 个（utils/emotion.js, utils/analytics.js, styles/global.css） |
+| 删除的 index.js | 3 个（history, monitor, analytics） |
+| 修改的导入路径 | 10 处（3 + 8） |
+| 重构的文件 | 4 个（utils/emotion.js, utils/analytics.js, styles/global.css, router/index.js） |
 | 新增的代码行数 | ~1160 行 |
-| 删除的代码行数 | ~150 行 |
-| Git Commits | 4 次 |
+| 删除的代码行数 | ~160 行（含 3 个 index.js） |
+| Git Commits | 5 次 |
 
 ---
 
