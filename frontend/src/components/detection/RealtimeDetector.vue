@@ -194,13 +194,13 @@ import { useThemeStore } from '@/stores/theme'
 import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotion'
 import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
 import wsManager from '@/api/websocket'
-import EmotionSVG from '../EmotionSVG.vue'
+import EmotionSVG from '@/components/common/EmotionSVG.vue'
 import { logFeatureUsage } from '@/utils/analytics'
 import httpMonitor from '@/utils/httpMonitor'
 import AudioCapture from '@/utils/audioCapture'
 import { API } from '@/api/config'
-import PerformanceMonitor from '../PerformanceMonitor.vue'
-import EmotionFeedback from '../EmotionFeedback.vue'
+import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
+import EmotionFeedback from '@/components/feedback/EmotionFeedback.vue'
 
 const themeStore = useThemeStore()
 const videoElement = ref(null)
