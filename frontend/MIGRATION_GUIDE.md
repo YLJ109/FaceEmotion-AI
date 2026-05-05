@@ -62,9 +62,11 @@ src/components/
 
 | 原路径 | 新路径 | 影响文件 |
 |--------|--------|----------|
-| `@/components/EmotionSVG.vue` | `@/components/common/EmotionSVG.vue` | `EmotionFeedback.vue` |
-| `@/components/MusicMonitor.vue` | `@/components/feedback/MusicMonitor.vue` | `App.vue` |
-| `@/components/HistoryViewer.vue` | `@/components/history/HistoryViewer.vue` | `router/index.js` |
+| `../EmotionSVG.vue` | `@/components/common/EmotionSVG.vue` | `RealtimeDetector.vue` |
+| `../PerformanceMonitor.vue` | `@/components/monitor/PerformanceMonitor.vue` | `RealtimeDetector.vue` |
+| `../EmotionFeedback.vue` | `@/components/feedback/EmotionFeedback.vue` | `RealtimeDetector.vue` |
+
+**注意**：所有导入路径都保留 `.vue` 扩展名，因为 Vite 需要明确的文件扩展名才能正确解析。
 
 ---
 
@@ -184,7 +186,7 @@ src/api/
 
 #### 使用示例
 
-```javascript
+```
 // ✅ 推荐：从统一入口导入
 import { getHistoryList, getEmotionTrend } from '@/api'
 
@@ -374,22 +376,22 @@ git pull origin main
 #### 优化策略
 
 **问题诊断**：
--  8 个 index.js 文件，部分目录只有 1 个组件
+- ❌ 8 个 index.js 文件，部分目录只有 1 个组件
 - ❌ 导入路径不一致（有的用 index.js，有的直接导入）
-- ❌ `.vue` 扩展名冗余（Vite 自动解析）
+- ❌ 部分组件使用旧的相对路径（`../Component.vue`）
 
 **优化原则**：
 - ✅ **单组件目录** → 删除 index.js，直接导入
 - ✅ **多组件目录** → 保留 index.js，支持批量导入
-- ✅ **统一命名** → 移除 `.vue` 扩展名（Vite 自动解析）
+- ✅ **保留 `.vue` 扩展名** - Vite 需要明确的文件扩展名才能正确解析
 
 #### 删除的 index.js（单组件目录）
 
 | 目录 | 组件数量 | 操作 | 导入方式 |
 |------|----------|------|----------|
-| history | 1 个 | 🗑️ 删除 | `import HistoryViewer from '@/components/history/HistoryViewer'` |
-| monitor | 1 个 | ️ 删除 | `import PerformanceMonitor from '@/components/monitor/PerformanceMonitor'` |
-| analytics | 1 个 | 🗑️ 删除 | `import AnalyticsDashboard from '@/components/analytics/AnalyticsDashboard'` |
+| history | 1 个 | 🗑️ 删除 | `import HistoryViewer from '@/components/history/HistoryViewer.vue'` |
+| monitor | 1 个 | ️ 删除 | `import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'` |
+| analytics | 1 个 | ️ 删除 | `import AnalyticsDashboard from '@/components/analytics/AnalyticsDashboard.vue'` |
 
 #### 保留的 index.js（多组件目录）
 
