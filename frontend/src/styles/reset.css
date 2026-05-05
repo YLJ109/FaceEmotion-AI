@@ -1,0 +1,171 @@
+/**
+ * CSS Reset - 统一浏览器默认样式
+ * 基于现代 CSS Reset 最佳实践
+ */
+
+/* ===== 基础重置 ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== HTML 和 Body ===== */
+html {
+  height: 100%;
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  -moz-tab-size: 4;
+  tab-size: 4;
+}
+
+body {
+  height: 100%;
+  font-family: inherit;
+  line-height: inherit;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ===== 媒体元素 ===== */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* ===== 表单元素 ===== */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+/* 移除按钮在 Firefox 中的内边距 */
+button::-moz-focus-inner {
+  padding: 0;
+  border: 0;
+}
+
+/* ===== 链接 ===== */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ===== 列表 ===== */
+ul,
+ol {
+  list-style: none;
+}
+
+/* ===== 表格 ===== */
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* ===== 标题 ===== */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* ===== 引用 ===== */
+blockquote,
+q {
+  quotes: none;
+}
+
+blockquote::before,
+blockquote::after,
+q::before,
+q::after {
+  content: '';
+  content: none;
+}
+
+/* ===== 代码 ===== */
+pre,
+code,
+kbd,
+samp {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1em;
+}
+
+pre {
+  overflow: auto;
+}
+
+/* ===== 其他 ===== */
+hr {
+  height: 0;
+  color: inherit;
+  border-top-width: 1px;
+}
+
+abbr[title] {
+  text-decoration: underline dotted;
+}
+
+b,
+strong {
+  font-weight: bolder;
+}
+
+small {
+  font-size: 80%;
+}
+
+sub,
+sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+sub {
+  bottom: -0.25em;
+}
+
+sup {
+  top: -0.5em;
+}
+
+/* ===== 焦点可见性 ===== */
+:focus-visible {
+  outline: 2px solid var(--primary, #7139FF);
+  outline-offset: 2px;
+}
+
+/* ===== 选择文本样式 ===== */
+::selection {
+  background: rgba(113, 57, 255, 0.3);
+  color: inherit;
+}
