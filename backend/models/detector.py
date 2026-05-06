@@ -1,60 +1,35 @@
-"""人脸检测器 - 双模型支持（Caffe SSD + ONNX RFB）"""
+"""人脸检测器 - Caffe SSD（纯 CPU）"""
 import cv2
 import numpy as np
-from typing import List, Dict, Optional
+from typing import List, Dict
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class FaceDetector:
-    """人脸检测器 - 支持Caffe SSD和ONNX RFB双模型"""
+    """基于 Caffe SSD 的人脸检测器（CPU 优化）"""
 
-    def __init__(self, proto_file: str, model_file: str, onnx_model_path: Optional[str] = None, use_onnx: bool = False):
-        self.use_onnx = use_onnx
-        self.onnx_detector = None
+    def __init__(self, proto_file: str, model_file: str):
+        """
+        初始化 Caffe SSD 人脸检测器
 
-        # ✅ 优化1: 支持ONNX RFB模型（更高精度）
-        if use_onnx and onnx_model_path:
-            try:
-                from models.face_detector_onnx import FaceDetectorONNX
-                self.onnx_detector = FaceDetectorONNX(
-                    model_path=onnx_model_path,
-                    input_size=(320, 240)  # RFB-320 输入尺寸
-                )
-                logger.info("✅ 使用ONNX RFB人脸检测器 (高精度)")
-                return
-            except Exception as e:
-                logger.warning(f"⚠️ ONNX RFB模型加载失败，降级到Caffe: {e}")
-
-        # 默认使用Caffe SSD
+        Args:
+            proto_file: Caffe prototxt 路径
+            model_file: Caffe caffemodel 路径
+        """
         self.face_net = cv2.dnn.readNetFromCaffe(proto_file, model_file)
         if self.face_net.empty():
             raise RuntimeError("无法加载Caffe模型")
 
-        # 安全检测 CUDA 是否真正可用（setPreferableBackend 不报错，forward() 才报）
-        use_cuda = False
-        try:
-            if hasattr(cv2, 'cuda'):
-                use_cuda = cv2.cuda.getCudaEnabledDeviceCount() > 0
-        except Exception:
-            pass
+        # 设置 CPU 后端
+        self.face_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+        self.face_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+        logger.info("✅ Caffe 人脸检测器使用 CPU")
 
-        if use_cuda:
-            self.face_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-            self.face_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-            logger.info("✅ 人脸检测器使用 CUDA 加速 (Caffe)")
-        else:
-            self.face_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-            self.face_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-            # 不设置线程数，让 OpenCV 自动管理，避免与 asyncio 线程池冲突
-            logger.info("⚠️ 人脸检测器使用 CPU（OpenCV未内置CUDA支持）")
-
-        # 缓存blob创建参数
         self._target_size = (300, 300)
         self._mean = (104.0, 177.0, 123.0)
         self._scale_factor = 1.0
-
         logger.info("✅ Caffe人脸检测器初始化完成")
 
     def detect(self, frame: np.ndarray, confidence_threshold: float = 0.6, max_faces: int = 10) -> List[Dict]:
@@ -64,21 +39,15 @@ class FaceDetector:
         参数:
             frame: 输入图像
             confidence_threshold: 置信度阈值
-            max_faces: ✅ 修改: 最多处理的人脸数量(默认10)
+            max_faces: 最多处理的人脸数量(默认10)
 
         返回:
             检测到的人脸列表(按置信度排序,最多max_faces个)
         """
-        # ✅ 优化1: 优先使用ONNX RFB模型
-        if self.onnx_detector:
-            faces = self.onnx_detector.detect(frame, confidence_threshold)
-        else:
-            faces = self._detect_caffe(frame, confidence_threshold)
-
-        # ✅ 优化2: bbox坐标后处理优化
+        faces = self._detect_caffe(frame, confidence_threshold)
         faces = self._postprocess_bboxes(faces, frame.shape[:2])
 
-        # ✅ 按置信度排序并限制最多处理max_faces个人脸
+        # 按置信度排序并限制最多处理max_faces个人脸
         faces.sort(key=lambda x: x['confidence'], reverse=True)
         if len(faces) > max_faces:
             logger.debug(f'检测到{len(faces)}张人脸，仅处理前{max_faces}张')

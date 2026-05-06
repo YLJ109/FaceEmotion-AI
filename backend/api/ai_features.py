@@ -1,5 +1,5 @@
 """AI 功能相关 API 路由"""
-from database import DatabaseManager
+from core.database import DatabaseManager
 from optimizer.dynamic_inference import DynamicInferenceOptimizer
 from analytics.user_analytics import UserAnalytics
 from adaptation.active_learner import AdaptiveLearner

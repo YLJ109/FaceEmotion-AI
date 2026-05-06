@@ -187,10 +187,6 @@ const dominantEmotion = computed(() => {
     if (!emotions.length) return 'neutral'
     const c = {}; emotions.forEach(e => c[e] = (c[e] || 0) + 1)
     const top = Object.keys(c).reduce((a, b) => c[a] > c[b] ? a : b)
-
-    // ✅ 调试: 打印主导情绪值
-    console.log('🎯 主导情绪:', top, '表情:', getEmotionEmoji(top))
-
     return top
 })
 const avgConfidence = computed(() => {
@@ -224,12 +220,9 @@ const sortedEmotionDistribution = computed(() => {
 const keyFramePreviews = computed(() => {
     const framesWithFaces = results.value.filter(r => r.faces && r.faces.length > 0)
 
-    // ✅ 添加调试日志
-    console.log('📊 总帧数:', results.value.length)
-    console.log('📊 有脸帧数:', framesWithFaces.length)
+    // ✅ 优化: 仅在 DEBUG 模式下打印调试信息
     if (framesWithFaces.length > 0) {
-        console.log('📊 第一帧:', framesWithFaces[0])
-        console.log('📊 最后一帧:', framesWithFaces[framesWithFaces.length - 1])
+        console.debug('总帧数:', results.value.length, '有脸帧数:', framesWithFaces.length)
     }
 
     if (framesWithFaces.length === 0) return []
@@ -248,11 +241,6 @@ const keyFramePreviews = computed(() => {
     for (let i = 1; i < framesWithFaces.length; i++) {
         const frame = framesWithFaces[i]
         const emotion = frame.faces[0].emotion
-
-        // ✅ 调试日志
-        if (i < 5) {
-            console.log(`🔍 帧 ${frame.frame}: emotion=${emotion}, timestamp=${frame.timestamp}, current=${currentSegment.dominantEmotion}`)
-        }
 
         // 如果情绪相同，合并到当前段
         if (emotion === currentSegment.dominantEmotion) {
@@ -276,9 +264,6 @@ const keyFramePreviews = computed(() => {
     // 添加最后一个段
     segments.push({ ...currentSegment })
 
-    // ✅ 调试日志
-    console.log(' 合并后的时间段:', segments)
-
     // 最多显示20个时间段
     return segments.slice(0, 20)
 })
@@ -294,22 +279,55 @@ const onVideoLoaded = () => {
     if (v) totalFrames.value = Math.floor(v.duration * 30)
 }
 
-// 视频时间更新时绘制检测框
+// 视频时间更新时绘制检测框并切换音乐
+let lastPlayedTimestamp = -1  // 记录上次播放音乐的关键帧时间戳
+
 const onVideoTimeUpdate = () => {
     if (!videoRef.value || !videoCanvasRef.value || results.value.length === 0) return
+
     drawDetectionBoxes()
+
+    // ✅ 新增: 根据当前视频时间切换情绪和音乐
+    const currentTime = videoRef.value.currentTime
+
+    // 找到当前时间对应的关键帧（允许±0.5秒误差）
+    const currentFrame = results.value.find(frame => {
+        return Math.abs(currentTime - frame.timestamp) < 0.5
+    })
+
+    if (currentFrame && currentFrame.faces?.length > 0) {
+        const dominantEmotion = currentFrame.faces[0].emotion
+
+        // 检查是否切换到新的关键帧（避免频繁触发）
+        if (currentFrame.timestamp !== lastPlayedTimestamp) {
+            lastPlayedTimestamp = currentFrame.timestamp
+
+            // ✅ 修复: 传递情绪数据到音乐引擎（必须使用后端返回的music_params）
+            if (currentFrame.music_params) {
+                // 触发全局事件,通知App.vue更新音乐面板状态
+                window.dispatchEvent(new CustomEvent('music-params-updated', {
+                    detail: currentFrame.music_params
+                }))
+
+                // 直接调用音乐引擎播放（先检查是否已初始化）
+                if (generativeAudio.isInitialized) {
+                    generativeAudio.playMusic(currentFrame.music_params)
+                }
+            }
+        }
+    }
 }
 
 // 视频开始播放
 const onVideoPlay = () => {
-    console.log('▶️ 视频开始播放')
+    console.debug('视频开始播放')
     isPlaying = true
     drawLoop()
 }
 
 // 视频暂停
 const onVideoPause = () => {
-    console.log('⏸️ 视频暂停')
+    console.debug('视频暂停')
     isPlaying = false
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId)
@@ -319,13 +337,13 @@ const onVideoPause = () => {
 
 // 用户拖动进度条（开始）
 const onVideoSeeking = () => {
-    console.log(' 开始拖动进度条')
+    console.debug('开始拖动进度条')
     drawDetectionBoxes()
 }
 
 // 用户拖动进度条（结束）
 const onVideoSeeked = () => {
-    console.log(' 拖动进度条结束')
+    console.debug('拖动进度条结束')
     drawDetectionBoxes()
 }
 
@@ -340,11 +358,6 @@ const drawLoop = () => {
 // 绘制检测框的核心函数
 const drawDetectionBoxes = () => {
     if (!videoRef.value || !videoCanvasRef.value || results.value.length === 0) {
-        console.log(' 跳过绘制：', {
-            hasVideo: !!videoRef.value,
-            hasCanvas: !!videoCanvasRef.value,
-            hasResults: results.value.length > 0
-        })
         return
     }
 
@@ -405,7 +418,6 @@ const drawDetectionBoxes = () => {
 
     // 如果都没有，返回
     if (!prevFrame && !nextFrame) {
-        console.log('⚪ 未找到关键帧')
         return
     }
 
@@ -446,7 +458,7 @@ const drawDetectionBoxes = () => {
             drawEmotionLabel(ctx, [scaledX, scaledY, scaledW, scaledH], face.emotion, face.confidence, themeStore.currentTheme, faceIndex + 1, totalFaces)
         })
     } else {
-        console.log(`⚪ 未找到人脸 - 当前时间: ${currentTime.toFixed(1)}s`)
+        // 静默处理，未找到人脸时不打印日志
     }
 }
 
@@ -511,7 +523,6 @@ const startDetection = async () => {
         if (!res.ok) throw new Error('视频检测失败')
 
         const data = await res.json()
-        console.log('后端返回数据:', data) // 调试信息
 
         if (data.status === 'success' && data.video_info) {
             // 更新视频信息
@@ -538,30 +549,22 @@ const startDetection = async () => {
             perfGpuMemory.value = 0  // 不直接监控GPU
             perfErrorRate.value = 0
 
-            // ✅ 新增: 传递情绪数据到音乐引擎（使用第一帧的情绪）
+            // ✅ 修复: 传递情绪数据到音乐引擎（必须使用后端返回的music_params）
             if (results.value.length > 0 && results.value[0].faces?.length > 0) {
                 const firstFrame = results.value[0]
-                const emotion = firstFrame.faces[0].emotion
-                const confidence = firstFrame.faces[0].confidence || 0
+                const musicParams = firstFrame.music_params
 
-                // 如果后端返回了 music_params，直接使用；否则构造默认值
-                const musicParams = firstFrame.music_params || {
-                    bpm: 100,
-                    root_note: 60,
-                    melody: [60, 64, 67],
-                    waveform: 'sine',
-                    filter_cutoff: 2000,
-                    reverb_mix: 0.3,
-                    volume: 0.5,
-                    emotion: emotion
+                if (musicParams) {
+                    // 触发全局事件,通知App.vue更新音乐面板状态
+                    window.dispatchEvent(new CustomEvent('music-params-updated', {
+                        detail: musicParams
+                    }))
+
+                    // 直接调用音乐引擎播放（先检查是否已初始化）
+                    if (generativeAudio.isInitialized) {
+                        generativeAudio.playMusic(musicParams)
+                    }
                 }
-
-                wsManager.emit('video_result', {
-                    type: 'result',
-                    music_params: musicParams,
-                    emotion: emotion,
-                    confidence: confidence
-                })
             }
 
             // 立即绘制一次检测框（如果视频正在播放）
@@ -600,12 +603,7 @@ const reset = () => {
 // 保存视频检测到历史记录
 const saveToHistory = async (keyFrames) => {
     try {
-        console.log('🔍 开始保存视频历史记录', {
-            keyFramesCount: keyFrames.length,
-            firstFrame: keyFrames[0]
-        })
-
-        // ✅ 优化: 每个人脸单独保存为一条记录
+        // 每个人脸单独保存为一条记录
         let savedCount = 0
         const allFaces = []
 
@@ -623,12 +621,19 @@ const saveToHistory = async (keyFrames) => {
             }
         })
 
-        console.log(`📊 共收集到 ${allFaces.length} 张人脸`)
+        console.debug(`共收集到 ${allFaces.length} 张人脸`)
+
+        // ✅ 新增: 过滤空检测结果
+        if (allFaces.length === 0) {
+            console.warn('⚠️ 未检测到人脸，跳过保存历史记录')
+            ElMessage.info('未检测到人脸，无法保存')
+            return
+        }
 
         // ✅ 新增: 从视频中截取帧并裁剪人脸的辅助函数
         const extractFaceThumbnail = async (face, videoElement) => {
             return new Promise((resolve) => {
-                console.log(`🎬 开始裁剪人脸 (时间: ${face.videoTime || 0}s)`)
+                console.debug(`开始裁剪人脸 (时间: ${face.videoTime || 0}s)`)
 
                 // 创建一个临时video元素
                 const tempVideo = document.createElement('video')
@@ -638,13 +643,13 @@ const saveToHistory = async (keyFrames) => {
 
                 // ✅ 修复: 先等待元数据加载完成
                 tempVideo.onloadedmetadata = () => {
-                    console.log(`📹 视频元数据加载完成: ${tempVideo.videoWidth}x${tempVideo.videoHeight}`)
+                    console.debug(`视频元数据加载完成: ${tempVideo.videoWidth}x${tempVideo.videoHeight}`)
                     // 设置时间戳,触发seeked事件
                     tempVideo.currentTime = face.videoTime || 0
                 }
 
                 tempVideo.onseeked = () => {
-                    console.log(`✅ 视频帧定位成功 (${face.videoTime || 0}s)`)
+                    console.debug(`视频帧定位成功 (${face.videoTime || 0}s)`)
                     try {
                         // 创建canvas并绘制视频帧
                         const canvas = document.createElement('canvas')
@@ -678,7 +683,7 @@ const saveToHistory = async (keyFrames) => {
 
                         // 转换为Base64
                         const thumbnail = cropCanvas.toDataURL('image/jpeg', 0.8)
-                        console.log(`✅ 人脸裁剪完成, Base64长度: ${thumbnail.length}`)
+                        console.debug(`人脸裁剪完成, Base64长度: ${thumbnail.length}`)
                         resolve(thumbnail)
                     } catch (error) {
                         console.error('❌ 裁剪人脸失败:', error)
@@ -697,7 +702,7 @@ const saveToHistory = async (keyFrames) => {
 
                 // ✅ 修复: 添加超时保护(5秒)
                 setTimeout(() => {
-                    console.warn('⚠️ 视频帧裁剪超时,使用降级缩略图')
+                    console.debug('视频帧裁剪超时,使用降级缩略图')
                     resolve(generateFallbackThumbnail(face.emotion))
                     tempVideo.remove()
                 }, 5000)
@@ -732,22 +737,21 @@ const saveToHistory = async (keyFrames) => {
         for (let i = 0; i < allFaces.length; i++) {
             const face = allFaces[i]
             try {
-                console.log(`💾 正在保存第 ${i + 1}/${allFaces.length} 张人脸...`)
+                // ✅ 优化: 仅在 DEBUG 模式下打印每张人脸的保存进度
+                console.debug(`正在保存第 ${i + 1}/${allFaces.length} 张人脸`)
 
                 // ✅ 修复: 从视频帧中裁剪真实的人脸缩略图
                 const videoElement = videoRef.value
                 let thumbnail
 
                 if (videoElement && face.videoTime !== undefined) {
-                    console.log(`🎬 正在从视频帧裁剪人脸 (时间: ${face.videoTime}s)`)
                     thumbnail = await extractFaceThumbnail(face, videoElement)
                 } else {
-                    console.log(`⚠️ 无法获取视频帧，使用降级缩略图`)
+                    console.debug(`无法获取视频帧，使用降级缩略图`)
                     // 降级方案: 使用渐变背景+emoji
                     thumbnail = generateFallbackThumbnail(face.emotion)
                 }
 
-                console.log(` 正在发送API请求...`)
                 const response = await fetch(API.historySave, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -769,13 +773,16 @@ const saveToHistory = async (keyFrames) => {
                 }
 
                 savedCount++
-                console.log(`✅ 第 ${i + 1} 张人脸保存成功`)
+                // ✅ 优化: 仅在第一张和最后一张时打印日志
+                if (i === 0 || i === allFaces.length - 1) {
+                    console.log(`✅ 第 ${i + 1} 张人脸保存成功`)
+                }
             } catch (error) {
                 console.error(`❌ 保存第 ${i + 1} 张人脸失败:`, error)
             }
         }
 
-        console.log(`✅ 视频历史记录已保存 (${savedCount} 张人脸)`)
+        console.debug(`视频历史记录已保存 (${savedCount} 张人脸)`)
     } catch (error) {
         console.error('保存视频历史记录失败:', error)
     }

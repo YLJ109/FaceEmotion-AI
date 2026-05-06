@@ -66,3 +66,8 @@ wav2vac2
 backend/data/uploads
 backend/data/screenshots
 backend/data/
+
+face-emotion-recognition
+
+docs
+models/weights/buffalo_l

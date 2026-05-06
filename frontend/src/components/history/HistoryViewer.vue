@@ -56,7 +56,7 @@
                         </el-icon>
                     </div>
                     <div class="filter-info">
-                        <span class="filter-label">批量检测</span>
+                        <span class="filter-label">批量图片检测</span>
                         <span class="filter-count">{{ typeCounts.batch }} 条</span>
                     </div>
                 </div>
@@ -73,6 +73,22 @@
                     <div class="filter-info">
                         <span class="filter-label">视频检测</span>
                         <span class="filter-count">{{ typeCounts.video }} 条</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-card" :class="{ active: filterType === 'batch_video' }"
+                @click="setFilter('batch_video')">
+                <div class="filter-card-inner">
+                    <div class="filter-icon-wrap"
+                        style="background: linear-gradient(135deg, rgba(230, 162, 60, 0.2), rgba(245, 108, 108, 0.2));">
+                        <el-icon :size="20" color="#E6A23C">
+                            <VideoPlay />
+                        </el-icon>
+                    </div>
+                    <div class="filter-info">
+                        <span class="filter-label">批量视频检测</span>
+                        <span class="filter-count">{{ typeCounts.batch_video }} 条</span>
                     </div>
                 </div>
             </div>
@@ -372,7 +388,7 @@
 
 <script setup>
 import { ref, onMounted, nextTick, watch } from 'vue'
-import { Clock, Loading, Picture, View, Download, DataAnalysis, VideoCamera, Files, Film, Edit, InfoFilled, UserFilled, Delete, Close } from '@element-plus/icons-vue'
+import { Clock, Loading, Picture, View, Download, DataAnalysis, VideoCamera, Files, Film, Edit, InfoFilled, UserFilled, Delete, Close, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getEmotionName, getEmotionColor, getEmotionEmoji, EMOTION_LIST } from '@/utils/emotion'
 import { API } from '@/api/config'
@@ -394,7 +410,8 @@ const typeCounts = ref({
     realtime: 0,
     image: 0,
     batch: 0,
-    video: 0
+    video: 0,
+    batch_video: 0
 })
 
 // ✅ 新增: 批量选择
@@ -458,7 +475,8 @@ const fetchHistory = async () => {
                 realtime: data.type_counts.realtime || 0,
                 image: data.type_counts.image || 0,
                 batch: data.type_counts.batch || 0,
-                video: data.type_counts.video || 0
+                video: data.type_counts.video || 0,
+                batch_video: data.type_counts.batch_video || 0
             }
         }
     } catch (error) {
@@ -517,7 +535,7 @@ const deleteRecord = async (item) => {
         const result = await response.json()
 
         if (result.status === 'success') {
-            ElMessage.success(`✅ 已成功删除记录`)
+            ElMessage.success('已成功删除记录')
             // 关闭详情对话框
             dialogVisible.value = false
             selectedItem.value = null
@@ -566,7 +584,7 @@ const batchDelete = async () => {
         const successCount = results.filter(r => r.ok).length
 
         if (successCount > 0) {
-            ElMessage.success(`✅ 成功删除 ${successCount} 条记录`)
+            ElMessage.success(`成功删除 ${successCount} 条记录`)
             // 重新加载数据
             fetchHistory()
             selectedRecords.value = []
@@ -603,7 +621,8 @@ const formatTime = (timeStr) => {
 const getTypeLabel = (type) => {
     const labels = {
         'image': '单张图片',
-        'batch': '批量检测',
+        'batch': '批量图片检测',
+        'batch_video': '批量视频检测',
         'video': '视频检测',
         'realtime': '实时检测'
     }
@@ -806,7 +825,7 @@ const exportSingleRecord = (item) => {
     link.download = `history_${item.id}_${Date.now()}.json`
     link.click()
     URL.revokeObjectURL(url)
-    ElMessage.success('✅ 已导出')
+    ElMessage.success('已导出')
 }
 
 // ✅ 新增: 打开记录反馈
@@ -975,7 +994,7 @@ watch(selectedItem, (newVal) => {
 /* 筛选器卡片 */
 .filter-cards {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 12px;
     margin-bottom: 16px;
     margin-top: 2px;

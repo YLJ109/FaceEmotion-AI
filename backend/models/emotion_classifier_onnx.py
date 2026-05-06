@@ -5,36 +5,19 @@ from typing import Tuple, Dict
 import cv2
 import logging
 
-from constants import EMOTION_NAMES
+from core.constants import EMOTION_NAMES
 
 logger = logging.getLogger(__name__)
 
 
 class EmotionClassifierONNX:
-    """基于ONNX的情感分类器（CPU/GPU优化版）"""
+    """基于ONNX的情感分类器（CPU版）"""
 
     def __init__(self, model_path: str):
+        # ✅ 修复: 强制使用CPU，移除CUDA逻辑
         providers = ['CPUExecutionProvider']
         provider_options = [{}]
         self.use_cuda = False
-
-        try:
-            available = ort.get_available_providers()
-            logger.info(f"📊 可用 providers: {available}")
-
-            if 'CUDAExecutionProvider' in available:
-                # 使用 CUDA 加速 (稳定可靠)
-                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-                provider_options = [
-                    {'device_id': 0},
-                    {}
-                ]
-                self.use_cuda = True
-                logger.info("✅ ONNX模型加载成功 (CUDA加速)")
-            else:
-                logger.info("✅ ONNX模型加载成功 (CPU)")
-        except Exception as e:
-            logger.warning(f"⚠️ ONNX provider 检测失败: {e}")
 
         self.session = ort.InferenceSession(
             model_path,
@@ -45,7 +28,7 @@ class EmotionClassifierONNX:
         self.output_name = self.session.get_outputs()[0].name
         logger.info(
             f"📊 ONNX Input: {self.input_name}, Output: {self.output_name}")
-        logger.info(f"🚀 使用 providers: {self.session.get_providers()}")
+        logger.info(f"✅ ONNX情绪识别模型加载成功 (CPU)")
 
     def predict(self, face_image: np.ndarray) -> Tuple[str, float, Dict[str, float]]:
         """

@@ -15,7 +15,8 @@
           <!-- ✅ 使用 keep-alive 缓存检测组件,避免切换时丢失状态 -->
           <RouterView v-slot="{ Component }">
             <transition name="page-fade" mode="out-in">
-              <keep-alive :include="['ImageDetector', 'RealtimeDetector', 'VideoDetector', 'BatchDetector']">
+              <keep-alive
+                :include="['ImageDetector', 'RealtimeDetector', 'VideoDetector', 'BatchDetector', 'BatchVideoDetector']">
                 <component :is="Component" :key="$route.fullPath" />
               </keep-alive>
             </transition>
@@ -53,7 +54,7 @@ let latestMusicParams = null
 onMounted(async () => {
   wsManager.connect().catch(() => { })
 
-  // 监听音乐参数
+  // 监听WebSocket消息（实时检测）
   wsManager.onMessage((data) => {
     if (data.type === 'result' && data.music_params) {
       latestMusicParams = data.music_params
@@ -66,11 +67,30 @@ onMounted(async () => {
       }
     }
   })
-})
 
-onUnmounted(() => {
-  wsManager.disconnect()
-  generativeAudio.destroy()
+  // ✅ 新增: 监听HTTP检测（图片/批量/视频）的音乐参数更新
+  const handleMusicParamsUpdate = (event) => {
+    const musicParams = event.detail
+    if (musicParams) {
+      latestMusicParams = musicParams
+      currentEmotion.value = musicParams.emotion || 'neutral'
+      currentBpm.value = musicParams.bpm || 100
+
+      // 如果音乐已开启,实时更新参数
+      if (musicOn.value) {
+        generativeAudio.playMusic(musicParams)
+      }
+    }
+  }
+
+  window.addEventListener('music-params-updated', handleMusicParamsUpdate)
+
+  // 组件卸载时清理
+  onUnmounted(() => {
+    wsManager.disconnect()
+    generativeAudio.destroy()
+    window.removeEventListener('music-params-updated', handleMusicParamsUpdate)
+  })
 })
 
 // 音乐控制面板切换

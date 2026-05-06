@@ -1,6 +1,6 @@
 """历史记录相关 API 路由"""
 from fastapi import APIRouter, HTTPException
-from database import DatabaseManager
+from core.database import DatabaseManager
 
 router = APIRouter(prefix="/api/history", tags=["history"])
 

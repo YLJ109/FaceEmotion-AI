@@ -1,12 +1,12 @@
 /**
- * AI 生成式音频引擎 - 使用 Web Audio API 实时合成音乐
+ * AI 生成式音频引擎 - 使用 Web Audio API 实时合成钢琴音色音乐
  * 
  * 核心特性:
- * 1. ADSR 包络控制 - 杜绝炸麦与爆音
- * 2. 全局增益平滑过渡 - 消除音量忽大忽小
- * 3. 交叉淡入淡出(Cross-fade) - 丝滑的情绪切换
- * 4. 低通滤波器 - 柔化音色,减少刺耳高频
- * 5. 内存管理 - 避免振荡器泄漏
+ * 1. 🎹 钢琴音色模拟 - ADSR包络 + 谐波叠加 + 合唱效果
+ * 2. 🎭 人性化随机 - Velocity、Detune、Timing微调
+ * 3. 🎼 动态情绪适配 - BPM/触键力度/音色亮度随情绪变化
+ * 4. ✨ 交叉淡入淡出 - 丝滑的情绪切换无爆音
+ * 5. 🔊 专业音频处理 - 低通滤波 + 混响 + 增益平滑
  */
 
 class GenerativeAudioEngine {
@@ -15,6 +15,7 @@ class GenerativeAudioEngine {
         this.masterGain = null;
         this.filterNode = null;
         this.reverbNode = null;
+        this.chorusNode = null; // ✅ 新增: 合唱效果节点
 
         // 当前播放的音符调度器
         this.currentOscillators = [];
@@ -27,12 +28,12 @@ class GenerativeAudioEngine {
         this.isSuspended = false;
 
         // 平滑过渡参数
-        this.targetVolume = 0.7;  // ✅ 提高: 从0.5提升到0.7，基础音量更大
-        this.currentVolume = 0.7;  // ✅ 提高: 从0.5提升到0.7
-        this.volumeSmoothFactor = 0.05; // 音量平滑系数(越小越平滑)
+        this.targetVolume = 0.7;
+        this.currentVolume = 0.7;
+        this.volumeSmoothFactor = 0.05;
 
         // 交叉淡入淡出
-        this.crossfadeDuration = 0.5; // 跨情绪淡入淡出时长(秒)
+        this.crossfadeDuration = 0.5;
         this.oldOscillators = [];
         this.oldGainNodes = [];
         this.isCrossfading = false;
@@ -45,16 +46,27 @@ class GenerativeAudioEngine {
 
         // ✅ 新增: 用户可配置的音乐参数
         this.config = {
-            musicVolume: 70,           // 基础音量 (0-100)
-            emotionSensitivity: 50,    // 情绪敏感度 (0-100)
-            rhythmSmoothness: 50,      // 节奏平滑度 (0-100)
-            timbreStyle: 'sine'        // 音色风格
+            musicVolume: 70,
+            emotionSensitivity: 50,
+            rhythmSmoothness: 50,
+            timbreStyle: 'piano' // ✅ 修改: 默认钢琴音色
+        };
+
+        // ✅ 新增: 钢琴音色预设(不同情绪的触键特征)
+        this.pianoPresets = {
+            happy: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.4, brightness: 3000, velocity: 0.8 },
+            sad: { attack: 0.05, decay: 0.5, sustain: 0.4, release: 0.8, brightness: 1500, velocity: 0.5 },
+            angry: { attack: 0.01, decay: 0.2, sustain: 0.7, release: 0.3, brightness: 4000, velocity: 0.95 },
+            surprise: { attack: 0.015, decay: 0.25, sustain: 0.5, release: 0.5, brightness: 3500, velocity: 0.85 },
+            fear: { attack: 0.04, decay: 0.4, sustain: 0.3, release: 0.6, brightness: 2000, velocity: 0.6 },
+            disgust: { attack: 0.03, decay: 0.35, sustain: 0.4, release: 0.5, brightness: 1800, velocity: 0.55 },
+            neutral: { attack: 0.03, decay: 0.4, sustain: 0.5, release: 0.6, brightness: 2200, velocity: 0.65 }
         };
 
         // 定时器
         this.schedulerTimer = null;
-        this.lookahead = 0.1; // 提前调度时间(秒)
-        this.scheduleInterval = 25; // 调度间隔(毫秒)
+        this.lookahead = 0.1;
+        this.scheduleInterval = 25;
 
         // 错误处理
         this.errorCount = 0;
@@ -96,8 +108,18 @@ class GenerativeAudioEngine {
             this.reverbNode = this.audioContext.createConvolver();
             this._createSimpleReverb();
 
-            // 连接音频链: Oscillator -> Gain -> VolumeControl -> Filter -> Reverb -> Master -> Destination
-            this.filterNode.connect(this.volumeControl);
+            // ✅ 新增: 创建合唱效果节点(增强钢琴音色真实感)
+            this.chorusNode = this.audioContext.createDelay();
+            this.chorusNode.delayTime.value = 0.03; // 30ms延迟
+            const chorusGain = this.audioContext.createGain();
+            chorusGain.gain.value = 0.3; // 合唱混合比
+            this.chorusNode.connect(chorusGain);
+            chorusGain.connect(this.volumeControl);
+
+            // 连接音频链: Oscillator -> Gain -> [Filter -> Chorus] -> VolumeControl -> Reverb -> Master -> Destination
+            this.filterNode.connect(this.chorusNode); // 滤波器后接合唱
+            this.filterNode.connect(this.volumeControl); // 干声直通
+            this.chorusNode.connect(this.volumeControl); // 湿声混合
             this.volumeControl.connect(this.reverbNode);
             this.reverbNode.connect(this.masterGain);
             this.masterGain.connect(this.audioContext.destination);
@@ -106,7 +128,7 @@ class GenerativeAudioEngine {
             this.isSuspended = false;
             this.errorCount = 0;
 
-            console.log('✅ 音频引擎初始化成功');
+            console.log('✅ 钢琴音色音频引擎初始化成功');
         } catch (error) {
             console.error('❌ 音频引擎初始化失败:', error);
             this.errorCount++;
@@ -158,8 +180,6 @@ class GenerativeAudioEngine {
 
         // 立即应用音量变化
         this.setVolume(this.config.musicVolume);
-
-        console.log('🎵 音乐配置已更新:', this.config);
     }
 
     /**
@@ -219,8 +239,6 @@ class GenerativeAudioEngine {
         const bpmTransitionTime = 0.5 + (1 - smoothnessFactor) * 2.0; // 0.5-2.5秒
 
         if (oldBpm !== newBpm && this.isPlaying) {
-            console.log(`🎵 BPM平滑过渡: ${oldBpm} → ${newBpm} (${bpmTransitionTime.toFixed(1)}s)`);
-
             // 使用渐变方式过渡BPM，避免突兀的节奏变化
             this._smoothBpmTransition(oldBpm, newBpm, bpmTransitionTime);
         }
@@ -295,10 +313,6 @@ class GenerativeAudioEngine {
         this.schedulerTimer = setInterval(() => {
             this._scheduler();
         }, this.scheduleInterval);
-
-        console.log(`🎵 开始播放: ${this.currentParams.emotion}, BPM=${this.currentParams.bpm}`);
-        // ✅ 关闭调试日志
-        // console.log(`🎵 开始播放: ${this.currentParams.emotion}, BPM=${this.currentParams.bpm}`);
     }
 
     /**
@@ -335,7 +349,7 @@ class GenerativeAudioEngine {
     }
 
     /**
-     * 调度单个音符
+     * 🎹 调度单个钢琴音符(带人性化随机)
      * @param {number} startTime - 音符开始时间(音频上下文时间)
      * @param {number} duration - 音符持续时间(秒)
      */
@@ -349,32 +363,53 @@ class GenerativeAudioEngine {
         const midiNote = melody[this.noteIndex % melody.length];
         const frequency = this._midiToFreq(midiNote);
 
-        // ✅ 修改: 使用用户配置的音色风格
-        const waveform = this.currentParams.waveform || this.config.timbreStyle || 'sine';
+        // ✅ 新增: 获取情绪对应的钢琴预设
+        const emotion = this.currentParams.emotion || 'neutral';
+        const preset = this.pianoPresets[emotion] || this.pianoPresets.neutral;
 
-        // 创建振荡器
-        const oscillator = this.audioContext.createOscillator();
-        oscillator.type = waveform;
-        oscillator.frequency.value = frequency;
+        // ✅ 新增: 人性化随机参数
+        const humanization = this._generateHumanization(preset);
 
-        // 创建增益节点(ADSR 包络)
+        // ✅ 修改: 使用多振荡器模拟钢琴谐波(基频 + 2次谐波 + 3次谐波)
+        const oscillators = [];
+        const harmonicGains = [];
+
+        // 1. 基频振荡器(主音)
+        const osc1 = this.audioContext.createOscillator();
+        osc1.type = 'triangle'; // 三角波作为基础
+        osc1.frequency.value = frequency * humanization.detuneFactor; // 应用随机音高偏移
+        oscillators.push(osc1);
+
+        // 2. 二次谐波(增加亮度)
+        const osc2 = this.audioContext.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.value = frequency * 2 * humanization.detuneFactor;
+        oscillators.push(osc2);
+
+        // 3. 三次谐波(增加质感)
+        const osc3 = this.audioContext.createOscillator();
+        osc3.type = 'sine';
+        osc3.frequency.value = frequency * 3 * humanization.detuneFactor;
+        oscillators.push(osc3);
+
+        // ✅ 修改: 创建增益节点(ADSR包络 + Velocity)
         const gainNode = this.audioContext.createGain();
 
-        // ✅ 修改: 根据情绪敏感度调整音量变化幅度
-        const sensitivityFactor = this.config.emotionSensitivity / 100; // 0-1
-        const baseVolume = this.targetVolume * 0.5;
-        const peakVolume = baseVolume * (0.5 + sensitivityFactor * 0.5); // 敏感度越高,音量变化越大
+        // ✅ 修改: 根据情绪敏感度和Velocity调整音量
+        const sensitivityFactor = this.config.emotionSensitivity / 100;
+        const baseVolume = this.targetVolume * 0.4; // 降低基础音量避免过载
+        const peakVolume = baseVolume * humanization.velocity * (0.5 + sensitivityFactor * 0.5);
 
-        // ADSR 包络参数
-        const attackTime = 0.05;  // 起音时间(秒)
-        const decayTime = 0.1;    // 衰减时间(秒)
-        const sustainLevel = 0.8; // 延音电平
-        const releaseTime = 0.15; // 释音时间(秒)
+        // ✅ 修改: 应用钢琴ADSR包络(含随机微调)
+        const attackTime = preset.attack * humanization.timingFactor;
+        const decayTime = preset.decay;
+        const sustainLevel = preset.sustain;
+        const releaseTime = preset.release;
 
-        // 应用 ADSR 包络
+        // ADSR 包络曲线
         gainNode.gain.setValueAtTime(0, startTime);
         gainNode.gain.linearRampToValueAtTime(
-            peakVolume,  // ✅ 使用敏感度调整后的峰值音量
+            peakVolume,
             startTime + attackTime
         );
         gainNode.gain.exponentialRampToValueAtTime(
@@ -390,16 +425,41 @@ class GenerativeAudioEngine {
             startTime + duration
         );
 
-        // 连接音频链
-        oscillator.connect(gainNode);
+        // ✅ 修改: 连接所有振荡器到增益节点(谐波混合)
+        const harmonicMix = this.audioContext.createGain();
+        harmonicMix.gain.value = 1.0;
+
+        oscillators.forEach((osc, index) => {
+            const oscGain = this.audioContext.createGain();
+            // 谐波音量递减: 基频100%, 二次谐波40%, 三次谐波20%
+            const harmonicVolume = index === 0 ? 1.0 : (index === 1 ? 0.4 : 0.2);
+            oscGain.gain.value = harmonicVolume;
+            osc.connect(oscGain);
+            oscGain.connect(harmonicMix);
+            harmonicGains.push(oscGain);
+        });
+
+        harmonicMix.connect(gainNode);
         gainNode.connect(this.filterNode);
 
-        // 启动和停止振荡器
-        oscillator.start(startTime);
-        oscillator.stop(startTime + duration + 0.1); // 额外留0.1秒确保释音完成
+        // ✅ 修改: 动态调整滤波器截止频率(根据情绪亮度)
+        if (this.filterNode) {
+            const targetCutoff = preset.brightness * (0.8 + Math.random() * 0.4); // ±20%随机
+            this.filterNode.frequency.setTargetAtTime(
+                targetCutoff,
+                startTime,
+                0.05
+            );
+        }
+
+        // 启动和停止所有振荡器
+        oscillators.forEach(osc => {
+            osc.start(startTime);
+            osc.stop(startTime + duration + 0.1);
+        });
 
         // 记录振荡器和增益节点(用于清理)
-        this.currentOscillators.push(oscillator);
+        this.currentOscillators.push(...oscillators, ...harmonicGains, harmonicMix);
         this.currentGainNodes.push(gainNode);
 
         // 清理已完成的振荡器(防止内存泄漏)
@@ -407,6 +467,24 @@ class GenerativeAudioEngine {
 
         // 移动到下一个音符
         this.noteIndex++;
+    }
+
+    /**
+     * ✅ 新增: 生成人性化随机参数
+     * @param {Object} preset - 钢琴预设
+     * @returns {Object} 随机化参数
+     */
+    _generateHumanization(preset) {
+        return {
+            // Velocity(触键力度): ±10% 随机
+            velocity: preset.velocity * (0.9 + Math.random() * 0.2),
+
+            // Detune(音高偏移): ±5 cents (1 cent = 1/100 半音)
+            detuneFactor: Math.pow(2, (Math.random() * 10 - 5) / 1200),
+
+            // Timing(时序偏移): ±20ms 随机
+            timingFactor: 0.9 + Math.random() * 0.2
+        };
     }
 
     /**
@@ -432,7 +510,7 @@ class GenerativeAudioEngine {
     }
 
     /**
-     * 启动交叉淡入淡出(情绪切换时)
+     * ✨ 启动交叉淡入淡出(情绪切换时)
      * @param {Object} newParams - 新情绪的音乐参数
      */
     _startCrossfade(newParams) {
@@ -448,18 +526,15 @@ class GenerativeAudioEngine {
         this.currentOscillators = [];
         this.currentGainNodes = [];
 
-        // ✅ 修改: 应用用户配置的音色风格和节奏平滑度
-        const adjustedParams = {
-            ...newParams,
-            waveform: this.config.timbreStyle || newParams.waveform
-        };
+        // ✅ 修改: 应用用户配置的节奏平滑度
+        const adjustedParams = { ...newParams };
         this._updateParams(adjustedParams);
 
         // ✅ 新增: 根据节奏平滑度调整交叉淡入淡出时长
         const smoothnessFactor = this.config.rhythmSmoothness / 100;
         const crossfadeDuration = 0.3 + (1 - smoothnessFactor) * 0.7; // 0.3-1.0秒
 
-        // 淡出旧音符
+        // 淡出旧音符(钢琴音色需要更长的释音时间)
         const fadeOutTime = this.audioContext.currentTime;
         this.oldGainNodes.forEach(gainNode => {
             try {
@@ -467,7 +542,7 @@ class GenerativeAudioEngine {
                 gainNode.gain.setValueAtTime(gainNode.gain.value, fadeOutTime);
                 gainNode.gain.exponentialRampToValueAtTime(
                     0.001,
-                    fadeOutTime + crossfadeDuration
+                    fadeOutTime + crossfadeDuration + 0.3 // ✅ 增加0.3s释音时间
                 );
             } catch (e) {
                 console.warn('⚠️ 淡出旧音符失败:', e);
@@ -487,7 +562,7 @@ class GenerativeAudioEngine {
             this.oldOscillators = [];
             this.oldGainNodes = [];
             this.isCrossfading = false;
-        }, crossfadeDuration * 1000 + 100);
+        }, (crossfadeDuration + 0.3) * 1000 + 100);
     }
 
     /**
@@ -549,8 +624,6 @@ class GenerativeAudioEngine {
         // 平滑过渡到目标音量
         const currentTime = this.audioContext.currentTime;
         this.volumeControl.gain.setTargetAtTime(gainValue, currentTime, 0.1);
-
-        console.log(`🔊 音量已设置为: ${clampedVolume}%`);
     }
 
     /**

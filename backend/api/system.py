@@ -1,6 +1,6 @@
 """系统配置和健康检查路由"""
 from fastapi import APIRouter
-from config import ConfigManager
+from core.config import ConfigManager
 from pydantic import BaseModel, Field
 from typing import Optional
 import logging
@@ -37,10 +37,7 @@ class ConfigUpdateModel(BaseModel):
     # ✅ 新增: 性能模式
     performance_mode: Optional[str] = None
 
-    # AI 模型配置
-    use_gpu: Optional[bool] = None
-    use_onnx_face_detector: Optional[bool] = None
-    emotion_model: Optional[str] = None
+    # AI 模型配置（✅ 修复: 移除已废弃的模型切换参数）
     confidence_threshold: Optional[float] = Field(None, ge=0.1, le=0.99)
 
     # 检测参数
@@ -90,29 +87,26 @@ async def update_config(config: ConfigUpdateModel):
     updates = {k: v for k, v in config.dict().items() if v is not None}
     _config_manager.update_config(updates)
 
-    # ✅ 新增: 热加载机制 - 根据配置变更动态调整
+    # ✅ 修复: 热加载机制 - 仅支持有效的配置项
     try:
-        # 1. 人脸检测模型切换
-        if 'use_onnx_face_detector' in updates:
-            logger.info(
-                f"🔄 切换人脸检测模型: {'ONNX RFB' if updates['use_onnx_face_detector'] else 'Caffe SSD'}")
-            # 注意：模型实例需要重启，这里只是更新配置
-            # 实际切换需要重启 WebSocket 处理器
-
-        # 2. 置信度阈值调整（实时生效）
+        # 1. 置信度阈值调整（实时生效）
         if 'confidence_threshold' in updates:
-            logger.info(f"🔄 更新置信度阈值: {updates['confidence_threshold']}")
+            logger.debug(f"更新置信度阈值: {updates['confidence_threshold']}")
             # 该值会被 websocket.py 实时读取，无需重启
 
-        # 3. 检测频率调整（实时生效）
+        # 2. 检测频率调整（实时生效）
         if 'detect_every_n_frames' in updates:
-            logger.info(
-                f"🔄 更新检测频率: 每 {updates['detect_every_n_frames']} 帧检测一次")
+            logger.debug(
+                f"更新检测频率: 每 {updates['detect_every_n_frames']} 帧检测一次")
 
-        # 4. GPU/CPU 切换（需要重新初始化模型）
-        if 'use_gpu' in updates:
-            logger.info(f" 切换推理设备: {'GPU' if updates['use_gpu'] else 'CPU'}")
-            # 注意：需要重新加载模型，建议提示用户重启服务
+        # 3. 性能模式切换（需要前端重新加载配置）
+        if 'performance_mode' in updates:
+            perf_config = _config_manager.get_performance_config()
+            logger.info(f"🚀 性能模式已切换: {updates['performance_mode'].upper()}")
+            logger.debug(
+                f"   分辨率: {perf_config['send_width']}x{perf_config['send_height']}")
+            logger.debug(f"   跳帧阈值: {perf_config['frame_skip_threshold']}")
+            logger.debug(f"   EMA Alpha: {perf_config['ema_alpha']}")
 
         return {
             "status": "success",
@@ -214,7 +208,8 @@ async def recommend_performance_mode():
             "recommendation_reason": _get_recommendation_reason(recommended_mode, gpu_info, gpu_memory_gb, cpu_cores)
         }
 
-        logger.info(f"✅ 性能模式推荐: {result}")
+        # ✅ 优化: 仅在 DEBUG 模式下打印详细日志
+        logger.debug(f"性能模式推荐: {result}")
         return result
 
     except Exception as e:

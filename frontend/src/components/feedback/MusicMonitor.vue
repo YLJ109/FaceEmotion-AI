@@ -155,7 +155,7 @@ const toggleMusic = async () => {
                 generativeAudio.playMusic(latestMusicParams)
             }
             emit('update:music-on', true)
-            ElMessage.success('🎵 AI 生成式音乐已开启')
+            ElMessage.success('AI 生成式音乐已开启')
         } catch (error) {
             console.error('❌ 开启音乐失败:', error)
             ElMessage.error('开启音乐失败,请检查浏览器权限')

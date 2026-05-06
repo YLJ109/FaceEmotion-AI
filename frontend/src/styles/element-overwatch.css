@@ -249,6 +249,10 @@
   background: color-mix(in srgb, var(--primary) 10%, transparent) !important;
 }
 
+.el-alert--success {
+  background: color-mix(in srgb, var(--success) 10%, transparent) !important;
+}
+
 .el-alert__title {
   color: var(--text) !important;
   /* font-weight: 600 !important; */
@@ -579,6 +583,13 @@
 
 .el-button--small.is-round {
   padding: 8px 20px !important;
+}
+
+/* ===== 按钮内部间距 ===== */
+.el-button>span {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
 }
 
 /* ===== 卡片 ===== */

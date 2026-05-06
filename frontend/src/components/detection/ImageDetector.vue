@@ -85,7 +85,7 @@
                                     'neutral') }}</div>
                                 <div class="emotion-confidence">{{ (detectionResult.faces[0].confidence *
                                     100).toFixed(1)
-                                    }}%
+                                }}%
                                 </div>
                                 <div class="face-count">1 张人脸</div>
 
@@ -313,15 +313,21 @@ const detectImage = async () => {
         perfSkipRate.value = 0  // 图片检测无跳帧
         perfGpuMemory.value = 0  // 图片检测不直接监控GPU
 
-        // ✅ 新增: 传递情绪数据到音乐引擎
-        if (result.faces?.length > 0 && result.music_params) {
-            // 通过 WebSocket 发送情绪数据，触发全局音乐更新
-            wsManager.emit('image_result', {
-                type: 'result',
-                music_params: result.music_params,
-                emotion: emotion,
-                confidence: result.faces[0].confidence || 0
-            })
+        // ✅ 修复: 传递情绪数据到音乐引擎（必须使用后端返回的music_params）
+        if (result.faces?.length > 0) {
+            const musicParams = result.music_params
+
+            if (musicParams) {
+                // 触发全局事件,通知App.vue更新音乐面板状态
+                window.dispatchEvent(new CustomEvent('music-params-updated', {
+                    detail: musicParams
+                }))
+
+                // 直接调用音乐引擎播放（先检查是否已初始化）
+                if (generativeAudio.isInitialized) {
+                    generativeAudio.playMusic(musicParams)
+                }
+            }
         }
 
         // 保存到历史记录
@@ -419,6 +425,13 @@ const saveToHistory = async (result, thumbnail) => {
         const dominantEmotion = result.faces?.[0]?.emotion || 'neutral'
         const confidence = result.faces?.[0]?.confidence || 0
         const faces = result.faces || []
+
+        // ✅ 新增: 过滤空检测结果
+        if (faces.length === 0) {
+            console.warn('⚠️ 未检测到人脸，跳过保存历史记录')
+            ElMessage.info('未检测到人脸，无法保存')
+            return
+        }
 
         await fetch(API.historySave, {
             method: 'POST',

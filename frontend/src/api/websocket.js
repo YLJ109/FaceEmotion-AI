@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 class WebSocketManager {
   constructor(url) {
     this.ws = null
-    this.reconnectInterval = 2000
+    this.reconnectInterval = 1000  // ✅ 优化: 从 2000ms 降到 1000ms，加快首次重连
     this.maxReconnectAttempts = 20
     this.reconnectAttempts = 0
     this.messageHandlers = []
@@ -94,10 +94,9 @@ class WebSocketManager {
   reconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++
-      // 指数退避：2s, 4s, 8s, ...
-      const delay = Math.min(30000, this.reconnectInterval * Math.pow(1.5, this.reconnectAttempts - 1))
-      // ✅ 关闭调试日志
-      // console.log(`🔄 重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts}) 延迟 ${Math.round(delay)}ms`)
+      // ✅ 优化: 更激进的重连策略（1s, 2s, 3s, 4s...）最大 10s
+      const delay = Math.min(10000, this.reconnectInterval * Math.pow(1.3, this.reconnectAttempts - 1))
+      console.log(`🔄 重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts}) 延迟 ${Math.round(delay)}ms`)
       setTimeout(() => {
         this.connect().catch(() => { })
       }, delay)

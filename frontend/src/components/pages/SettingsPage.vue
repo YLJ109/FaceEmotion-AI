@@ -28,26 +28,26 @@
                             <el-form-item label="性能模式">
                                 <el-select v-model="settingsConfig.performance_mode" style="width:100%"
                                     @change="handlePerformanceModeChange" class="compact-select">
-                                    <el-option label="🚀 超高 (Ultra) - GPU加速 + 高分辨率 + 无跳帧" value="ultra" />
-                                    <el-option label="⚡ 高 (High) - GPU加速 + 标准分辨率 + 适度跳帧" value="high" />
-                                    <el-option label="💻 中 (Medium) - CPU推理 + 低分辨率 + 较大跳帧" value="medium" />
-                                    <el-option label="🐢 低 (Low) - 轻量CPU + 最低分辨率 + 最大跳帧" value="low" />
+                                    <el-option label="🚀 超高 (Ultra) - 高分辨率 + 无跳帧 + 极速响应" value="ultra" />
+                                    <el-option label="⚡ 高 (High) - 标准分辨率 + 适度跳帧 + 平衡性能" value="high" />
+                                    <el-option label="💻 中 (Medium) - 低分辨率 + 较大跳帧 + 稳定运行" value="medium" />
+                                    <el-option label="🐢 低 (Low) - 最低分辨率 + 最大跳帧 + 轻量运行" value="low" />
                                 </el-select>
                                 <div class="mode-description">
                                     <div v-if="settingsConfig.performance_mode === 'ultra'">
-                                        <p><strong>适用场景：</strong>高端 NVIDIA GPU (RTX 3060+ / RTX 40系列)</p>
-                                        <p><strong>性能表现：</strong>30-60 FPS，最佳画质和响应速度</p>
-                                        <p><strong>硬件要求：</strong>GPU 显存 ≥ 4GB，推荐 8GB+</p>
+                                        <p><strong>适用场景：</strong>高端 CPU (Intel i7+ / AMD Ryzen 7+)</p>
+                                        <p><strong>性能表现：</strong>25-40 FPS，最佳画质和响应速度</p>
+                                        <p><strong>硬件要求：</strong>CPU 6核心以上，内存 ≥ 8GB</p>
                                     </div>
                                     <div v-else-if="settingsConfig.performance_mode === 'high'">
-                                        <p><strong>适用场景：</strong>中端 GPU (GTX 1060+ / RTX 20系列) 或入门级独显</p>
-                                        <p><strong>性能表现：</strong>15-30 FPS，平衡性能和画质</p>
-                                        <p><strong>硬件要求：</strong>GPU 显存 ≥ 2GB</p>
+                                        <p><strong>适用场景：</strong>中端 CPU (Intel i5 / AMD Ryzen 5)</p>
+                                        <p><strong>性能表现：</strong>15-25 FPS，平衡性能和流畅度</p>
+                                        <p><strong>硬件要求：</strong>CPU 4核心以上，内存 ≥ 4GB</p>
                                     </div>
                                     <div v-else-if="settingsConfig.performance_mode === 'medium'">
-                                        <p><strong>适用场景：</strong>无 GPU 或中端 CPU (Intel i5+ / AMD Ryzen 5+)</p>
+                                        <p><strong>适用场景：</strong>入门 CPU (Intel i3 / AMD Ryzen 3)</p>
                                         <p><strong>性能表现：</strong>8-15 FPS，CPU 推理，稳定运行</p>
-                                        <p><strong>硬件要求：</strong>CPU 4核心以上，内存 ≥ 4GB</p>
+                                        <p><strong>硬件要求：</strong>CPU 2核心以上，内存 ≥ 4GB</p>
                                     </div>
                                     <div v-else>
                                         <p><strong>适用场景：</strong>老旧硬件或低功耗设备 (Intel i3 / 集成显卡)</p>
@@ -86,39 +86,16 @@
                     <!-- AI 模型配置 -->
                     <div v-show="activeTab === 'ai'" class="tab-panel">
                         <el-form label-position="top" size="large">
-
-                            <el-form-item label="推理设备">
-                                <el-radio-group v-model="settingsConfig.use_gpu" size="large"
-                                    @change="handleConfigChange" class="compact-radio-group">
-                                    <el-radio-button :value="true" class="compact-radio">
-                                        <el-icon>
-                                            <Monitor />
-                                        </el-icon> GPU 加速
-                                    </el-radio-button>
-                                    <el-radio-button :value="false" class="compact-radio">
-                                        <el-icon>
-                                            <Cpu />
-                                        </el-icon> CPU 推理
-                                    </el-radio-button>
-                                </el-radio-group>
-                            </el-form-item>
-
-                            <el-form-item label="人脸检测模型">
-                                <el-radio-group v-model="settingsConfig.use_onnx_face_detector" size="large"
-                                    @change="handleConfigChange" class="compact-radio-group">
-                                    <el-radio-button :value="false" class="compact-radio">Caffe SSD
-                                        (更准确)</el-radio-button>
-                                    <el-radio-button :value="true" class="compact-radio">ONNX RFB (更快)</el-radio-button>
-                                </el-radio-group>
-                            </el-form-item>
-
-                            <el-form-item label="情绪识别模型">
-                                <el-select v-model="settingsConfig.emotion_model" style="width:100%"
-                                    @change="handleConfigChange" class="compact-select">
-                                    <el-option label="ONNX 优化版 (推荐)" value="./models/emotion_model.onnx" />
-                                    <el-option label="PyTorch 原版" value="./models/pytorch_final_3060.pth" />
-                                </el-select>
-                            </el-form-item>
+                            <!-- ✅ 修复: 移除推理设备选项（当前仅支持 CPU） -->
+                            <el-alert title="当前运行模式" type="info" :closable="false" show-icon
+                                style="margin-bottom: 20px;">
+                                <template #default>
+                                    <p style="margin: 0;">🖥️ <strong>CPU 推理模式</strong></p>
+                                    <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);">
+                                        系统当前使用 ONNX Runtime + Caffe SSD 进行纯 CPU 推理，无需 GPU 加速。
+                                    </p>
+                                </template>
+                            </el-alert>
 
                             <el-form-item label="置信度阈值">
                                 <div class="slider-group">
@@ -128,6 +105,9 @@
                                     <span class="slider-hint">当前阈值: {{ (settingsConfig.confidence_threshold *
                                         100).toFixed(0) }}%</span>
                                 </div>
+                                <p class="field-description">
+                                    较低的值会检测到更多人脸但可能增加误检，较高的值更严格但可能漏检。
+                                </p>
                             </el-form-item>
                         </el-form>
                     </div>
@@ -254,11 +234,8 @@ const settingsConfig = reactive({
     // ✅ 新增: 性能模式
     performance_mode: 'high',
 
-    // AI 模型配置
-    use_gpu: true,
-    use_onnx_face_detector: false,
-    emotion_model: './models/emotion_model.onnx',
-    confidence_threshold: 0.6,
+    // AI 模型配置（✅ 修复: 移除已废弃的模型切换参数）
+    confidence_threshold: 0.45,
 
     // 检测参数
     resolution: '640x480',
@@ -295,10 +272,8 @@ const loadConfig = async () => {
         // 同步后端配置到前端
         const backendConfig = data.config
         settingsConfig.performance_mode = backendConfig.performance_mode ?? 'high'
-        settingsConfig.use_gpu = backendConfig.use_gpu ?? true
-        settingsConfig.use_onnx_face_detector = backendConfig.use_onnx_face_detector ?? false
-        settingsConfig.emotion_model = backendConfig.emotion_model ?? './models/emotion_model.onnx'
-        settingsConfig.confidence_threshold = backendConfig.confidence_threshold ?? 0.6
+        // ✅ 修复: 移除已废弃的模型切换参数
+        settingsConfig.confidence_threshold = backendConfig.confidence_threshold ?? 0.45
         settingsConfig.detect_every_n_frames = backendConfig.detect_every_n_frames ?? 2
         settingsConfig.theme_mode = backendConfig.theme_mode ?? 'auto'
         // AI 音乐配置
@@ -310,7 +285,7 @@ const loadConfig = async () => {
         // 保存原始配置用于重置
         originalConfig.value = { ...settingsConfig }
 
-        console.log('✅ 配置加载成功:', settingsConfig)
+        console.debug('配置加载成功')
     } catch (error) {
         console.error('❌ 加载配置失败:', error)
         ElMessage.error('加载配置失败，使用默认值')
@@ -362,14 +337,14 @@ const detectAndRecommendMode = async () => {
 
 // ✅ 修改: 性能模式切换处理
 const handlePerformanceModeChange = async () => {
-    console.log(`🚀 切换性能模式: ${settingsConfig.performance_mode}`)
+    console.debug(`切换性能模式: ${settingsConfig.performance_mode}`)
 
     // 立即保存配置（静默模式，避免提示重叠）
     await saveConfig(true)
 
     // 提示用户重启检测以生效
     ElMessage({
-        message: '✅ 性能模式已更新，请重启实时检测以生效',
+        message: '性能模式已更新，请重启实时检测以生效',
         type: 'success',
         duration: 3000
     })
@@ -379,12 +354,9 @@ const handlePerformanceModeChange = async () => {
 const saveConfig = async (silent = false) => {
     saving.value = true
     try {
-        // 1. 同步到后端
+        // 1. 同步到后端（✅ 修复: 移除已废弃的模型切换参数）
         const payload = {
             performance_mode: settingsConfig.performance_mode,
-            use_gpu: settingsConfig.use_gpu,
-            use_onnx_face_detector: settingsConfig.use_onnx_face_detector,
-            emotion_model: settingsConfig.emotion_model,
             confidence_threshold: settingsConfig.confidence_threshold,
             detect_every_n_frames: settingsConfig.detect_every_n_frames,
             theme_mode: settingsConfig.theme_mode,
@@ -425,12 +397,9 @@ const saveConfig = async (silent = false) => {
 // 恢复默认配置
 const resetConfig = async () => {
     try {
-        // 重置为后端默认值
+        // 重置为后端默认值（✅ 修复: 移除已废弃的模型切换参数）
         settingsConfig.performance_mode = 'high'
-        settingsConfig.use_gpu = true
-        settingsConfig.use_onnx_face_detector = false
-        settingsConfig.emotion_model = './models/emotion_model.onnx'
-        settingsConfig.confidence_threshold = 0.6
+        settingsConfig.confidence_threshold = 0.45
         settingsConfig.detect_every_n_frames = 2
         settingsConfig.theme_mode = 'auto'
         settingsConfig.resolution = '640x480'
@@ -532,6 +501,15 @@ watch(
     word-break: break-word;
     line-height: 1.4;
     flex: 1;
+}
+
+/* ✅ 新增: 字段描述样式 */
+.field-description {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    line-height: 1.5;
 }
 
 /* 响应式适配：小屏幕时恢复垂直排列 */

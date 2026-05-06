@@ -493,7 +493,8 @@ function renderTypeDistChart() {
     'realtime': { name: '实时检测', color: colors.accent },
     'image': { name: '图片检测', color: colors.success },
     'batch': { name: '批量检测', color: colors.warning },
-    'video': { name: '视频检测', color: colors.highlight }
+    'video': { name: '视频检测', color: colors.highlight },
+    'batch_video': { name: '批量视频', color: colors.secondary }
   }
 
   const data = Object.entries(typeDist.value).map(([key, count]) => ({
@@ -826,12 +827,13 @@ function renderTypeTrendChart() {
   const textColor = colors.text
   const primaryColor = colors.primary
 
-  const types = ['realtime', 'image', 'batch', 'video']
+  const types = ['realtime', 'image', 'batch', 'video', 'batch_video']
   const typeMap = {
     'realtime': { name: '实时检测', color: colors.accent },
     'image': { name: '图片检测', color: colors.success },
     'batch': { name: '批量检测', color: colors.warning },
-    'video': { name: '视频检测', color: colors.highlight }
+    'video': { name: '视频检测', color: colors.highlight },
+    'batch_video': { name: '批量视频', color: colors.secondary }
   }
 
   // 使用情绪趋势的日期作为横轴

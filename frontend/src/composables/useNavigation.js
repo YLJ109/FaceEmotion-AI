@@ -19,8 +19,9 @@ const NAVIGATION_CONFIG = {
     detection: [
         { key: 'realtime', label: '实时检测', icon: 'VideoCamera', path: '/realtime' },
         { key: 'image', label: '图片检测', icon: 'Picture', path: '/image' },
-        { key: 'batch', label: '批量检测', icon: 'Files', path: '/batch', badge: '3并发' },
-        { key: 'video', label: '视频检测', icon: 'VideoPlay', path: '/video', badge: 'Beta' }
+        { key: 'batch', label: '图片批量检测', icon: 'Files', path: '/batch', badge: '3并发' },
+        { key: 'video', label: '视频检测', icon: 'VideoPlay', path: '/video', badge: 'Beta' },
+        { key: 'batch-video', label: '批量视频检测', icon: 'Film', path: '/batch-video', badge: '3并发' }
     ],
 
     // 记录模式分组

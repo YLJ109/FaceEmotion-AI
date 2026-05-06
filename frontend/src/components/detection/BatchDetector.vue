@@ -7,7 +7,7 @@
                     <template #header>
                         <div class="card-header">
                             <span class="card-icon">📁</span>
-                            <h3>批量检测 <span class="badge">并发3张</span></h3>
+                            <h3>图片批量检测 <span class="badge">并发3张</span></h3>
                         </div>
                     </template>
 
@@ -206,14 +206,21 @@ const startBatchDetection = async () => {
             const dominantEmotion = result.faces?.[0]?.emotion || 'neutral'
             const confidence = result.faces?.[0]?.confidence || 0
 
-            // ✅ 新增: 传递情绪数据到音乐引擎（使用第一张检测到人脸的图片）
-            if (result.faces?.length > 0 && result.music_params && completed === 0) {
-                wsManager.emit('batch_result', {
-                    type: 'result',
-                    music_params: result.music_params,
-                    emotion: dominantEmotion,
-                    confidence: confidence
-                })
+            // ✅ 修复: 传递情绪数据到音乐引擎（使用第一张检测到人脸的图片，必须使用后端返回的music_params）
+            if (result.faces?.length > 0 && completed === 0) {
+                const musicParams = result.music_params
+
+                if (musicParams) {
+                    // 触发全局事件,通知App.vue更新音乐面板状态
+                    window.dispatchEvent(new CustomEvent('music-params-updated', {
+                        detail: musicParams
+                    }))
+
+                    // 直接调用音乐引擎播放（先检查是否已初始化）
+                    if (generativeAudio.isInitialized) {
+                        generativeAudio.playMusic(musicParams)
+                    }
+                }
             }
 
             return { imageUrl, faces: result.faces || [], dominant_emotion: dominantEmotion, confidence }
@@ -345,9 +352,9 @@ const saveBatchToHistory = async () => {
             const confidence = result.confidence || 0
             const faces = result.faces || []
 
-            // 数据验证
-            if (!result.imageUrl && faces.length === 0) {
-                console.warn(`⚠️ 跳过第 ${i + 1} 张图片：无缩略图且无人脸数据`)
+            // ✅ 修复: 严格验证人脸数据
+            if (faces.length === 0) {
+                console.warn(`⚠️ 跳过第 ${i + 1} 张图片：未检测到人脸`)
                 failCount++
                 continue
             }

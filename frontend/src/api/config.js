@@ -10,6 +10,7 @@ export const API = {
   detectImage: `${API_BASE_URL}/api/detect/image`,
   detectBatch: `${API_BASE_URL}/api/detect/batch`,
   detectVideo: `${API_BASE_URL}/api/detect/video`,
+  detectBatchVideo: `${API_BASE_URL}/api/detect/batch-video`, // ✅ 新增: 批量视频检测
   history: `${API_BASE_URL}/api/history`,
   historySave: `${API_BASE_URL}/api/history/save`,
   historyStats: `${API_BASE_URL}/api/history/stats`,

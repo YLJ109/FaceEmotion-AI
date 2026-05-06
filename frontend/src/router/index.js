@@ -9,6 +9,7 @@ const RealtimeDetector = () => import('@/components/detection/RealtimeDetector.v
 const ImageDetector = () => import('@/components/detection/ImageDetector.vue')
 const BatchDetector = () => import('@/components/detection/BatchDetector.vue')
 const VideoDetector = () => import('@/components/detection/VideoDetector.vue')
+const BatchVideoDetector = () => import('@/components/detection/BatchVideoDetector.vue') // ✅ 新增: 批量视频检测
 const AnalyticsDashboard = () => import('@/components/analytics/AnalyticsDashboard.vue')
 const HistoryViewer = () => import('@/components/history/HistoryViewer.vue')
 const ThemePage = () => import('@/components/pages/ThemePage.vue')
@@ -46,7 +47,7 @@ const routes = [
         name: 'Batch',
         component: BatchDetector,
         meta: {
-            title: '批量检测',
+            title: '图片批量检测',
             icon: 'Files',
             badge: '3并发',
             group: 'detection'
@@ -60,6 +61,17 @@ const routes = [
             title: '视频检测',
             icon: 'VideoPlay',
             badge: 'Beta',
+            group: 'detection'
+        }
+    },
+    {
+        path: '/batch-video',
+        name: 'BatchVideo',
+        component: BatchVideoDetector,
+        meta: {
+            title: '批量视频检测',
+            icon: 'Film',
+            badge: '3并发',
             group: 'detection'
         }
     },

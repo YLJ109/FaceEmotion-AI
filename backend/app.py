@@ -6,11 +6,10 @@ from api import register_all_routes
 from optimizer.dynamic_inference import DynamicInferenceOptimizer
 from analytics.user_analytics import UserAnalytics
 from adaptation.active_learner import AdaptiveLearner
-from models.emotion_classifier_onnx import EmotionClassifierONNX
 from models.detector import FaceDetector
-from database import DatabaseManager
-from config import ConfigManager
-from constants import LOGGING_CONFIG
+from core.database import DatabaseManager
+from core.config import ConfigManager
+from core.constants import LOGGING_CONFIG
 import traceback
 import time
 from fastapi.responses import JSONResponse
@@ -47,6 +46,10 @@ if _cuda_bin.exists():
 
 logging.basicConfig(**LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
+
+# ✅ 优化: 减少高频请求的日志输出
+logging.getLogger('api.system').setLevel(logging.WARNING)  # 系统配置接口
+logging.getLogger('core.config').setLevel(logging.WARNING)  # 配置管理器
 
 # ==================== 全局实例管理器 ====================
 config_manager = ConfigManager()
@@ -95,30 +98,35 @@ async def lifespan(app: FastAPI):
 
     # 加载模型
     try:
-        # ✅ 优化1: 启用ONNX RFB人脸检测器(更高精度)
-        onnx_face_model_path = '../models/weights/version-RFB-320.onnx'
-        use_onnx_detector = config_manager.get('use_onnx_face_detector', False)
+        import time as _time
+
+        logger.info("🔧 正在加载 Caffe SSD 人脸检测模型...")
+        start_time = _time.time()
+
+        #  切换回 Caffe SSD 人脸检测模型 (CPU)
+        proto_file = os.path.join(
+            os.path.dirname(__file__), 'configs', 'deploy.prototxt')
+        model_file = os.path.join(os.path.dirname(
+            __file__), 'weights', 'res10_300x300_ssd_iter_140000_fp16.caffemodel')
 
         face_detector = FaceDetector(
-            proto_file='../models/configs/deploy.prototxt',
-            model_file='../models/weights/res10_300x300_ssd_iter_140000_fp16.caffemodel',
-            onnx_model_path=onnx_face_model_path,
-            use_onnx=use_onnx_detector
+            proto_file=proto_file,
+            model_file=model_file
         )
-        logger.info("✅ 人脸检测器加载成功")
+        elapsed = _time.time() - start_time
+        logger.info(f"✅ Caffe 人脸检测器加载完成 ({elapsed:.2f}s, CPU)")
 
-        # ✅ 修改: 使用配置文件中的模型路径
-        onnx_path = config_manager.get(
-            'emotion_model', '../models/weights/emotion_model.onnx')
-        # 如果是相对路径，转换为绝对路径
-        if not os.path.isabs(onnx_path):
-            onnx_path = os.path.join(os.path.dirname(__file__), onnx_path)
+        # ✅ 固定使用 ONNX 情绪识别模型 (CPU)
+        logger.info("🔧 正在加载 ONNX 情绪识别模型...")
+        start_time = _time.time()
 
-        if not os.path.exists(onnx_path):
-            raise RuntimeError(f"ONNX模型不存在: {onnx_path}")
+        onnx_emotion_model_path = os.path.join(os.path.dirname(
+            __file__), 'weights', 'emotion_model.onnx')
 
-        emotion_model = EmotionClassifierONNX(onnx_path)
-        logger.info("✅ ONNX情感分类器加载成功")
+        from models.emotion_classifier_onnx import EmotionClassifierONNX
+        emotion_model = EmotionClassifierONNX(onnx_emotion_model_path)
+        elapsed = _time.time() - start_time
+        logger.info(f"✅ ONNX 情绪识别模型加载完成 ({elapsed:.2f}s, CPU, 7种表情)")
     except Exception as e:
         logger.error(f"❌ 模型加载失败: {e}")
         raise
