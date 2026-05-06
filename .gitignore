@@ -63,4 +63,6 @@ temp/
 wav2vac2
 
 # Backend Data
-backend/data
+backend/data/uploads
+backend/data/screenshots
+backend/data/

@@ -14,14 +14,14 @@ logger = logging.getLogger(__name__)
 EMOTION_MUSIC_MAP = {
     'happy': {
         'mode': 'major',
-        'bpm': 120,
-        'root_note': 60,  # C4
-        # C-F-G-F
-        'chord_progression': [[60, 64, 67], [65, 69, 72], [67, 71, 74], [65, 69, 72]],
-        'waveform': 'sine',
-        'filter_cutoff': 2000,
-        'reverb_mix': 0.3,
-        'melody_complexity': 0.7,
+        'bpm': 140,  # ✅ 提高: 从120提升到140，更轻快
+        'root_note': 64,  # ✅ 提高: 从C4(60)提升到E4(64)，更高亢明亮
+        # C-F-G-F (保持在较高音区)
+        'chord_progression': [[64, 68, 71], [69, 73, 76], [71, 75, 78], [69, 73, 76]],
+        'waveform': 'triangle',  # ✅ 修改: 从sine改为triangle，更明亮清脆
+        'filter_cutoff': 2500,  # ✅ 提高: 允许更多高频通过
+        'reverb_mix': 0.25,  # ✅ 降低: 减少混响，让声音更直接
+        'melody_complexity': 0.8,  # ✅ 提高: 更复杂的旋律
     },
     'sad': {
         'mode': 'minor',
@@ -80,14 +80,14 @@ EMOTION_MUSIC_MAP = {
     },
     'neutral': {
         'mode': 'major',
-        'bpm': 100,
-        'root_note': 57,  # A3
-        # Am-Dm-Em-Dm
-        'chord_progression': [[57, 61, 64], [62, 66, 69], [64, 68, 71], [62, 66, 69]],
-        'waveform': 'sine',
-        'filter_cutoff': 1800,
-        'reverb_mix': 0.3,
-        'melody_complexity': 0.5,
+        'bpm': 85,  # ✅ 降低: 从100降到85，更舒缓
+        'root_note': 52,  # ✅ 降低: 从A3(57)降到D3(52)，更低沉柔和
+        # Dm-Gm-Am-Gm (低音区和弦)
+        'chord_progression': [[52, 55, 59], [57, 60, 64], [59, 62, 66], [57, 60, 64]],
+        'waveform': 'sine',  # ✅ 保持: sine波最柔和
+        'filter_cutoff': 1400,  # ✅ 降低: 过滤掉更多高频，更温暖
+        'reverb_mix': 0.4,  # ✅ 提高: 增加空间感
+        'melody_complexity': 0.4,  # ✅ 降低: 更简单的旋律
     },
 }
 

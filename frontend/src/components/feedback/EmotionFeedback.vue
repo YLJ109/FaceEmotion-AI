@@ -160,7 +160,7 @@ async function submitFeedback() {
         })
 
         if (response.ok) {
-            ElMessage.success('✅ 反馈已提交，系统将自动学习优化')
+            ElMessage.success('反馈已提交，系统将自动学习优化')
             emit('submitted')
             dialogVisible.value = false
         } else {

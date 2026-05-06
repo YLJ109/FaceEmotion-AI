@@ -89,6 +89,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.info("⚠️ 无GPU可用")
 
+    # ✅ 新增: 应用性能模式配置
+    perf_config = config_manager.get_performance_config()
+    logger.info(f"📊 性能模式配置: {perf_config}")
+
     # 加载模型
     try:
         # ✅ 优化1: 启用ONNX RFB人脸检测器(更高精度)

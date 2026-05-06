@@ -49,6 +49,61 @@ class ConfigManager:
     def get(self, key: str, default=None):
         return self.config.get(key, default)
 
+    # ✅ 新增: 获取性能模式配置
+    def get_performance_config(self) -> Dict[str, Any]:
+        """根据当前性能模式返回对应的配置参数"""
+        mode = self.config.get('performance_mode', 'high')
+
+        # 四级性能模式配置表
+        PERFORMANCE_PROFILES = {
+            'ultra': {
+                'use_gpu': True,
+                'send_width': 224,
+                'send_height': 168,
+                'frame_skip_threshold': 1,  # 不跳帧
+                'ema_alpha': 0.15,  # 快速响应
+                'enable_multimodal': True,
+                'enable_adaptive_learning': True,
+                'enable_realtime_charts': True,
+            },
+            'high': {
+                'use_gpu': True,
+                'send_width': 160,
+                'send_height': 120,
+                'frame_skip_threshold': 2,  # 适度跳帧
+                'ema_alpha': 0.15,
+                'enable_multimodal': True,
+                'enable_adaptive_learning': True,
+                'enable_realtime_charts': True,
+            },
+            'medium': {
+                'use_gpu': False,  # 强制CPU
+                'send_width': 128,
+                'send_height': 96,
+                'frame_skip_threshold': 3,  # 较大跳帧
+                'ema_alpha': 0.2,  # 更平滑但响应稍慢
+                'enable_multimodal': False,  # 禁用多模态
+                'enable_adaptive_learning': False,  # 禁用自适应学习
+                'enable_realtime_charts': True,
+            },
+            'low': {
+                'use_gpu': False,  # 强制CPU
+                'send_width': 96,
+                'send_height': 72,
+                'frame_skip_threshold': 5,  # 最大跳帧
+                'ema_alpha': 0.25,  # 极致平滑
+                'enable_multimodal': False,
+                'enable_adaptive_learning': False,
+                'enable_realtime_charts': False,  # 禁用实时图表
+            }
+        }
+
+        # 返回对应模式的配置，如果模式不存在则使用 high 作为默认值
+        profile = PERFORMANCE_PROFILES.get(mode, PERFORMANCE_PROFILES['high'])
+        logger.info(
+            f"🚀 性能模式: {mode.upper()} - GPU: {profile['use_gpu']}, 分辨率: {profile['send_width']}x{profile['send_height']}")
+        return profile
+
     def get_default_config(self) -> Dict[str, Any]:
         """✅ 新增: 从环境变量获取默认配置"""
         return {
@@ -62,6 +117,10 @@ class ConfigManager:
             'database_url': os.getenv('DATABASE_URL', 'sqlite:///./data/emotion.db'),
             'db_pool_size': int(os.getenv('DB_POOL_SIZE', '5')),
             'db_max_overflow': int(os.getenv('DB_MAX_OVERFLOW', '10')),
+
+            # ✅ 新增: 性能模式配置
+            # ultra/high/medium/low
+            'performance_mode': os.getenv('PERFORMANCE_MODE', 'high'),
 
             # AI模型配置
             'use_gpu': os.getenv('USE_GPU', 'true').lower() == 'true',
@@ -107,5 +166,11 @@ class ConfigManager:
             'show_fps': True,
             'show_confidence_bar': True,
             'use_fp16': True,
-            'use_onnx': False
+            'use_onnx': False,
+
+            # AI 音乐配置
+            'music_volume': 70,
+            'emotion_sensitivity': 50,
+            'rhythm_smoothness': 50,
+            'timbre_style': 'sine'
         }

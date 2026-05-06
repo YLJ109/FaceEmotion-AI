@@ -679,7 +679,7 @@
 
 /* ===== 选择器 ===== */
 .el-select__wrapper {
-  width: 160px;
+  width: 100%;
   background: var(--card-bg) !important;
   backdrop-filter: blur(12px);
   border: 1px solid var(--border) !important;
@@ -935,6 +935,18 @@
 
 .el-form-item {
   margin-bottom: 20px !important;
+}
+
+/* ✅ 新增: 自定义表单内容区域样式 */
+.el-form-item__content {
+  line-height: 32px !important;
+  font-size: var(--font-size) !important;
+  flex-wrap: wrap !important;
+  flex: 1 !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  display: flex !important;
+  position: relative !important;
 }
 
 .el-empty__description {

@@ -34,6 +34,9 @@ def init_system_router(
 
 class ConfigUpdateModel(BaseModel):
     """配置更新模型 - 支持所有可配置参数"""
+    # ✅ 新增: 性能模式
+    performance_mode: Optional[str] = None
+
     # AI 模型配置
     use_gpu: Optional[bool] = None
     use_onnx_face_detector: Optional[bool] = None
@@ -56,6 +59,12 @@ class ConfigUpdateModel(BaseModel):
     current_theme: Optional[str] = None
     show_fps: Optional[bool] = None
     show_confidence_bar: Optional[bool] = None
+
+    # AI 音乐配置
+    music_volume: Optional[int] = Field(None, ge=0, le=100)
+    emotion_sensitivity: Optional[int] = Field(None, ge=0, le=100)
+    rhythm_smoothness: Optional[int] = Field(None, ge=0, le=100)
+    timbre_style: Optional[str] = None
 
 
 def get_gpu_memory_usage():
@@ -144,3 +153,88 @@ async def health_check():
             "inference_optimizer": _inference_optimizer.enabled if _inference_optimizer else False,
         }
     }
+
+
+@router.get("/performance/recommend")
+async def recommend_performance_mode():
+    """根据硬件配置智能推荐性能模式"""
+    try:
+        gpu_info = None
+        gpu_memory_gb = 0
+        cpu_cores = 0
+        recommended_mode = 'high'  # 默认推荐
+
+        # 1. 检测 GPU
+        try:
+            import pynvml as nvidia_smi
+            nvidia_smi.nvmlInit()
+            device_count = nvidia_smi.nvmlDeviceGetCount()
+            if device_count > 0:
+                handle = nvidia_smi.nvmlDeviceGetHandleByIndex(0)
+                gpu_name = nvidia_smi.nvmlDeviceGetName(handle)
+                mem_info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+                gpu_memory_gb = mem_info.total / 1024**3
+                gpu_info = f"{gpu_name} ({gpu_memory_gb:.1f}GB)"
+                logger.info(f"🔍 检测到 GPU: {gpu_info}")
+        except Exception as e:
+            logger.info(f"⚠️ 未检测到 GPU: {e}")
+
+        # 2. 检测 CPU
+        import multiprocessing
+        cpu_cores = multiprocessing.cpu_count()
+        try:
+            import platform
+            cpu_info = platform.processor()
+        except:
+            cpu_info = "未知"
+
+        # 3. 智能推荐逻辑
+        if gpu_info and gpu_memory_gb >= 4:
+            # GPU 显存 >= 4GB，推荐 Ultra 或 High
+            if gpu_memory_gb >= 8:
+                recommended_mode = 'ultra'
+            else:
+                recommended_mode = 'high'
+        elif gpu_info and gpu_memory_gb >= 2:
+            # GPU 显存 >= 2GB，推荐 High
+            recommended_mode = 'high'
+        elif cpu_cores >= 4:
+            # CPU 4核心以上，推荐 Medium
+            recommended_mode = 'medium'
+        else:
+            # 低配设备，推荐 Low
+            recommended_mode = 'low'
+
+        result = {
+            "gpu": gpu_info,
+            "cpu": cpu_info,
+            "gpu_memory_gb": round(gpu_memory_gb, 1),
+            "cpu_cores": cpu_cores,
+            "recommended_mode": recommended_mode,
+            "recommendation_reason": _get_recommendation_reason(recommended_mode, gpu_info, gpu_memory_gb, cpu_cores)
+        }
+
+        logger.info(f"✅ 性能模式推荐: {result}")
+        return result
+
+    except Exception as e:
+        logger.error(f"❌ 性能推荐失败: {e}")
+        return {
+            "gpu": None,
+            "cpu": "未知",
+            "gpu_memory_gb": 0,
+            "cpu_cores": 0,
+            "recommended_mode": "high",
+            "recommendation_reason": "检测失败，使用默认推荐"
+        }
+
+
+def _get_recommendation_reason(mode, gpu_info, gpu_memory_gb, cpu_cores):
+    """获取推荐理由"""
+    reasons = {
+        'ultra': f'检测到高端 GPU ({gpu_info})，显存充足，推荐使用 Ultra 模式以获得最佳性能',
+        'high': f'检测到中端 GPU ({gpu_info})，推荐使用 High 模式平衡性能和画质',
+        'medium': f'未检测到 GPU 或显存不足，但 CPU 性能良好 ({cpu_cores} 核心)，推荐使用 Medium 模式',
+        'low': f'硬件配置较低 (CPU {cpu_cores} 核心)，推荐使用 Low 模式确保流畅运行'
+    }
+    return reasons.get(mode, '使用默认 High 模式')

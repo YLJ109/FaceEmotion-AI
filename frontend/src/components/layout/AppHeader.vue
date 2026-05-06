@@ -11,7 +11,7 @@
                 </svg>
             </div>
             <div class="logo-text-wrapper">
-                <h1 class="logo">AI 情感检测系统</h1>
+                <h1 class="logo">AI情感检测系统</h1>
                 <span class="logo-sub">智能情绪识别平台</span>
             </div>
         </div>
@@ -194,7 +194,7 @@ const themeStore = useThemeStore()
     display: flex !important;
     align-items: center !important;
     gap: 6px !important;
-    font-size: 13px !important;
+    font-size: 14px !important;
     /* font-weight: 600 !important; */
     transition: all 0.3s ease !important;
     position: relative;

@@ -164,7 +164,7 @@ const toggleMusic = async () => {
         // 关闭音乐
         generativeAudio.stop()
         emit('update:music-on', false)
-        ElMessage.info('⏹️ 音乐已停止')
+        ElMessage.info('音乐已停止')
     }
 }
 

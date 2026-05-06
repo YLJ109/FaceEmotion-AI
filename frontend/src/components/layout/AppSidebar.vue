@@ -52,7 +52,7 @@ const { navigateTo, isActive, navigationMenus } = useNavigation()
 <style scoped>
 /* ===== 侧边栏 ===== */
 .sidebar {
-    width: 200px;
+    width: 220px;
     height: 100%;
     display: flex;
     flex-direction: column;

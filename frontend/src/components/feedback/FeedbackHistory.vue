@@ -9,13 +9,10 @@
                 <div class="filter-group">
                     <label>情绪类型：</label>
                     <el-select v-model="filters.emotion" placeholder="全部情绪" clearable @change="loadFeedbackHistory"
-                        size="small">
+                        size="small" style="width: 150px">
                         <el-option label="全部" value="" />
-                        <el-option v-for="emotion in emotionList" :key="emotion" :label="getEmotionName(emotion)"
-                            :value="emotion">
-                            <span class="emotion-option-emoji">{{ getEmotionEmoji(emotion) }}</span>
-                            <span class="emotion-option-name">{{ getEmotionName(emotion) }}</span>
-                        </el-option>
+                        <el-option v-for="emotion in emotionList" :key="emotion"
+                            :label="getEmotionEmoji(emotion) + ' ' + getEmotionName(emotion)" :value="emotion" />
                     </el-select>
                 </div>
 
@@ -71,7 +68,7 @@
                     </el-table-column>
 
                     <!-- 快照图片列 -->
-                    <el-table-column label="快照" width="100" align="center">
+                    <el-table-column label="快照" width="150" align="center">
                         <template #default="{ row }">
                             <div class="snapshot-thumbnail">
                                 <img v-if="row.snapshot" :src="row.snapshot" alt="快照" />
@@ -279,7 +276,7 @@ import { getEmotionName, getEmotionEmoji, getEmotionColor, EMOTION_LIST } from '
 import { API } from '@/api/config'
 
 // ✅ 使用完整的 emotion 列表（过滤别名，避免重复）
-const emotionList = EMOTION_LIST.filter(e => !['enjoy', 'surprise', 'fear', 'disgusted', 'neutral'].includes(e))
+const emotionList = EMOTION_LIST.filter(e => !['surprised', 'fearful', 'calm'].includes(e))
 
 // 数据状态
 const loading = ref(false)
@@ -430,7 +427,7 @@ const deleteRecord = async (record, event) => {
         const data = await response.json()
 
         if (data.status === 'success') {
-            ElMessage.success('✅ 删除成功')
+            ElMessage.success('删除成功')
             const index = feedbackRecords.value.findIndex(r => r.id === record.id)
             if (index !== -1) {
                 feedbackRecords.value.splice(index, 1)
@@ -487,7 +484,7 @@ const batchDelete = async () => {
         const successCount = results.filter(r => r.ok).length
 
         if (successCount > 0) {
-            ElMessage.success(`✅ 成功删除 ${successCount} 条记录`)
+            ElMessage.success(`成功删除 ${successCount} 条记录`)
             // 重新加载数据
             loadFeedbackHistory()
             selectedRecords.value = []
@@ -1454,6 +1451,12 @@ onMounted(() => {
 }
 
 /* 下拉选项样式 */
+.emotion-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .emotion-option-emoji {
     font-size: 16px;
     line-height: 1;

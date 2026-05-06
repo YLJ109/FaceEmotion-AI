@@ -84,7 +84,7 @@
                                 <el-card class="stat-card glass-card-inner">
                                     <div class="stat-value">
                                         <span class="dominant-emoji-large">{{ getEmotionEmoji(dominantEmotion) || '😐'
-                                            }}</span>
+                                        }}</span>
                                     </div>
                                     <div class="stat-label">主导情绪</div>
                                     <div class="stat-desc">{{ getEmotionName(dominantEmotion) }}</div>
@@ -122,7 +122,7 @@
                                         <span class="frame-emoji">{{ getEmotionEmoji(segment.dominantEmotion) }}</span>
                                         <span class="frame-time">{{ segment.startTime.toFixed(1) }}s-{{
                                             segment.endTime.toFixed(1)
-                                        }}s</span>
+                                            }}s</span>
                                     </div>
                                     <div class="frame-count">{{ segment.count }}帧</div>
                                 </div>
@@ -570,7 +570,7 @@ const startDetection = async () => {
 
             statusText.value = '分析完成'
             logFeatureUsage('视频检测', { frames: totalFrames.value })
-            ElMessage.success(`✅ 视频分析完成！提取 ${results.value.length} 个关键帧`)
+            ElMessage.success(`视频分析完成！提取 ${results.value.length} 个关键帧`)
 
             // ✅ 修复: 立即关闭进度提示框
             processing.value = false
@@ -581,7 +581,7 @@ const startDetection = async () => {
                 console.log('✅ 历史记录保存完成')
             } catch (error) {
                 console.error('保存历史记录失败:', error)
-                ElMessage.warning('⚠️ 视频分析完成，但保存历史记录失败')
+                ElMessage.warning('视频分析完成，但保存历史记录失败')
             }
         } else {
             throw new Error(data.detail || data.message || '视频检测失败')

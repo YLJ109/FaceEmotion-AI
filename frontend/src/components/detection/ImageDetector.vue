@@ -85,7 +85,7 @@
                                     'neutral') }}</div>
                                 <div class="emotion-confidence">{{ (detectionResult.faces[0].confidence *
                                     100).toFixed(1)
-                                }}%
+                                    }}%
                                 </div>
                                 <div class="face-count">1 张人脸</div>
 
@@ -306,7 +306,7 @@ const detectImage = async () => {
 
         const emotion = result.faces?.[0]?.emotion || 'neutral'
         logFeatureUsage('图片检测', { emotion, faces: result.faces?.length || 0 })
-        ElMessage.success('✅ 检测完成')
+        ElMessage.success('检测完成')
 
         // ✅ 新增: 更新性能监控数据
         perfFps.value = 1000 / perfHttpLatency.value  // 基于HTTP延迟估算FPS
@@ -456,7 +456,7 @@ const submitFeedback = async (correctEmotion) => {
         })
 
         if (response.ok) {
-            ElMessage.success('✅ 感谢反馈！系统将自动优化')
+            ElMessage.success('感谢反馈！系统将自动优化')
         } else {
             throw new Error('提交失败')
         }

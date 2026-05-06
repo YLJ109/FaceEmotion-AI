@@ -106,7 +106,7 @@
                                             <span class="face-label">人脸 {{ faceIndex + 1 }}</span>
                                             <span class="face-emotion">{{ getEmotionName(face.emotion) }}</span>
                                             <span class="face-confidence">{{ (face.confidence * 100).toFixed(1)
-                                                }}%</span>
+                                            }}%</span>
                                         </div>
                                         <el-progress :percentage="face.confidence * 100"
                                             :color="getEmotionColor(face.emotion)" :stroke-width="6" :show-text="false"
@@ -249,7 +249,7 @@ const startBatchDetection = async () => {
     perfErrorRate.value = (errorCount / total) * 100  // 错误率百分比
 
     logFeatureUsage('批量检测', { total: results.value.length })
-    ElMessage.success(`✅ 批量检测完成！共 ${results.value.length} 张图片`)
+    ElMessage.success(`批量检测完成！共 ${results.value.length} 张图片`)
     detecting.value = false
 
     // 检测完成后绘制 Canvas
@@ -386,11 +386,11 @@ const saveBatchToHistory = async () => {
 
         // 如果有失败，提示用户
         if (failCount > 0) {
-            ElMessage.warning(`⚠️ 部分记录保存失败 (${failCount}/${results.value.length})`)
+            ElMessage.warning(`部分记录保存失败 (${failCount}/${results.value.length})`)
         }
     } catch (error) {
         console.error('保存批量历史记录失败:', error)
-        ElMessage.error('❌ 批量历史记录保存失败')
+        ElMessage.error('批量历史记录保存失败')
     }
 }
 </script>

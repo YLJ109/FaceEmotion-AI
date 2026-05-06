@@ -235,7 +235,7 @@
                         <div v-else class="preview-placeholder-redesign">
                             <span class="large-emoji-redesign">{{ getEmotionEmoji(selectedItem.dominant_emotion ||
                                 'neutral')
-                                }}</span>
+                            }}</span>
                             <p>无预览图片</p>
                         </div>
                     </div>
@@ -353,8 +353,8 @@
                 <el-form :model="feedbackForm" label-width="80px">
                     <el-form-item label="正确情绪">
                         <el-select v-model="feedbackForm.correctEmotion" placeholder="请选择正确的情绪" style="width: 100%">
-                            <el-option v-for="emotion in EMOTION_LIST" :key="emotion"
-                                :label="`${getEmotionEmoji(emotion)} ${getEmotionName(emotion)}`" :value="emotion" />
+                            <el-option v-for="emotion in emotionList" :key="emotion"
+                                :label="getEmotionEmoji(emotion) + ' ' + getEmotionName(emotion)" :value="emotion" />
                         </el-select>
                     </el-form-item>
                     <el-form-item label="备注说明">
@@ -376,6 +376,9 @@ import { Clock, Loading, Picture, View, Download, DataAnalysis, VideoCamera, Fil
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getEmotionName, getEmotionColor, getEmotionEmoji, EMOTION_LIST } from '@/utils/emotion'
 import { API } from '@/api/config'
+
+// 过滤重复情绪（排除别名：surprised, fearful, calm）
+const emotionList = EMOTION_LIST.filter(e => !['surprised', 'fearful', 'calm'].includes(e))
 
 const loading = ref(false)
 const historyList = ref([])
@@ -403,8 +406,10 @@ const feedbackSubmitting = ref(false)
 const feedbackForm = ref({
     recordId: null,
     faceIndex: null,
+    predictedEmotion: '',  // ✅ 新增: 预测的情绪
     correctEmotion: '',
-    comment: ''
+    comment: '',
+    snapshot: ''  // ✅ 新增: 快照图片
 })
 
 // ✅ 新增: 人脸表格样式配置
@@ -809,8 +814,10 @@ const openFeedback = (record) => {
     feedbackForm.value = {
         recordId: record.id,
         faceIndex: null,
+        predictedEmotion: record.emotion || record.dominant_emotion || '',  // ✅ 填充预测情绪
         correctEmotion: '',
-        comment: ''
+        comment: '',
+        snapshot: record.thumbnail || ''  // ✅ 保存快照图片
     }
     feedbackDialogVisible.value = true
 }
@@ -820,8 +827,10 @@ const openFaceFeedback = (face, index) => {
     feedbackForm.value = {
         recordId: selectedItem.value?.id,
         faceIndex: index,
+        predictedEmotion: face.emotion || '',  // ✅ 填充预测情绪
         correctEmotion: '',
-        comment: `人脸 #${index + 1} 的识别结果可能需要纠正`
+        comment: `人脸 #${index + 1} 的识别结果可能需要纠正`,
+        snapshot: selectedItem.value?.thumbnail || ''  // ✅ 保存快照图片
     }
     feedbackDialogVisible.value = true
 }
@@ -839,20 +848,32 @@ const submitFeedback = async () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                record_id: feedbackForm.value.recordId,
-                face_index: feedbackForm.value.faceIndex,
+                // ✅ 修复: 使用后端期望的字段名
+                predicted_emotion: feedbackForm.value.predictedEmotion,
                 correct_emotion: feedbackForm.value.correctEmotion,
-                comment: feedbackForm.value.comment
+                feedback_type: 'incorrect',  // 用户提交反馈说明预测错误
+                notes: feedbackForm.value.comment || '',
+                confidence: selectedItem.value?.confidence,
+                bbox: selectedItem.value?.bbox,
+                snapshot: feedbackForm.value.snapshot || '',  // ✅ 新增: 快照图片
+                timestamp: Date.now()
             })
         })
 
-        if (!response.ok) throw new Error('提交失败')
+        // ✅ 修复: 获取详细错误信息
+        const data = await response.json()
+        if (!response.ok) {
+            throw new Error(data.detail || data.message || '提交失败')
+        }
 
-        ElMessage.success('✅ 反馈已提交，感谢您的帮助！')
+        ElMessage.success('反馈已提交，感谢您的帮助！')
         feedbackDialogVisible.value = false
+
+        // 刷新历史记录列表
+        fetchHistory()
     } catch (error) {
         console.error('提交反馈错误:', error)
-        ElMessage.error('提交失败，请重试')
+        ElMessage.error(`提交失败: ${error.message}`)
     } finally {
         feedbackSubmitting.value = false
     }
@@ -1909,7 +1930,7 @@ watch(selectedItem, (newVal) => {
     max-height: 60vh;
     overflow: hidden;
     display: flex;
-    flex-direction: column;
+    /* flex-direction: column; */
 }
 
 .section-title-redesign {

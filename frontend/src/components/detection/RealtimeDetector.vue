@@ -176,7 +176,7 @@
         </div>
 
         <!-- ✅ 新增: 性能监控面板 -->
-        <PerformanceMonitor :fps="fps" :latency="perfLatency" :skip-rate="perfSkipRate" :gpu-memory="perfGpuMemory"
+        <PerformanceMonitor :fps="perfFps" :latency="perfLatency" :skip-rate="perfSkipRate" :gpu-memory="perfGpuMemory"
             :detect-interval="perfDetectInterval" :http-latency="perfHttpLatency" :error-rate="perfErrorRate" />
 
         <!-- ✅ 新增: 情绪反馈对话框（静态快照） -->
@@ -242,6 +242,12 @@ const perfDetectInterval = ref(2)
 // ✅ 新增: HTTP延迟和错误率
 const perfHttpLatency = ref(0)
 const perfErrorRate = ref(0)
+// ✅ 修复: 添加缺失的 perfFps 变量
+const perfFps = ref(0)
+
+// ✅ 新增: 错误计数（用于计算错误率）
+let errorCount = 0
+let totalFrames = 0
 
 // ✅ 新增: 动态分辨率策略
 const SEND_RESOLUTIONS = {
@@ -253,6 +259,50 @@ let currentResolution = SEND_RESOLUTIONS.medium
 let lastAdjustTime = 0
 let lastSaveTime = 0  // ✅ 新增: 上次保存时间戳,防止重复保存
 const SAVE_COOLDOWN = 2000  // ✅ 新增: 保存冷却时间(2秒)
+
+// ✅ 新增: 性能模式配置
+let performanceModeConfig = {
+    send_width: 160,
+    send_height: 120,
+    frame_skip_threshold: 2,
+    ema_alpha: 0.15,
+    enable_realtime_charts: true
+}
+
+// ✅ 新增: 加载性能模式配置
+const loadPerformanceConfig = async () => {
+    try {
+        const response = await fetch(`${API.baseUrl}/api/config`)
+        if (!response.ok) throw new Error('获取配置失败')
+        const data = await response.json()
+
+        const perfMode = data.config.performance_mode || 'high'
+        console.log(`🚀 加载性能模式: ${perfMode}`)
+
+        // 根据性能模式设置分辨率和参数
+        if (perfMode === 'ultra') {
+            currentResolution = { width: 224, height: 168 }
+            performanceModeConfig.frame_skip_threshold = 1
+            EMA_ALPHA = 0.15
+        } else if (perfMode === 'high') {
+            currentResolution = { width: 160, height: 120 }
+            performanceModeConfig.frame_skip_threshold = 2
+            EMA_ALPHA = 0.15
+        } else if (perfMode === 'medium') {
+            currentResolution = { width: 128, height: 96 }
+            performanceModeConfig.frame_skip_threshold = 3
+            EMA_ALPHA = 0.2
+        } else if (perfMode === 'low') {
+            currentResolution = { width: 96, height: 72 }
+            performanceModeConfig.frame_skip_threshold = 5
+            EMA_ALPHA = 0.25
+        }
+
+        console.log(`📊 应用配置: 分辨率=${currentResolution.width}x${currentResolution.height}, 跳帧=${performanceModeConfig.frame_skip_threshold}, EMA=${EMA_ALPHA}`)
+    } catch (error) {
+        console.error('❌ 加载性能模式配置失败:', error)
+    }
+}
 
 // ✅ 新增: 动态调整分辨率函数
 const adjustResolution = () => {
@@ -298,7 +348,8 @@ const RESULT_TIMEOUT = 5000
 
 // === EMA 平滑(抗情绪闪烁) ===
 const _emaScores = reactive({})
-const EMA_ALPHA = 0.12  // ✅ 深度优化: 从0.18降到0.12,极致平滑度
+// ✅ 修改: EMA_ALPHA 将根据性能模式动态调整，初始值会被 loadPerformanceConfig 覆盖
+let EMA_ALPHA = 0.15  // 默认值，将在加载配置后更新
 let _consecutiveEmpty = 0
 const EMPTY_THRESHOLD = 10  // ✅ 修复: 从3提高到10,避免频繁清除（约1-2秒容错）
 let _lastGoodEmotion = null
@@ -332,6 +383,9 @@ onMounted(() => {
         perfHttpLatency.value = stats.averageLatency
         perfErrorRate.value = stats.errorRate
     }, 2000)
+
+    // ✅ 新增: 加载性能模式配置
+    loadPerformanceConfig()
 })
 
 onUnmounted(() => {
@@ -368,23 +422,29 @@ const startCamera = async () => {
         if (videoElement.value) {
             videoElement.value.srcObject = stream
             await videoElement.value.play()
+
+            // ✅ 新增: 重置性能监控计数器
+            errorCount = 0
+            totalFrames = 0
+            perfErrorRate.value = 0
+
             startRendering()
             isCameraOn.value = true
         }
-        ElMessage.success('✅ 摄像头已启动')
+        ElMessage.success('摄像头已启动')
     } catch (error) {
         console.error('摄像头启动失败:', error)
         // ✅ 优化: 细化错误类型，提供友好提示
         if (error.name === 'NotAllowedError') {
-            ElMessage.error('❌ 摄像头权限被拒绝，请在浏览器设置中允许访问')
+            ElMessage.error('摄像头权限被拒绝，请在浏览器设置中允许访问')
         } else if (error.name === 'NotFoundError') {
-            ElMessage.error('❌ 未检测到摄像头设备，请检查连接')
+            ElMessage.error('未检测到摄像头设备，请检查连接')
         } else if (error.name === 'NotReadableError') {
-            ElMessage.error('❌ 摄像头被其他应用占用，请关闭后重试')
+            ElMessage.error('摄像头被其他应用占用，请关闭后重试')
         } else if (error.name === 'OverconstrainedError') {
-            ElMessage.error('❌ 摄像头不支持 requested 分辨率')
+            ElMessage.error('摄像头不支持 requested 分辨率')
         } else {
-            ElMessage.error(`❌ 摄像头启动失败: ${error.message}`)
+            ElMessage.error(`摄像头启动失败: ${error.message}`)
         }
     }
 }
@@ -424,7 +484,7 @@ const submitFeedback = async (correctEmotion) => {
         })
 
         if (response.ok) {
-            ElMessage.success('✅ 感谢反馈！系统将自动优化')
+            ElMessage.success('感谢反馈！系统将自动优化')
         } else {
             throw new Error('提交失败')
         }
@@ -612,7 +672,9 @@ const startRendering = () => {
             ? _roundTripHistory.reduce((a, b) => a + b, 0) / _roundTripHistory.length : 0
 
         // ✅ 优化: 动态调整跳帧阈值（更激进的策略）
-        const skipThreshold = avgRtt > 250 ? 3 : avgRtt > 150 ? 2 : 1
+        // ✅ 修改: 使用性能模式配置的跳帧阈值作为基础
+        const baseSkipThreshold = performanceModeConfig.frame_skip_threshold
+        const skipThreshold = avgRtt > 250 ? baseSkipThreshold + 1 : avgRtt > 150 ? baseSkipThreshold : Math.max(1, baseSkipThreshold - 1)
 
         if (frameSkip >= skipThreshold && isEmotionDetectionOn.value) {
             frameSkip = 0
@@ -632,8 +694,11 @@ const startRendering = () => {
             // 非阻塞发送
             try {
                 wsManager.sendBinary(buf)
+                totalFrames++  // ✅ 记录成功发送的帧数
             } catch (error) {
                 console.warn('发送帧失败:', error)
+                errorCount++  // ✅ 记录错误
+                totalFrames++  // 仍然计入总帧数
             }
         }
 
@@ -671,11 +736,28 @@ const handleWsMessage = (data) => {
     _roundTripHistory.push(rtt)
     if (_roundTripHistory.length > 10) _roundTripHistory.shift()
 
-    // ✅ 新增: 计算跳帧率
+    // ✅ 修复: 计算 FPS（基于平均往返延迟）
     const avgRtt = _roundTripHistory.length > 0
         ? _roundTripHistory.reduce((a, b) => a + b, 0) / _roundTripHistory.length : 0
-    const skipThreshold = avgRtt > 250 ? 3 : avgRtt > 150 ? 2 : 1
+
+    // FPS = 1000ms / 平均延迟(ms)
+    if (avgRtt > 0) {
+        perfFps.value = 1000 / avgRtt
+    }
+
+    // ✅ 修复: 计算跳帧率（基于实际跳帧阈值）
+    const baseSkipThreshold = performanceModeConfig.frame_skip_threshold
+    const skipThreshold = avgRtt > 250 ? baseSkipThreshold + 1 : avgRtt > 150 ? baseSkipThreshold : Math.max(1, baseSkipThreshold - 1)
+    // 跳帧率 = (跳过的帧数 / 总帧数) * 100
     perfSkipRate.value = ((skipThreshold - 1) / skipThreshold) * 100
+
+    // ✅ 修复: 检测间隔 = 跳帧阈值
+    perfDetectInterval.value = skipThreshold
+
+    // ✅ 新增: 更新错误率（每10帧计算一次）
+    if (totalFrames > 0 && totalFrames % 10 === 0) {
+        perfErrorRate.value = (errorCount / totalFrames) * 100
+    }
 
     awaitingResult = false
 
@@ -775,7 +857,7 @@ const takeScreenshot = () => {
         link.download = `screenshot_${Date.now()}.png`
         link.href = canvas.toDataURL()
         link.click()
-        ElMessage.success('✅ 截图已保存')
+        ElMessage.success('截图已保存')
     }
 }
 
@@ -783,7 +865,7 @@ const takeScreenshot = () => {
 const openFeedbackWithSnapshot = () => {
     const canvas = canvasElement.value
     if (!canvas || !currentEmotion.value) {
-        ElMessage.warning('⚠️ 请先确保已检测到人脸')
+        ElMessage.warning('请先确保已检测到人脸')
         return
     }
 
@@ -814,7 +896,7 @@ const openFeedbackWithSnapshot = () => {
         showFeedback.value = true
     } catch (error) {
         console.error('❌ 捕获快照失败:', error)
-        ElMessage.error('❌ 截图失败，请重试')
+        ElMessage.error('截图失败，请重试')
     }
 }
 
@@ -824,7 +906,7 @@ const saveToHistoryManual = async () => {
 
     // 检查是否有可保存的数据
     if (!currentEmotion.value || !currentConfidence.value || currentFaces.value.length === 0) {
-        ElMessage.warning('⚠️ 暂无可保存的检测数据')
+        ElMessage.warning('暂无可保存的检测数据')
         return
     }
 
@@ -844,11 +926,11 @@ const saveToHistoryManual = async () => {
             currentFaces.value
         )
 
-        ElMessage.success('✅ 已保存到历史档案')
+        ElMessage.success('已保存到历史档案')
         console.log('✅ 手动保存成功')
     } catch (error) {
         console.error(' 手动保存失败:', error)
-        ElMessage.error('❌ 保存失败，请重试')
+        ElMessage.error('保存失败，请重试')
     } finally {
         // 延迟重置状态，让用户看到加载动画
         setTimeout(() => {
@@ -881,7 +963,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
         if (timeSinceLastSave < SAVE_COOLDOWN) {
             console.log('ℹ️ 保存过于频繁,已跳过(冷却中)')
-            ElMessage.warning('⚠️ 请勿重复保存')
+            ElMessage.warning('请勿重复保存')
             return
         }
         lastSaveTime = now

@@ -6,6 +6,7 @@
   "database_url": "sqlite:///./data/emotion.db",
   "db_pool_size": 5,
   "db_max_overflow": 10,
+  "performance_mode": "ultra",
   "use_gpu": true,
   "model_path": "../models/weights/pytorch_final_3060.pth",
   "face_detector_model": "../models/weights/res10_300x300_ssd_iter_140000_fp16.caffemodel",
@@ -41,5 +42,9 @@
   "show_confidence_bar": true,
   "use_fp16": true,
   "use_onnx": false,
-  "use_enhanced_learner": false
+  "use_enhanced_learner": false,
+  "music_volume": 100,
+  "emotion_sensitivity": 50,
+  "rhythm_smoothness": 50,
+  "timbre_style": "square"
 }
