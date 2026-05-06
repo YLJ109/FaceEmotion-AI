@@ -4,11 +4,12 @@
         <nav class="sidebar-nav">
             <!-- 数据模式分组 -->
             <div class="nav-group-label nav-group-first">数据</div>
-            <div class="nav-item" :class="{ active: isActive('analytics') }" @click="navigateTo('analytics')">
+            <div v-for="item in navigationMenus.data" :key="item.key" class="nav-item"
+                :class="{ active: isActive(item.key) }" @click="navigateTo(item.key)">
                 <el-icon>
-                    <DataAnalysis />
+                    <component :is="item.icon" />
                 </el-icon>
-                <span>数据看板</span>
+                <span>{{ item.label }}</span>
             </div>
 
             <div class="nav-group-label">检测模式</div>

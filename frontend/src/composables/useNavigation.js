@@ -11,7 +11,8 @@ import { useRouter, useRoute } from 'vue-router'
 const NAVIGATION_CONFIG = {
     // 数据模式分组
     data: [
-        { key: 'analytics', label: '数据看板', icon: 'DataAnalysis', path: '/analytics' }
+        { key: 'analytics', label: '数据看板', icon: 'DataAnalysis', path: '/analytics' },
+        { key: 'adaptive-learning', label: 'AI学习监控', icon: 'Cpu', path: '/adaptive-learning' }
     ],
 
     // 检测模式分组

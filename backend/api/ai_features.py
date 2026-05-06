@@ -127,7 +127,47 @@ async def get_learner_status():
     """获取学习器状态"""
     if not _adaptive_learner:
         return {"status": "not_initialized"}
-    return {"status": "success", "learner": _adaptive_learner.get_stats()}
+
+    # ✅ 修复: 确保返回完整的统计数据
+    stats = _adaptive_learner.get_stats()
+
+    # 如果是基础版学习器，补充缺失的字段
+    if 'top_corrections' not in stats:
+        # 手动计算纠正模式
+        from collections import defaultdict
+        correction_counts = defaultdict(int)
+        matrix = stats.get('calibration_matrix', [])
+        emotion_order = stats.get('emotion_order', [])
+
+        for i, row in enumerate(matrix):
+            for j, value in enumerate(row):
+                if i != j and value > 0.5:
+                    correction_counts[f"{emotion_order[i]}->{emotion_order[j]}"] = float(
+                        value)
+
+        top_corrections = []
+        for key, count in sorted(correction_counts.items(), key=lambda x: x[1], reverse=True)[:5]:
+            from_emotion, to_emotion = key.split('->')
+            top_corrections.append({
+                'from': from_emotion,
+                'to': to_emotion,
+                'count': count
+            })
+
+        stats['top_corrections'] = top_corrections
+
+        # 添加矩阵统计信息
+        import numpy as np
+        matrix_np = np.array(matrix)
+        stats['matrix_statistics'] = {
+            'max_value': float(matrix_np.max()) if matrix_np.size > 0 else 0,
+            'sum': float(matrix_np.sum()),
+            'sparsity': float((matrix_np > 0.5).sum() / 49) if matrix_np.size > 0 else 0
+        }
+
+        stats['calibration_ready'] = stats.get('total_corrections', 0) >= 3
+
+    return {"status": "success", "learner": stats}
 
 
 @router.post("/feedback")

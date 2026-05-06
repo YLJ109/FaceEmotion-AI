@@ -14,6 +14,7 @@ const HistoryViewer = () => import('@/components/history/HistoryViewer.vue')
 const ThemePage = () => import('@/components/pages/ThemePage.vue')
 const SettingsPage = () => import('@/components/pages/SettingsPage.vue')
 const FeedbackHistory = () => import('@/components/feedback/FeedbackHistory.vue') // ✅ 新增: 反馈历史页面
+const AdaptiveLearningMonitor = () => import('@/components/monitor/AdaptiveLearningMonitor.vue') // ✅ 新增: AI学习监控
 
 const routes = [
     {
@@ -110,6 +111,16 @@ const routes = [
             title: '反馈历史',
             icon: 'DocumentChecked',
             group: 'record'
+        }
+    },
+    {
+        path: '/adaptive-learning',
+        name: 'AdaptiveLearning',
+        component: AdaptiveLearningMonitor,
+        meta: {
+            title: 'AI学习监控',
+            icon: 'Cpu',
+            group: 'data'
         }
     }
 ]
