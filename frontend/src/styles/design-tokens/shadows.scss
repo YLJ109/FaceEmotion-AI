@@ -1,0 +1,48 @@
+/**
+ * 设计令牌 - 阴影系统
+ * 多层次阴影设计，营造层次感和深度
+ */
+
+// ================ 基础阴影 ================
+$shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3)
+$shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3)
+$shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3)
+$shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3)
+$shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5)
+
+// ================ 内阴影 ================
+$shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3)
+
+// ================ 彩色阴影（主色调） ================
+$shadow-primary: 0 0 20px rgba(139, 92, 246, 0.3)
+$shadow-primary-lg: 0 0 40px rgba(139, 92, 246, 0.4)
+
+// ================ 发光效果 ================
+$shadow-glow-happy: 0 0 20px rgba(16, 185, 129, 0.4)
+$shadow-glow-sad: 0 0 20px rgba(59, 130, 246, 0.4)
+$shadow-glow-angry: 0 0 20px rgba(239, 68, 68, 0.4)
+$shadow-glow-surprise: 0 0 20px rgba(139, 92, 246, 0.4)
+$shadow-glow-fear: 0 0 20px rgba(147, 51, 234, 0.4)
+$shadow-glow-disgust: 0 0 20px rgba(245, 158, 11, 0.4)
+$shadow-glow-neutral: 0 0 20px rgba(107, 114, 128, 0.4)
+
+// ================ CSS 变量导出 ================
+:root {
+  --shadow-sm: #{$shadow-sm};
+  --shadow-md: #{$shadow-md};
+  --shadow-lg: #{$shadow-lg};
+  --shadow-xl: #{$shadow-xl};
+  --shadow-2xl: #{$shadow-2xl};
+  --shadow-inner: #{$shadow-inner};
+  
+  --shadow-primary: #{$shadow-primary};
+  --shadow-primary-lg: #{$shadow-primary-lg};
+  
+  --shadow-glow-happy: #{$shadow-glow-happy};
+  --shadow-glow-sad: #{$shadow-glow-sad};
+  --shadow-glow-angry: #{$shadow-glow-angry};
+  --shadow-glow-surprise: #{$shadow-glow-surprise};
+  --shadow-glow-fear: #{$shadow-glow-fear};
+  --shadow-glow-disgust: #{$shadow-glow-disgust};
+  --shadow-glow-neutral: #{$shadow-glow-neutral};
+}

@@ -503,7 +503,7 @@ const submitFeedback = async (correctEmotion) => {
 
 .detector-layout {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 350px;
     gap: 12px;
     height: 100%;
 }

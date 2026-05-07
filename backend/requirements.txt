@@ -1,36 +1,26 @@
 # ============================================================
-# AI情感检测系统 - 后端依赖清单
-# Python 版本要求: >= 3.10
-# 最后更新: 2026-05-06
+# AI Emotion Detection - Backend Dependencies
+# Python >= 3.10
+# Updated: 2026-05-06
 # ============================================================
 
-# -------------------- 核心框架 --------------------
-fastapi==0.109.0              # Web 框架
-uvicorn==0.27.0               # ASGI 服务器
+# Web Framework
+fastapi==0.109.0
+uvicorn==0.27.0
 
-# -------------------- 数据处理 --------------------
-numpy==2.0.0                  # 数值计算
-opencv-python==4.13.0.92      # 图像处理
-Pillow==11.0.0                # 图像 I/O
+# Data Processing
+numpy==2.0.0
+opencv-python==4.13.0.92
+Pillow==11.0.0
 
-# -------------------- API 支持 --------------------
-pydantic==2.5.3               # 数据验证
-python-multipart==0.0.6       # 文件上传支持
-websockets==12.0              # WebSocket 支持
+# API
+pydantic==2.5.3
+python-multipart==0.0.6
+websockets==12.0
 
-# -------------------- AI 推理引擎 --------------------
-onnxruntime==1.19.0           # ONNX Runtime (CPU 版本)
+# AI Inference
+onnxruntime==1.19.0
 
-# -------------------- 工具库 --------------------
-python-dotenv==1.0.0          # 环境变量管理
-nvidia-ml-py==12.560.30       # GPU 监控（可选，用于状态检测）
-
-# ============================================================
-# 安装说明:
-#   pip install -r requirements.txt
-#
-# 注意:
-#   - 本项目使用纯 CPU 推理，无需 CUDA/cuDNN
-#   - 如需 GPU 加速，请将 onnxruntime 替换为 onnxruntime-gpu
-#   - 建议使用虚拟环境: python -m venv .venv
-# ============================================================
+# Utils
+python-dotenv==1.0.0
+nvidia-ml-py==12.560.30

@@ -1,0 +1,24 @@
+/**
+ * 主样式文件
+ * 整合所有设计令牌和基础样式
+ */
+
+// ================ 设计令牌 ================
+@import './design-tokens/index.scss';
+
+// ================ 基础样式 ================
+@import './base/reset.scss';
+@import './base/layout.scss';
+@import './base/animations.scss';
+
+// ================ 组件样式 ================
+@import './element-overwatch.scss';
+
+// ================ 全局组件样式 ================
+@import './components/detection.scss';
+@import './components/charts.scss';
+@import './components/feedback.scss';
+@import './components/history.scss';
+@import './components/monitor.scss';
+@import './components/settings.scss';
+@import './components/layout.scss';

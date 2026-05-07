@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <div class="history-viewer">
         <!-- 筛选器 -->
         <div class="filter-cards">
@@ -195,13 +195,13 @@
                 <el-table-column label="操作" width="200" align="center" fixed="right">
                     <template #default="{ row }">
                         <div class="action-buttons">
-                            <el-button size="small" type="primary" link @click.stop="showDetail(row)">
+                            <el-button size="small" class="detail-btn">
                                 <el-icon>
                                     <View />
                                 </el-icon>
                                 详情
                             </el-button>
-                            <el-button size="small" type="danger" link @click.stop="deleteRecord(row)">
+                            <el-button size="small" class="delete-btn">
                                 <el-icon>
                                     <Delete />
                                 </el-icon>
@@ -1006,22 +1006,57 @@ watch(selectedItem, (newVal) => {
 .filter-card {
     background: var(--card-bg);
     backdrop-filter: blur(16px);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    transition: all 0.3s ease;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     cursor: pointer;
+    position: relative;
+}
+
+.filter-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.filter-card:hover::before {
+    left: 100%;
 }
 
 .filter-card:hover {
-    border-color: color-mix(in srgb, var(--border) 60%, var(--primary));
-    box-shadow: var(--shadow-lg);
-    transform: translateY(-2px);
+    border-color: var(--primary-light);
+    box-shadow: 0 8px 32px rgba(113, 57, 255, 0.15);
+    transform: translateY(-3px) scale(1.02);
 }
 
 .filter-card.active {
     border-color: var(--primary);
-    box-shadow: 0 0 20px rgba(113, 57, 255, 0.3);
+    box-shadow: 
+        0 0 0 1px var(--primary),
+        0 0 30px rgba(113, 57, 255, 0.35),
+        inset 0 0 20px rgba(113, 57, 255, 0.05);
+    animation: cardPulse 2s ease-in-out infinite;
+}
+
+@keyframes cardPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 1px var(--primary),
+            0 0 30px rgba(113, 57, 255, 0.35),
+            inset 0 0 20px rgba(113, 57, 255, 0.05);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 1px var(--primary),
+            0 0 45px rgba(113, 57, 255, 0.5),
+            inset 0 0 30px rgba(113, 57, 255, 0.08);
+    }
 }
 
 
@@ -1034,13 +1069,31 @@ watch(selectedItem, (newVal) => {
 }
 
 .filter-icon-wrap {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-card:hover .filter-icon-wrap {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.filter-card.active .filter-icon-wrap {
+    animation: iconBounce 1s ease-in-out infinite;
+}
+
+@keyframes iconBounce {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
 }
 
 .filter-info {
@@ -1048,20 +1101,49 @@ watch(selectedItem, (newVal) => {
     min-width: 0;
     display: flex;
     flex-direction: column;
+    gap: 4px;
 }
 
 .filter-label {
-    font-size: 14px;
-    font-weight: 100;
+    font-size: 13px;
+    font-weight: 500;
     color: var(--text);
-    margin-bottom: 2px;
+    transition: color 0.3s ease;
+}
+
+.filter-card:hover .filter-label {
+    color: var(--primary-light);
 }
 
 .filter-count {
-    font-size: 18px;
-    font-weight: 100;
-    color: var(--primary-light);
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
     font-family: 'Consolas', 'Monaco', monospace;
+    transition: all 0.3s ease;
+}
+
+.filter-card:hover .filter-count {
+    color: var(--text);
+    transform: translateX(4px);
+}
+
+.filter-card.active .filter-label {
+    color: var(--primary);
+}
+
+.filter-card.active .filter-count {
+    color: var(--primary-light);
+    animation: countPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes countPulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
 }
 
 .empty-state {
@@ -1335,6 +1417,48 @@ watch(selectedItem, (newVal) => {
     border-color: var(--danger);
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(245, 108, 108, 0.3);
+}
+
+/* ✅ 详情按钮样式 - 玻璃拟态 */
+.detail-btn {
+    background: transparent !important;
+    border: 1.5px solid var(--border) !important;
+    color: var(--text) !important;
+    backdrop-filter: blur(8px) !important;
+    padding: 6px 12px !important;
+}
+
+.detail-btn:hover {
+    background: color-mix(in srgb, var(--primary) 12%, transparent) !important;
+    border-color: var(--primary-light) !important;
+    color: var(--text) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(113, 57, 255, 0.15) !important;
+}
+
+.detail-btn:active {
+    transform: translateY(0) scale(0.98) !important;
+}
+
+/* ✅ 删除按钮样式 - 玻璃拟态 */
+.delete-btn {
+    background: transparent !important;
+    border: 1.5px solid var(--danger) !important;
+    color: var(--danger) !important;
+    backdrop-filter: blur(8px) !important;
+    padding: 6px 12px !important;
+}
+
+.delete-btn:hover {
+    background: rgba(245, 108, 108, 0.15) !important;
+    border-color: var(--danger) !important;
+    color: var(--danger) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(245, 108, 108, 0.2) !important;
+}
+
+.delete-btn:active {
+    transform: translateY(0) scale(0.98) !important;
 }
 
 /* 表格行样式 */

@@ -1,0 +1,125 @@
+/**
+ * 设计令牌 - 颜色系统
+ * 基于 WCAG 2.1 无障碍标准设计
+ * 主色调采用紫色系，符合情感识别主题的科技感
+ */
+
+// ================ 主色调 ================
+// 紫色系 - 代表创造力、智慧和情感
+$color-primary-50: #faf5ff
+$color-primary-100: #f3e8ff
+$color-primary-200: #e9d5ff
+$color-primary-300: #d8b4fe
+$color-primary-400: #c084fc
+$color-primary-500: #8b5cf6
+$color-primary-600: #7c3aed
+$color-primary-700: #6d28d9
+$color-primary-800: #5b21b6
+$color-primary-900: #4c1d95
+$color-primary-950: #2e1065
+
+// ================ 情感色彩映射 ================
+// 七种基本情绪对应的颜色
+$color-emotion-happy: #10b981        // 开心 - 绿色
+$color-emotion-sad: #3b82f6          // 悲伤 - 蓝色
+$color-emotion-angry: #ef4444        // 愤怒 - 红色
+$color-emotion-surprise: #8b5cf6     // 惊讶 - 紫色
+$color-emotion-fear: #9333ea         // 恐惧 - 深紫色
+$color-emotion-disgust: #f59e0b      // 厌恶 - 橙色
+$color-emotion-neutral: #6b7280      // 平静 - 灰色
+
+// 情绪颜色列表（用于图表）
+$emotion-colors: (
+  $color-emotion-happy,
+  $color-emotion-sad,
+  $color-emotion-angry,
+  $color-emotion-surprise,
+  $color-emotion-fear,
+  $color-emotion-disgust,
+  $color-emotion-neutral
+)
+
+// ================ 中性色 ================
+$color-slate-50: #f8fafc
+$color-slate-100: #f1f5f9
+$color-slate-200: #e2e8f0
+$color-slate-300: #cbd5e1
+$color-slate-400: #94a3b8
+$color-slate-500: #64748b
+$color-slate-600: #475569
+$color-slate-700: #334155
+$color-slate-800: #1e293b
+$color-slate-900: #0f172a
+$color-slate-950: #020617
+
+// ================ 状态色 ================
+$color-success: #10b981
+$color-warning: #f59e0b
+$color-error: #ef4444
+$color-info: #3b82f6
+
+// ================ 语义化颜色 ================
+$color-text-primary: #f1f5f9           // 主文本
+$color-text-secondary: #94a3b8         // 次要文本
+$color-text-muted: #64748b             // 辅助文本
+$color-text-disabled: #475569          // 禁用文本
+
+$color-bg-primary: #0f172a             // 主背景
+$color-bg-secondary: #1e293b           // 次要背景
+$color-bg-tertiary: #334155            // 三级背景
+$color-bg-card: #1e293b                // 卡片背景
+$color-bg-hover: #334155               // 悬停背景
+
+$color-border: #334155                 // 边框
+$color-border-light: #475569           // 浅色边框
+
+// ================ CSS 变量导出 ================
+:root {
+  // 主色调
+  --color-primary: #{$color-primary-500};
+  --color-primary-dark: #{$color-primary-700};
+  --color-primary-light: #{$color-primary-300};
+  
+  // 情感色彩
+  --color-emotion-happy: #{$color-emotion-happy};
+  --color-emotion-sad: #{$color-emotion-sad};
+  --color-emotion-angry: #{$color-emotion-angry};
+  --color-emotion-surprise: #{$color-emotion-surprise};
+  --color-emotion-fear: #{$color-emotion-fear};
+  --color-emotion-disgust: #{$color-emotion-disgust};
+  --color-emotion-neutral: #{$color-emotion-neutral};
+  
+  // 中性色
+  --color-slate-50: #{$color-slate-50};
+  --color-slate-100: #{$color-slate-100};
+  --color-slate-200: #{$color-slate-200};
+  --color-slate-300: #{$color-slate-300};
+  --color-slate-400: #{$color-slate-400};
+  --color-slate-500: #{$color-slate-500};
+  --color-slate-600: #{$color-slate-600};
+  --color-slate-700: #{$color-slate-700};
+  --color-slate-800: #{$color-slate-800};
+  --color-slate-900: #{$color-slate-900};
+  --color-slate-950: #{$color-slate-950};
+  
+  // 状态色
+  --color-success: #{$color-success};
+  --color-warning: #{$color-warning};
+  --color-error: #{$color-error};
+  --color-info: #{$color-info};
+  
+  // 语义化颜色
+  --text-primary: #{$color-text-primary};
+  --text-secondary: #{$color-text-secondary};
+  --text-muted: #{$color-text-muted};
+  --text-disabled: #{$color-text-disabled};
+  
+  --bg-primary: #{$color-bg-primary};
+  --bg-secondary: #{$color-bg-secondary};
+  --bg-tertiary: #{$color-bg-tertiary};
+  --bg-card: #{$color-bg-card};
+  --bg-hover: #{$color-bg-hover};
+  
+  --border-color: #{$color-border};
+  --border-light: #{$color-border-light};
+}

@@ -94,7 +94,7 @@ onMounted(async () => {
 })
 
 // 音乐控制面板切换
-const toggleMusicPanel = () => {
-  window.dispatchEvent(new CustomEvent('toggle-music-panel'))
+const toggleMusicPanel = (visible) => {
+  window.dispatchEvent(new CustomEvent('toggle-music-panel', { detail: visible }))
 }
 </script>

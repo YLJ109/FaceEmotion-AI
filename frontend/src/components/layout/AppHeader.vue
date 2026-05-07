@@ -18,39 +18,36 @@
         <div class="navbar-right">
             <!-- ✅ 性能监控按钮 -->
             <el-tooltip content="性能监控 (Ctrl+P)" placement="bottom">
-                <el-button class="nav-tool-btn" @click="togglePerformanceMonitor">
-                    <el-icon :size="18">
-                        <Monitor />
-                    </el-icon>
-                    <span>性能监控</span>
-                </el-button>
+                <button class="nav-tool-btn" :class="{ active: performancePanelVisible }" @click="togglePerformanceMonitor">
+                    <span class="btn-icon">🖥️</span>
+                    <span class="btn-label">性能监控</span>
+                    <span class="btn-arrow">{{ performancePanelVisible ? '▲' : '▼' }}</span>
+                </button>
             </el-tooltip>
 
             <!-- ✅ 新增: AI音乐按钮 -->
             <el-tooltip :content="musicOn ? 'AI音乐控制面板' : '开启AI音乐'" placement="bottom">
-                <el-button class="nav-tool-btn" :class="{ active: musicOn }" @click="$emit('toggle-music-panel')">
-                    <el-icon :size="18">
-                        <Headset />
-                    </el-icon>
-                    <span>{{ musicOn ? 'AI音乐 ON' : 'AI音乐' }}</span>
+                <button class="nav-tool-btn" :class="{ active: musicPanelVisible }" @click="toggleMusicPanel">
+                    <span class="btn-icon">🎵</span>
+                    <span class="btn-label">{{ musicOn ? 'AI音乐 ON' : 'AI音乐' }}</span>
                     <span v-if="musicOn" class="music-badge"></span>
-                </el-button>
+                    <span class="btn-arrow">{{ musicPanelVisible ? '▲' : '▼' }}</span>
+                </button>
             </el-tooltip>
 
-            <!-- 主题指示器 -->
-            <el-tooltip content="当前主题" placement="bottom">
-                <el-button class="theme-indicator" @click="$emit('navigate', 'theme')">
-                    <span class="theme-emoji">{{ themeStore.currentTheme.emoji }}</span>
-                    <span>{{ themeStore.currentTheme.name }}</span>
-                </el-button>
-            </el-tooltip>
+            <!-- 情绪分析按钮 -->
+            <EmotionAnalyzer 
+                :show-panel="emotionPanelVisible"
+                @toggle="toggleEmotionPanel"
+            />
+
         </div>
     </header>
 </template>
 
 <script setup>
-import { useThemeStore } from '@/stores/theme'
-import { Monitor, Headset } from '@element-plus/icons-vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import EmotionAnalyzer from '@/components/header/EmotionAnalyzer.vue'
 
 // ✅ 新增: 音乐状态
 defineProps({
@@ -60,14 +57,86 @@ defineProps({
     }
 })
 
-defineEmits(['navigate', 'toggle-music-panel'])
+const emit = defineEmits(['navigate', 'toggle-music-panel'])
+
+// 面板可见状态
+const performancePanelVisible = ref(false)
+const musicPanelVisible = ref(false)
+const emotionPanelVisible = ref(false)
+
+// 隐藏其他面板
+const hideOtherPanels = (exceptPanel) => {
+    if (exceptPanel !== 'performance') {
+        performancePanelVisible.value = false
+        window.dispatchEvent(new CustomEvent('toggle-performance-monitor', { detail: { visible: false } }))
+    }
+    if (exceptPanel !== 'music') {
+        musicPanelVisible.value = false
+        emit('toggle-music-panel', false)
+    }
+    if (exceptPanel !== 'emotion') {
+        emotionPanelVisible.value = false
+    }
+}
 
 // 性能监控切换 - 发送全局事件
 const togglePerformanceMonitor = () => {
-    window.dispatchEvent(new CustomEvent('toggle-performance-monitor'))
+    const newState = !performancePanelVisible.value
+    if (newState) {
+        hideOtherPanels('performance')
+    }
+    performancePanelVisible.value = newState
+    window.dispatchEvent(new CustomEvent('toggle-performance-monitor', { detail: { visible: newState } }))
 }
 
-const themeStore = useThemeStore()
+// AI音乐面板切换
+const toggleMusicPanel = () => {
+    const newState = !musicPanelVisible.value
+    if (newState) {
+        hideOtherPanels('music')
+    }
+    musicPanelVisible.value = newState
+    emit('toggle-music-panel', newState)
+}
+
+// 情绪分析面板切换
+const toggleEmotionPanel = () => {
+    const newState = !emotionPanelVisible.value
+    if (newState) {
+        hideOtherPanels('emotion')
+    }
+    emotionPanelVisible.value = newState
+}
+
+// 监听性能监控面板状态变化
+const handlePerformanceToggle = (e) => {
+    performancePanelVisible.value = e.detail?.visible ?? !performancePanelVisible.value
+}
+
+// 监听AI音乐面板状态变化
+const handleMusicToggle = (e) => {
+    musicPanelVisible.value = e.detail?.visible ?? !musicPanelVisible.value
+}
+
+// 监听点击外部区域关闭面板
+const handleClickOutside = (e) => {
+    const target = e.target
+    if (!target.closest('.navbar-right')) {
+        hideOtherPanels(null)
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('performance-monitor-toggled', handlePerformanceToggle)
+    window.addEventListener('music-panel-toggled', handleMusicToggle)
+    document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('performance-monitor-toggled', handlePerformanceToggle)
+    window.removeEventListener('music-panel-toggled', handleMusicToggle)
+    document.removeEventListener('click', handleClickOutside)
+})
 </script>
 
 <style scoped>
@@ -160,58 +229,43 @@ const themeStore = useThemeStore()
     align-items: center;
 }
 
-.theme-indicator {
-    background: color-mix(in srgb, var(--primary) 10%, transparent) !important;
-    border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent) !important;
-    color: var(--text) !important;
-    border-radius: 50px !important;
-    padding: 8px 16px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    font-size: 14px !important;
-    /* font-weight: 600 !important; */
-    transition: all 0.3s ease !important;
-}
-
-.theme-indicator:hover {
-    background: color-mix(in srgb, var(--primary) 22%, transparent) !important;
-    border-color: var(--primary) !important;
-    /* box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent); */
-}
-
-.theme-emoji {
-    font-size: 15px;
-}
-
-/* ✅ 新增: 工具按钮样式 */
+/* ✅ 工具按钮样式 - 与情绪分析按钮保持一致 */
 .nav-tool-btn {
-    background: color-mix(in srgb, var(--primary) 8%, transparent) !important;
-    border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent) !important;
-    color: var(--text) !important;
-    border-radius: 50px !important;
-    padding: 8px 14px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    font-size: 14px !important;
-    /* font-weight: 600 !important; */
-    transition: all 0.3s ease !important;
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 20px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    font-weight: 500;
 }
 
 .nav-tool-btn:hover {
-    background: color-mix(in srgb, var(--primary) 18%, transparent) !important;
-    border-color: var(--primary) !important;
-    /* box-shadow: 0 0 12px color-mix(in srgb, var(--primary) 25%, transparent); */
-    transform: translateY(-1px);
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.4);
 }
 
 .nav-tool-btn.active {
-    background: linear-gradient(135deg, var(--primary), #9B59B6) !important;
-    border-color: transparent !important;
-    color: var(--text) !important;
-    /* box-shadow: 0 0 16px rgba(113, 57, 255, 0.4); */
+    background: rgba(139, 92, 246, 0.2);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+
+.nav-tool-btn .btn-icon {
+    font-size: 16px;
+}
+
+.nav-tool-btn .btn-label {
+    white-space: nowrap;
+}
+
+.nav-tool-btn .btn-arrow {
+    font-size: 12px;
+    opacity: 0.7;
 }
 
 .music-badge {

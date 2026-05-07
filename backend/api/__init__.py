@@ -27,6 +27,7 @@ def register_all_routes(
     from api.history import router as history_router, init_history_router
     from api.ai_features import router as ai_router, init_ai_router
     from api.system import router as system_router, init_system_router
+    from api.text_analysis import router as text_analysis_router, init_text_analysis_router
 
     # 2. 初始化各路由依赖
     init_ws_router(
@@ -62,9 +63,12 @@ def register_all_routes(
         inference_optimizer=inference_optimizer
     )
 
+    init_text_analysis_router(db_manager=db_manager)
+
     # 3. 注册路由到 FastAPI 应用
     app.include_router(ws_router)
     app.include_router(detection_router)
     app.include_router(history_router)
     app.include_router(ai_router)
     app.include_router(system_router)
+    app.include_router(text_analysis_router)

@@ -16,6 +16,7 @@ const ThemePage = () => import('@/components/pages/ThemePage.vue')
 const SettingsPage = () => import('@/components/pages/SettingsPage.vue')
 const FeedbackHistory = () => import('@/components/feedback/FeedbackHistory.vue') // ✅ 新增: 反馈历史页面
 const AdaptiveLearningMonitor = () => import('@/components/monitor/AdaptiveLearningMonitor.vue') // ✅ 新增: AI学习监控
+const TextAnalysisPage = () => import('@/components/pages/TextAnalysisPage.vue') // ✅ 新增: 文本情绪分析
 
 const routes = [
     {
@@ -24,7 +25,7 @@ const routes = [
     },
     {
         path: '/realtime',
-        name: 'Realtime',
+        name: 'realtime',
         component: RealtimeDetector,
         meta: {
             title: '实时检测',
@@ -34,7 +35,7 @@ const routes = [
     },
     {
         path: '/image',
-        name: 'Image',
+        name: 'image',
         component: ImageDetector,
         meta: {
             title: '图片检测',
@@ -44,7 +45,7 @@ const routes = [
     },
     {
         path: '/batch',
-        name: 'Batch',
+        name: 'batch',
         component: BatchDetector,
         meta: {
             title: '图片批量检测',
@@ -55,7 +56,7 @@ const routes = [
     },
     {
         path: '/video',
-        name: 'Video',
+        name: 'video',
         component: VideoDetector,
         meta: {
             title: '视频检测',
@@ -66,7 +67,7 @@ const routes = [
     },
     {
         path: '/batch-video',
-        name: 'BatchVideo',
+        name: 'batch-video',
         component: BatchVideoDetector,
         meta: {
             title: '批量视频检测',
@@ -77,7 +78,7 @@ const routes = [
     },
     {
         path: '/analytics',
-        name: 'Analytics',
+        name: 'analytics',
         component: AnalyticsDashboard,
         meta: {
             title: '数据看板',
@@ -87,7 +88,7 @@ const routes = [
     },
     {
         path: '/history',
-        name: 'History',
+        name: 'history',
         component: HistoryViewer,
         meta: {
             title: '历史档案',
@@ -97,7 +98,7 @@ const routes = [
     },
     {
         path: '/theme',
-        name: 'Theme',
+        name: 'theme',
         component: ThemePage,
         meta: {
             title: '主题切换',
@@ -107,7 +108,7 @@ const routes = [
     },
     {
         path: '/settings',
-        name: 'Settings',
+        name: 'settings',
         component: SettingsPage,
         meta: {
             title: '系统设置',
@@ -117,7 +118,7 @@ const routes = [
     },
     {
         path: '/feedback-history',
-        name: 'FeedbackHistory',
+        name: 'feedback-history',
         component: FeedbackHistory,
         meta: {
             title: '反馈历史',
@@ -127,11 +128,21 @@ const routes = [
     },
     {
         path: '/adaptive-learning',
-        name: 'AdaptiveLearning',
+        name: 'adaptive-learning',
         component: AdaptiveLearningMonitor,
         meta: {
             title: 'AI学习监控',
             icon: 'Cpu',
+            group: 'data'
+        }
+    },
+    {
+        path: '/text-analysis',
+        name: 'text-analysis',
+        component: TextAnalysisPage,
+        meta: {
+            title: '文本情绪分析',
+            icon: 'FileText',
             group: 'data'
         }
     }

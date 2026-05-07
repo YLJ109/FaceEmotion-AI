@@ -141,7 +141,7 @@ class ConfigManager:
             # ✅ 修改: 禁用ONNX RFB，使用 Caffe SSD 模型
             'use_onnx_face_detector': os.getenv('USE_ONNX_FACE_DETECTOR', 'false').lower() == 'false',
             'emotion_model': os.getenv('EMOTION_MODEL', 'weights/emotion_model.onnx'),
-            #  修改: 降低置信度阈值到 0.45，提高 Caffe SSD 检出率
+            # ✅ 修改: 降低置信度阈值到 0.45，提高 Caffe SSD 检出率
             'confidence_threshold': float(os.getenv('CONFIDENCE_THRESHOLD', '0.45')),
 
             # WebSocket配置
@@ -166,13 +166,18 @@ class ConfigManager:
             'audio_channels': int(os.getenv('AUDIO_CHANNELS', '1')),
             'voice_fusion_weight': float(os.getenv('VOICE_FUSION_WEIGHT', '0.3')),
 
-            # UI配置
+            # 检测配置
             'camera_index': 2,
             'frame_width': 640,
             'frame_height': 480,
-            'face_detect_confidence': 0.5,
+            # 人脸检测置信度阈值（Caffe SSD 使用，值越低检出率越高）
+            'face_detect_confidence': float(os.getenv('FACE_DETECT_CONFIDENCE', '0.3')),
             'detect_every_n_frames': 2,
-            'emotion_confidence_threshold': 0.3,
+            # 情绪识别置信度阈值（前端过滤使用）
+            'emotion_confidence_threshold': float(os.getenv('EMOTION_CONFIDENCE_THRESHOLD', '0.1')),
+            'max_faces': 10,  # ✅ 新增: 最大检测人脸数量
+            
+            # UI配置
             'theme_mode': 'auto',
             'current_theme': 'zen',
             'show_fps': True,

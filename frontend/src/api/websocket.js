@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 class WebSocketManager {
   constructor(url) {
     this.ws = null
-    this.reconnectInterval = 1000  // ✅ 优化: 从 2000ms 降到 1000ms，加快首次重连
+    this.reconnectInterval = 1000
     this.maxReconnectAttempts = 20
     this.reconnectAttempts = 0
     this.messageHandlers = []
@@ -38,8 +38,6 @@ class WebSocketManager {
         this.ws.binaryType = 'blob'
 
         this.ws.onopen = () => {
-          // ✅ 明确记录连接成功
-          console.log('✅ WebSocket连接成功 (readyState:', this.ws.readyState, ')')
           this.isConnected = true
           this.reconnectAttempts = 0
           this._expectingPong = false
@@ -56,7 +54,6 @@ class WebSocketManager {
           } else {
             try {
               const data = JSON.parse(event.data)
-              // 处理心跳 pong
               if (data.type === 'ping') {
                 this.ws.send(JSON.stringify({ type: 'pong' }))
                 return
@@ -69,15 +66,9 @@ class WebSocketManager {
           }
         }
 
-        this.ws.onerror = (error) => {
-          // ✅ 完全隐藏Chrome扩展的无关错误
-          // 这些错误不影响实际连接，后端日志显示连接已成功建立
-          // 如果连接真的失败，onclose 会触发重连机制
-        }
+        this.ws.onerror = () => {}
 
         this.ws.onclose = () => {
-          // ✅ 关闭调试日志
-          // console.log('⚠️ WebSocket连接关闭')
           this.isConnected = false
           this._stopHeartbeat()
           this.notifyHandlers({ type: 'disconnected' })
@@ -94,9 +85,7 @@ class WebSocketManager {
   reconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++
-      // ✅ 优化: 更激进的重连策略（1s, 2s, 3s, 4s...）最大 10s
       const delay = Math.min(10000, this.reconnectInterval * Math.pow(1.3, this.reconnectAttempts - 1))
-      console.log(`🔄 重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts}) 延迟 ${Math.round(delay)}ms`)
       setTimeout(() => {
         this.connect().catch(() => { })
       }, delay)
@@ -161,11 +150,8 @@ class WebSocketManager {
     this.isConnected = false
   }
 
-  /** 心跳 */
   _startHeartbeat() {
     this._stopHeartbeat()
-    // 不主动发 ping（服务端发 ping 我们回 pong）
-    // 只保活检测
     this._pingTimer = setInterval(() => {
       if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
         this._stopHeartbeat()

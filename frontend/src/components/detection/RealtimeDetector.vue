@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <div class="realtime-page">
         <!-- 视频区域 -->
         <div class="video-section">
@@ -115,68 +115,55 @@
                     </h3>
                 </div>
 
-                <!-- 检测到人脸 -->
-                <div v-if="currentEmotion" class="emotion-display">
-                    <!-- ✅ 移除: 大表情图标 -->
-                    <!-- <div class="emotion-icon-large">
-                        <EmotionSVG :emotion="currentEmotion" size="xlarge" :animated="true" />
-                    </div> -->
-                    <!-- ✅ 移除: 情绪名称和置信度 -->
-                    <!-- <div class="emotion-name">{{ getEmotionName(currentEmotion) }}</div>
-                    <div class="emotion-confidence">{{ (currentConfidence * 100).toFixed(1) }}%</div> -->
+                <!-- 摄像头未启动状态 -->
+                <div v-if="!isCameraOn" class="no-detection">
+                    <EmotionSVG emotion="neutral" size="large" :animated="false" />
+                    <p class="status-hint">请启动摄像头</p>
+                    <p class="status-sub">点击左侧"启动摄像头"按钮开始检测</p>
+                </div>
 
-
-
-                    <!-- ✅ 移除: 情绪纠正按钮 -->
-                    <!-- <el-popover trigger="click" placement="bottom" width="200">
-                        <template #reference>
-                            <el-button link type="warning" size="small" class="feedback-btn">
-                                <el-icon>
-                                    <Edit />
-                                </el-icon>
-                                纠正
-                            </el-button>
-                        </template>
-<div class="feedback-popover">
-    <p class="feedback-title">选择正确情绪:</p>
-    <div class="emotion-options">
-        <el-button v-for="emotion in emotionList" :key="emotion" size="small"
-            :type="emotion === currentEmotion ? 'primary' : ''" @click="submitFeedback(emotion)" round>
-            {{ getEmotionEmoji(emotion) }} {{ getEmotionName(emotion) }}
-        </el-button>
-    </div>
-</div>
-</el-popover> -->
-
-                    <!-- 置信度分布条 -->
-                    <div class="confidence-bars">
-                        <transition-group name="emotion-sort" tag="div">
-                            <div v-for="(item, index) in sortedEmotionScores" :key="item.emotion"
-                                class="confidence-bar-item">
-                                <span class="bar-label">
-                                    <EmotionSVG :emotion="item.emotion" size="small" :animated="false" />
-                                    {{ getEmotionName(item.emotion) }}
-                                </span>
-                                <div class="bar-track">
-                                    <div class="bar-fill" :style="{
-                                        width: `${item.score * 100}%`, background: getEmotionColor(item.emotion),
-                                        boxShadow: `0 0 8px ${getEmotionColor(item.emotion)}`
-                                    }"></div>
-                                </div>
-                                <span class="bar-value">{{ (item.score * 100).toFixed(0) }}%</span>
+                <!-- 摄像头已启动 -->
+                <template v-else>
+                    <!-- 检测到人脸 -->
+                    <div v-if="currentEmotion" class="emotion-display">
+                        <!-- 情绪名称和置信度（颜色随情绪变化） -->
+                        <div class="emotion-info" :style="{ '--emotion-color': getEmotionColor(currentEmotion) }">
+                            <div class="emotion-name" :style="{ color: getEmotionColor(currentEmotion) }">
+                                {{ getEmotionEmoji(currentEmotion) }} {{ getEmotionName(currentEmotion) }}
                             </div>
-                        </transition-group>
+                            <div class="emotion-confidence" :style="{ color: getEmotionColor(currentEmotion) }">
+                                置信度: {{ (currentConfidence * 100).toFixed(1) }}%
+                            </div>
+                        </div>
+
+                        <!-- 置信度分布条 -->
+                        <div class="confidence-bars">
+                            <transition-group name="emotion-sort" tag="div">
+                                <div v-for="(item, index) in sortedEmotionScores" :key="item.emotion"
+                                    class="confidence-bar-item">
+                                    <span class="bar-label">
+                                        <EmotionSVG :emotion="item.emotion" size="small" :animated="false" />
+                                        {{ getEmotionName(item.emotion) }}
+                                    </span>
+                                    <div class="bar-track">
+                                        <div class="bar-fill" :style="{
+                                            width: `${item.score * 100}%`, background: getEmotionColor(item.emotion),
+                                            boxShadow: `0 0 8px ${getEmotionColor(item.emotion)}`
+                                        }"></div>
+                                    </div>
+                                    <span class="bar-value">{{ (item.score * 100).toFixed(0) }}%</span>
+                                </div>
+                            </transition-group>
+                        </div>
                     </div>
 
-
-                </div>
-
-                <!-- 等待状态 -->
-                <div v-if="isCameraOn && !currentEmotion" class="no-detection">
-                    <EmotionSVG emotion="neutral" size="large" :animated="false" />
-                    <p class="status-hint">等待人脸检测...</p>
-                    <p class="status-sub">将脸部对准摄像头，系统将自动分析</p>
-                </div>
+                    <!-- 等待状态 -->
+                    <div v-else class="no-detection">
+                        <EmotionSVG emotion="neutral" size="large" :animated="false" />
+                        <p class="status-hint">等待人脸检测...</p>
+                        <p class="status-sub">将脸部对准摄像头，系统将自动分析</p>
+                    </div>
+                </template>
             </div>
 
             <!-- 下半部分：情绪趋势图表 -->
@@ -206,7 +193,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, onActivated, onDeactivated, reactive, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, reactive, computed } from 'vue'
 import { VideoCamera, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
@@ -221,6 +208,7 @@ import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
 import EmotionFeedback from '@/components/feedback/EmotionFeedback.vue'
 import EmotionLineChart from '@/components/charts/EmotionLineChart.vue'
 import { TrendCharts } from '@element-plus/icons-vue'
+import logger from '@/utils/logger'
 
 // ✅ 新增: 组件名称,用于 keep-alive 缓存
 defineOptions({
@@ -275,8 +263,7 @@ const startHistoryTimer = () => {
                 emotionHistory.value = emotionHistory.value.slice(-HISTORY_MAX_LENGTH)
             }
         }
-    }, 1000)  // 每秒记录一次
-    console.log('⏱️ 情绪历史记录已启动 (1秒/次)')
+    }, 1000)
 }
 
 // ✅ 新增: 停止情绪历史记录定时器
@@ -284,7 +271,6 @@ const stopHistoryTimer = () => {
     if (historyTimer) {
         clearInterval(historyTimer)
         historyTimer = null
-        console.log('⏹️ 情绪历史记录已停止')
     }
 }
 
@@ -337,7 +323,7 @@ const loadPerformanceConfig = async () => {
         const data = await response.json()
 
         const perfMode = data.config.performance_mode || 'high'
-        console.debug(`加载性能模式: ${perfMode}`)
+        logger.debug(`加载性能模式: ${perfMode}`)
 
         // 根据性能模式设置分辨率和参数
         if (perfMode === 'ultra') {
@@ -358,16 +344,16 @@ const loadPerformanceConfig = async () => {
             EMA_ALPHA = 0.25
         }
 
-        console.debug(`应用配置: 分辨率=${currentResolution.width}x${currentResolution.height}, 跳帧=${performanceModeConfig.frame_skip_threshold}, EMA=${EMA_ALPHA}`)
+        logger.debug(`应用配置: 分辨率=${currentResolution.width}x${currentResolution.height}, 跳帧=${performanceModeConfig.frame_skip_threshold}, EMA=${EMA_ALPHA}`)
 
         // ✅ 新增: 重新初始化发送 Canvas
         if (sendCanvas) {
             sendCanvas.width = currentResolution.width
             sendCanvas.height = currentResolution.height
-            console.debug('发送 Canvas 已更新为新分辨率')
+            logger.debug('发送 Canvas 已更新为新分辨率')
         }
     } catch (error) {
-        console.error('❌ 加载性能模式配置失败:', error)
+        logger.error('加载性能模式配置失败:', error)
     }
 }
 
@@ -386,7 +372,7 @@ const adjustResolution = () => {
 
     // 只在分辨率变化时更新
     if (newResolution.width !== currentResolution.width || newResolution.height !== currentResolution.height) {
-        console.debug(`调整分辨率: ${currentResolution.width}x${currentResolution.height} -> ${newResolution.width}x${newResolution.height}`)
+        logger.debug(`调整分辨率: ${currentResolution.width}x${currentResolution.height} -> ${newResolution.width}x${newResolution.height}`)
         currentResolution = newResolution
 
         // 重新初始化发送 Canvas
@@ -441,7 +427,7 @@ const FADE_OUT_DURATION = 500  // 500ms淡出时长
 let lastLoadedPerfMode = 'high'
 
 onMounted(() => {
-    wsManager.onConnect(() => { console.debug('WebSocket 就绪') })
+    wsManager.onConnect(() => { logger.debug('WebSocket 就绪') })
     wsManager.onMessage(handleWsMessage)
     wsManager.onDisconnect(() => {
         awaitingResult = false
@@ -469,7 +455,7 @@ onMounted(() => {
 
             // 如果性能模式发生变化，重新加载配置
             if (currentMode !== lastLoadedPerfMode) {
-                console.debug(`检测到性能模式变化: ${lastLoadedPerfMode} -> ${currentMode}`)
+                logger.debug(`检测到性能模式变化: ${lastLoadedPerfMode} -> ${currentMode}`)
                 lastLoadedPerfMode = currentMode
                 await loadPerformanceConfig()
             }
@@ -491,18 +477,18 @@ onUnmounted(() => {
     if (window._perfModeCheckInterval) {
         clearInterval(window._perfModeCheckInterval)
         window._perfModeCheckInterval = null
-        console.debug('性能模式检查定时器已清理')
+        logger.debug('性能模式检查定时器已清理')
     }
 })
 
 // ✅ 新增: keep-alive 缓存时的生命周期
 onDeactivated(() => {
-    console.debug('实时检测组件被缓存，停止摄像头')
+    logger.debug('实时检测组件被缓存，停止摄像头')
     stopCamera()
 })
 
 onActivated(() => {
-    console.debug('实时检测组件被激活，恢复状态')
+    logger.debug('实时检测组件被激活，恢复状态')
     // 注意: 不自动启动摄像头,由用户手动点击“启动摄像头”按钮
 })
 
@@ -518,28 +504,23 @@ const cleanupCanvas = () => {
 
 const startCamera = async () => {
     try {
-        // ✅ 优化: 先确保 WebSocket 连接就绪，避免发送帧被丢弃
         if (!wsManager.isConnected) {
-            console.log('⏳ 等待 WebSocket 连接...')
             await wsManager.connect()
-            console.log('✅ WebSocket 已连接')
         }
 
         if (stream) stream.getTracks().forEach(t => t.stop())
         stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        
         if (videoElement.value) {
             videoElement.value.srcObject = stream
             await videoElement.value.play()
 
-            // ✅ 新增: 重置性能监控计数器
             errorCount = 0
             totalFrames = 0
             perfErrorRate.value = 0
 
-            // ✅ 新增: 记录功能使用埋点
             logFeatureUsage('realtime', { action: 'start_camera' })
 
-            // ✅ 新增: 启动情绪历史记录
             startHistoryTimer()
 
             startRendering()
@@ -547,7 +528,7 @@ const startCamera = async () => {
         }
         ElMessage.success('摄像头已启动')
     } catch (error) {
-        console.error('摄像头启动失败:', error)
+        logger.error('摄像头启动失败:', error)
         // ✅ 优化: 细化错误类型，提供友好提示
         if (error.name === 'NotAllowedError') {
             ElMessage.error('摄像头权限被拒绝，请在浏览器设置中允许访问')
@@ -571,18 +552,16 @@ const stopCamera = () => {
     isCameraOn.value = false
     fps.value = 0
     frameCountForFps = 0
-    // ✅ 修复: 使用 nextTick 确保 DOM 更新完成后再清理数据，避免 keep-alive 缓存时的 DOM 错误
-    nextTick(() => {
-        currentEmotion.value = null
-        currentConfidence.value = 0
-        emotionScores.value = {}
-        currentFaces.value = []
-        awaitingResult = false
-        _consecutiveEmpty = 0
-        _adaptiveQuality = 0.5
-        _smoothedBbox = null
-        clearEmotionHistory()
-    })
+    // ✅ 立即清空情绪数据，确保UI立即更新
+    currentEmotion.value = null
+    currentConfidence.value = 0
+    emotionScores.value = {}
+    currentFaces.value = []
+    awaitingResult = false
+    _consecutiveEmpty = 0
+    _adaptiveQuality = 0.5
+    _smoothedBbox = null
+    clearEmotionHistory()
     // ✅ 修改: 不再重置情绪统计，保留历史数据供图表显示
     // emotionCounts.happy = 0
     // emotionCounts.sad = 0
@@ -595,7 +574,9 @@ const stopCamera = () => {
     themeStore.resetTheme()
 }
 
-const toggleCamera = () => { isCameraOn.value ? stopCamera() : startCamera() }
+const toggleCamera = () => { 
+    isCameraOn.value ? stopCamera() : startCamera() 
+}
 const toggleEmotionDetection = () => {
     isEmotionDetectionOn.value = !isEmotionDetectionOn.value
     // ✅ 修复: 切换情感识别开关时，通知后端停止/恢复检测
@@ -603,20 +584,16 @@ const toggleEmotionDetection = () => {
         wsManager.sendMessage('detection_control', {
             enabled: isEmotionDetectionOn.value
         })
-        console.log(`🎛️ 发送检测开关控制: ${isEmotionDetectionOn.value ? '开启' : '关闭'}`)
     } catch (error) {
-        console.warn('⚠️ 发送检测控制消息失败:', error)
+        logger.warn('发送检测控制消息失败:', error)
     }
 
-    // ✅ 修复: 如果关闭则清除Canvas上的绘制
     if (!isEmotionDetectionOn.value) {
-        // 清除当前人脸框和情绪数据
         currentFaces.value = []
         currentEmotion.value = null
         currentConfidence.value = 0
         emotionScores.value = {}
         _smoothedBbox = null
-        console.log('🚫 情感识别已关闭，清除 Canvas 绘制')
     }
 }
 
@@ -641,7 +618,7 @@ const submitFeedback = async (correctEmotion) => {
             throw new Error('提交失败')
         }
     } catch (error) {
-        console.error('反馈提交失败:', error)
+        logger.error('反馈提交失败:', error)
         ElMessage.error('反馈提交失败')
     }
 }
@@ -683,7 +660,10 @@ const updateInferenceFps = () => {
 const startRendering = () => {
     const canvas = canvasElement.value
     const video = videoElement.value
-    if (!canvas || !video) return
+    if (!canvas || !video) {
+        logger.error('❌ startRendering: canvas或video元素不存在')
+        return
+    }
 
     initSendCanvas()
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -703,16 +683,13 @@ const startRendering = () => {
             return
         }
 
-        // ✅ 深度优化: 检测视频帧是否真正更新(避免无效重绘)
         const currentVideoTime = video.currentTime
-        if (render._lastVideoTime === currentVideoTime && !currentFaces.value?.length) {
-            // 视频暂停或静止且无人脸,跳过渲染
+        if (render._lastVideoTime === currentVideoTime && currentFaces.value?.length > 0) {
             animationId = requestAnimationFrame(render)
             return
         }
         render._lastVideoTime = currentVideoTime
 
-        // 帧率限制：控制渲染速度，避免绘制过快
         const elapsed = timestamp - lastRenderTime
         if (elapsed < FRAME_INTERVAL) {
             animationId = requestAnimationFrame(render)
@@ -720,7 +697,6 @@ const startRendering = () => {
         }
         lastRenderTime = timestamp - (elapsed % FRAME_INTERVAL)
 
-        // ✅ 优化: 只在视频尺寸变化时更新 canvas 宽高，避免频繁重布局
         const vw = video.videoWidth || 640
         const vh = video.videoHeight || 480
         if (canvas.width !== vw || canvas.height !== vh) {
@@ -728,7 +704,6 @@ const startRendering = () => {
             canvas.height = vh
         }
 
-        // 绘制视频帧
         ctx.save()
         ctx.translate(canvas.width, 0)
         ctx.scale(-1, 1)
@@ -737,12 +712,10 @@ const startRendering = () => {
 
         updateFps()
 
-        // 静态帧跳过优化：检测画面是否变化
         if (currentFaces.value?.length === 0) {
-            // 采样部分像素计算哈希
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
             let currentHash = 0
-            const step = 200  // 每 200 个像素采样一次
+            const step = 200
             for (let i = 0; i < imageData.data.length; i += step * 4) {
                 currentHash = ((currentHash << 5) - currentHash) + imageData.data[i]
                 currentHash |= 0
@@ -751,7 +724,6 @@ const startRendering = () => {
             if (currentHash === lastFrameHash) {
                 staticFrameCount++
                 if (staticFrameCount >= MAX_STATIC_FRAMES) {
-                    // 画面静止，跳过渲染（降低 CPU 占用）
                     animationId = requestAnimationFrame(render)
                     return
                 }
@@ -764,21 +736,16 @@ const startRendering = () => {
             lastFrameHash = 0
         }
 
-        // 绘制人脸框和标签(与视频帧同步)
-        // ✅ 修复: 检查情感识别开关状态，关闭时跳过绘制
-        if (isEmotionDetectionOn.value && currentFaces.value?.length && currentEmotion.value) {
-            // ✅ 修复: 使用实际发送到后端的图片尺寸计算缩放比例
+        if (isCameraOn.value && isEmotionDetectionOn.value && currentFaces.value?.length) {
             const scaleX = canvas.width / currentResolution.width
             const scaleY = canvas.height / currentResolution.height
             const totalFaces = currentFaces.value.length
 
-            // ✅ 新增: 已绘制的标签位置数组（用于碰撞检测）
             const drawnLabels = []
 
             currentFaces.value.forEach((face, index) => {
                 let [x, y, w, h] = face.bbox
 
-                // ✅ 深度优化: 人脸框坐标平滑(减少抖动)
                 if (_smoothedBbox && _smoothedBbox[index]) {
                     const [px, py, pw, ph] = _smoothedBbox[index]
                     x = px * (1 - BBOX_SMOOTH_ALPHA) + x * BBOX_SMOOTH_ALPHA
@@ -796,68 +763,56 @@ const startRendering = () => {
                 const color = getEmotionColor(face.emotion)
                 drawCornerBox(ctx, flippedBbox, color, 3)
 
-                // ✅ 新增: 绘制情绪标签，传入已绘制标签数组避免重叠
                 const labelRect = drawEmotionLabel(ctx, flippedBbox, face.emotion, face.confidence, themeStore.currentTheme, index + 1, totalFaces, drawnLabels)
                 drawnLabels.push(labelRect)
             })
         } else {
-            // ✅ 修复: 无人脸或关闭情感识别时重置平滑状态
             _smoothedBbox = null
         }
 
-        // ✅ 优化: 移除 awaitingResult 检查，持续发送帧（不再等待后端响应）
         frameSkip++
 
-        // ✅ 新增: 每5秒调整一次分辨率
         if (performance.now() - lastAdjustTime > 5000) {
             adjustResolution()
             lastAdjustTime = performance.now()
         }
 
-        // 根据真实延迟自适应跳帧
         const avgRtt = _roundTripHistory.length > 0
             ? _roundTripHistory.reduce((a, b) => a + b, 0) / _roundTripHistory.length : 0
 
-        // ✅ 优化: 降低跳帧阈值，提升响应速度
-        // ✅ 修改: 使用性能模式配置的跳帧阈值作为基础
         const baseSkipThreshold = performanceModeConfig.frame_skip_threshold
 
-        // ✅ 修改: 更激进的跳帧策略，降低延迟
         const skipThreshold = avgRtt > 200
-            ? baseSkipThreshold + 1   // 高延迟时增加跳帧
+            ? baseSkipThreshold + 1
             : avgRtt > 100
-                ? baseSkipThreshold    // 中等延迟保持默认
-                : Math.max(1, baseSkipThreshold - 1)  // 低延迟时减少跳帧
+                ? baseSkipThreshold
+                : Math.max(1, baseSkipThreshold - 1)
 
-        if (frameSkip >= skipThreshold && isEmotionDetectionOn.value) {
+        if (isEmotionDetectionOn.value && wsManager.isConnected) {
             frameSkip = 0
             lastSentTime = performance.now()
 
-            // ✅ 使用动态分辨率
             sendCtx.drawImage(video, 0, 0, currentResolution.width, currentResolution.height)
             const imageData = sendCtx.getImageData(0, 0, currentResolution.width, currentResolution.height)
-            // 二进制格式: [type(1B)] + [width(2B), height(2B), RGBA像素...]
+            
             const buf = new ArrayBuffer(1 + 4 + imageData.data.length)
             const dv = new DataView(buf)
-            dv.setUint8(0, 0x01) // 类型标识：0x01=video
+            dv.setUint8(0, 0x01)
             dv.setUint16(1, currentResolution.width, true)
             dv.setUint16(3, currentResolution.height, true)
             new Uint8Array(buf, 5).set(imageData.data)
 
-            // 非阻塞发送
             try {
-                wsManager.sendBinary(buf)
-                totalFrames++  // ✅ 记录成功发送的帧数
+                const success = wsManager.sendBinary(buf)
+                if (success) {
+                    totalFrames++
+                } else {
+                    errorCount++
+                }
             } catch (error) {
-                console.warn('发送帧失败:', error)
-                errorCount++  // ✅ 记录错误
-                totalFrames++  // 仍然计入总帧数
+                errorCount++
+                totalFrames++
             }
-        }
-
-        // 调试信息：显示平均延迟
-        if (avgRtt > 100 && frameSkip === 0) {
-            console.log(`📊 平均延迟: ${avgRtt.toFixed(0)}ms, 跳帧: ${skipThreshold}`)
         }
 
         animationId = requestAnimationFrame(render)
@@ -869,10 +824,7 @@ const startRendering = () => {
 
 const handleWsMessage = (data) => {
     if (data.type !== 'result') return
-
-
-
-    // ✅ 新增: 更新性能监控数据
+    
     const processTime = data.process_time
     // ✅ 修复: 使用 lastSentTime 计算往返延迟，而不是 process_time
     // process_time 是后端处理完成的时间戳，不能直接用于计算 RTT
@@ -914,19 +866,32 @@ const handleWsMessage = (data) => {
 
     awaitingResult = false
 
-    // ✅ 关键修复: 降低置信度阈值，提高检出率
+    // ✅ 关键修复: 信任后端结果，只过滤无效数据
     const validFaces = data.faces?.filter(face => {
-        // ✅ 修复: 缓存人脸无条件通过（已在后端过滤）
+        // 必须有有效的 bbox 数据
+        if (!face || !face.bbox || face.bbox.length !== 4) return false
+        // 缓存人脸无条件通过
         if (face._cached) return true
-
-        // ✅ 修复: 非缓存人脸：置信度 >= 0.40（从 0.45 降到 0.40）
-        return face.confidence >= 0.40
+        // 置信度阈值降到 0.1，避免有效人脸被误过滤
+        return face.confidence >= 0.1
     }) || []
 
+    // ✅ 新增: 诊断日志
+    if (data.faces && data.faces.length > 0) {
+        logger.debug(`收到 ${data.faces.length} 个人脸，过滤后 ${validFaces.length} 个`)
+        data.faces.forEach((face, i) => {
+            logger.debug(`人脸${i}: 置信度=${face.confidence?.toFixed(2)}, 缓存=${face._cached || false}`)
+        })
+    }
+
     if (validFaces.length) {
-        const rawScores = validFaces[0].scores
+        const rawScores = validFaces[0]?.scores
 
-
+        // ✅ 修复: 防御性检查，防止 scores 为 undefined 导致崩溃
+        if (!rawScores || typeof rawScores !== 'object' || Object.keys(rawScores).length === 0) {
+            logger.warn('收到无效的 scores 数据，跳过此帧')
+            return
+        }
 
         if (Object.keys(_emaScores).length === 0) {
             Object.keys(rawScores).forEach(k => { _emaScores[k] = rawScores[k] })
@@ -979,17 +944,15 @@ const handleWsMessage = (data) => {
             Object.keys(_emaScores).forEach(key => delete _emaScores[key])
             _lastGoodEmotion = null
             _lastGoodScores = {}
-            _smoothedBbox = null  // 重置框平滑
+            _smoothedBbox = null
             _consecutiveEmpty = 0
-
-            console.log(`️ 连续 ${EMPTY_THRESHOLD} 帧未检测到人脸，已清除 Canvas 绘制（约 ${EMPTY_THRESHOLD / 10} 秒）`)
         } else {
             // ✅ 优化: 在阈值内保持当前状态，但逐渐降低置信度（平滑过渡）
             // 这可以防止误检框突兀消失，提供自然流畅的视觉体验
             const decayFactor = 1 - (_consecutiveEmpty / EMPTY_THRESHOLD) * 0.5  // 逐渐降到 50%
             currentConfidence.value *= decayFactor
 
-            console.debug(`⏳ 连续${_consecutiveEmpty}帧无人脸，置信度衰减至 ${(currentConfidence.value * 100).toFixed(1)}%`)
+            logger.debug(`连续${_consecutiveEmpty}帧无人脸，置信度衰减至 ${(currentConfidence.value * 100).toFixed(1)}%`)
         }
     }
 }
@@ -1029,40 +992,26 @@ const openFeedbackWithSnapshot = () => {
             timestamp: Date.now()
         }
 
-        console.log('📸 静态快照已捕获:', {
-            emotion: feedbackSnapshot.value.emotion,
-            confidence: feedbackSnapshot.value.confidence,
-            bbox: feedbackSnapshot.value.bbox,
-            timestamp: new Date(feedbackSnapshot.value.timestamp).toLocaleString()
-        })
-
-        // 4. 打开反馈对话框
         showFeedback.value = true
     } catch (error) {
-        console.error('❌ 捕获快照失败:', error)
+        logger.error('捕获快照失败:', error)
         ElMessage.error('截图失败，请重试')
     }
 }
 
 // ✅ 新增: 手动保存到历史档案
 const saveToHistoryManual = async () => {
-    console.log(' 用户点击保存按钮')
-
-    // 检查是否有可保存的数据
     if (!currentEmotion.value || !currentConfidence.value || currentFaces.value.length === 0) {
         ElMessage.warning('暂无可保存的检测数据')
         return
     }
 
-    // 防止重复点击
     if (isSaving.value) {
-        console.log('️ 正在保存中，忽略重复点击')
         return
     }
 
     try {
         isSaving.value = true
-        console.log(' 开始手动保存历史记录...')
 
         await saveRealtimeToHistory(
             currentEmotion.value,
@@ -1071,15 +1020,12 @@ const saveToHistoryManual = async () => {
         )
 
         ElMessage.success('已保存到历史档案')
-        console.log('✅ 手动保存成功')
     } catch (error) {
-        console.error(' 手动保存失败:', error)
+        logger.error('手动保存失败:', error)
         ElMessage.error('保存失败，请重试')
     } finally {
-        // 延迟重置状态，让用户看到加载动画
         setTimeout(() => {
             isSaving.value = false
-            console.log(' 保存锁已释放')
         }, 500)
     }
 }
@@ -1094,78 +1040,51 @@ const handleFeedbackSubmitted = () => {
         confidence: 0,
         timestamp: null
     }
-    console.log('✅ 用户反馈已提交，系统将自动学习优化')
 }
 
-// ✅ 新增: 保存实时检测历史记录
 const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     try {
-        // ✅ 新增: 防止重复保存(2秒冷却时间)
         const now = Date.now()
         const timeSinceLastSave = now - lastSaveTime
-        console.log(`⏱️ 距离上次保存: ${timeSinceLastSave}ms`)
 
         if (timeSinceLastSave < SAVE_COOLDOWN) {
-            console.log('ℹ️ 保存过于频繁,已跳过(冷却中)')
             ElMessage.warning('请勿重复保存')
             return
         }
         lastSaveTime = now
-        console.log('📝 开始执行保存操作...')
 
-        // ✅ 修复: 增加更严格的检查
         if (!isCameraOn.value) {
-            console.log('ℹ️ 摄像头已关闭，跳过保存历史记录')
             return
         }
 
-        // ✅ 新增: 过滤空检测结果
         if (!faces || faces.length === 0) {
-            console.warn('⚠️ 未检测到人脸，跳过保存历史记录')
+            logger.warn('未检测到人脸，跳过保存历史记录')
             ElMessage.info('未检测到人脸，无法保存')
             return
         }
 
         const canvas = canvasElement.value
         if (!canvas) {
-            console.warn('⚠️ Canvas 元素未找到，无法保存历史记录')
+            logger.warn('Canvas 元素未找到，无法保存历史记录')
             return
         }
 
-        // ✅ 新增: 检查 Canvas 是否有有效尺寸
         if (canvas.width === 0 || canvas.height === 0) {
-            console.warn('⚠️ Canvas 尺寸为 0，无法保存历史记录')
+            logger.warn('Canvas 尺寸为 0，无法保存历史记录')
             return
         }
 
-        console.log(' 开始保存实时检测历史记录...', {
-            emotion,
-            confidence,
-            canvasSize: `${canvas.width}x${canvas.height}`,
-            facesCount: faces.length
-        })
-
-        // ✅ 终极修复: 不再保存全局坐标，而是直接裁剪人脸区域
         const thumbnailCanvas = document.createElement('canvas')
         const thumbCtx = thumbnailCanvas.getContext('2d')
         thumbnailCanvas.width = 320
         thumbnailCanvas.height = 240
 
-        console.log('🖼️ 缩略图生成开始:', {
-            sourceCanvasSize: `${canvas.width}x${canvas.height}`,
-            facesCount: faces.length
-        })
-
         let savedFaces = []
 
         if (faces.length > 0 && faces[0].bbox) {
-            // ✅ 核心重构: 裁剪人脸区域并填充整个320x240
             const bbox = Array.from(faces[0].bbox)
             let [x, y, w, h] = bbox
 
-            console.log('📍 原始人脸bbox:', bbox, '(来自发送Canvas坐标系)')
-
-            // ✅ 关键: bbox来自发送Canvas,需转换到显示Canvas坐标
             const scaleX = canvas.width / currentResolution.width
             const scaleY = canvas.height / currentResolution.height
 
@@ -1174,43 +1093,32 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
             const displayW = w * scaleX
             const displayH = h * scaleY
 
-            console.log('✅ 转换到显示Canvas的bbox:', [displayX, displayY, displayW, displayH])
-
-            // 添加20%边距
             const padding = 0.2
             const padX = Math.max(0, displayX - displayW * padding)
             const padY = Math.max(0, displayY - displayH * padding)
             const padW = displayW * (1 + padding * 2)
             const padH = displayH * (1 + padding * 2)
 
-            // 验证裁剪区域有效性
             if (padW <= 0 || padH <= 0) {
-                console.error('❌ 裁剪区域尺寸无效,使用默认完整帧')
+                logger.error('裁剪区域尺寸无效,使用默认完整帧')
                 thumbCtx.drawImage(canvas, 0, 0, 320, 240)
                 savedFaces = [{
                     ...faces[0],
                     bbox: [80, 60, 160, 120]
                 }]
             } else {
-                // ✅ 将裁剪区域直接填充到320x240(无黑边)
                 thumbCtx.drawImage(
                     canvas,
-                    padX, padY, padW, padH,  // 源图像裁剪区域
-                    0, 0, 320, 240  // 目标区域(填满整个缩略图)
+                    padX, padY, padW, padH,
+                    0, 0, 320, 240
                 )
 
-                console.log('✅ 人脸区域已裁剪并填充缩略图')
-
-                // ✅ bbox设置为缩略图中的中心区域(80%大小)
                 savedFaces = [{
                     ...faces[0],
-                    bbox: [32, 24, 256, 192]  // 320x240的80%中心区域
+                    bbox: [32, 24, 256, 192]
                 }]
-
-                console.log(' 保存到数据库的bbox (320x240坐标系):', savedFaces[0].bbox)
             }
 
-            // 保存其他人脸(使用相同逻辑)
             for (let i = 1; i < faces.length; i++) {
                 if (faces[i].bbox) {
                     savedFaces.push({
@@ -1220,19 +1128,12 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
                 }
             }
         } else {
-            // 此分支理论上不会到达，因为前面已经检查过 faces.length > 0
-            console.error('❌ 代码逻辑错误：不应进入此分支')
+            logger.error('代码逻辑错误：不应进入此分支')
             return
         }
 
         const thumbnail = thumbnailCanvas.toDataURL('image/jpeg', 0.8)
-        console.log('📦 缩略图生成完成:', {
-            dataLength: thumbnail.length,
-            expectedRange: '8000-15000 bytes',
-            isEmpty: thumbnail.length < 5000
-        })
 
-        // ✅ 构建保存数据（使用已转换坐标的savedFaces）
         const historyData = {
             detection_type: 'realtime',
             results: [{
@@ -1257,12 +1158,12 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
         })
 
         if (response.ok) {
-            console.log('✅ 实时检测历史记录已保存')
+            logger.debug('实时检测历史记录已保存')
         } else {
-            console.warn('️ 保存历史记录失败:', response.statusText)
+            logger.warn('保存历史记录失败:', response.statusText)
         }
     } catch (error) {
-        console.error('❌ 保存实时检测历史记录失败:', error)
+        logger.error('保存实时检测历史记录失败:', error)
     }
 }
 </script>
@@ -1271,7 +1172,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 .realtime-page {
     height: 100%;
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 350px;
     gap: 16px;
     padding: 0;
 }
@@ -1590,7 +1491,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    padding: 14px 14px 10px;
+    padding: 14px 30px 10px;
     /* ✅ 优化: 参考 AnalyticsDashboard.vue 的 chart-card-header 内边距 */
     min-height: 0;
 }
@@ -1668,20 +1569,24 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 .emotion-name {
     font-size: 20px;
-    /* font-weight: 800; */
-    background: var(--gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-weight: 600;
     flex-shrink: 0;
+    text-shadow: 0 0 10px currentColor;
+}
+
+.emotion-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    /* margin-bottom: 16px; */
 }
 
 .emotion-confidence {
     font-size: 26px;
-    /* font-weight: 800; */
-    color: var(--highlight);
+    font-weight: 600;
     flex-shrink: 0;
-    text-shadow: 0 0 12px rgba(226, 202, 255, 0.3);
+    text-shadow: 0 0 12px currentColor;
 }
 
 /* ✅ 新增: 多模态融合指示器样式 */

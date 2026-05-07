@@ -2,11 +2,6 @@
     <div class="performance-monitor" v-if="isVisible">
         <div class="monitor-header">
             <span class="monitor-title">📊 性能监控</span>
-            <el-button link size="small" @click="toggleVisible">
-                <el-icon>
-                    <Close />
-                </el-icon>
-            </el-button>
         </div>
 
         <div class="monitor-content">
@@ -211,8 +206,12 @@ onMounted(() => {
     window.addEventListener('keydown', handleKeydown)
 
     // ✅ 监听导航栏的事件
-    handleToggle = () => {
-        toggleVisible()
+    handleToggle = (e) => {
+        if (e.detail?.visible !== undefined) {
+            isVisible.value = e.detail.visible
+        } else {
+            toggleVisible()
+        }
     }
     window.addEventListener('toggle-performance-monitor', handleToggle)
 })

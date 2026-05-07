@@ -1,0 +1,153 @@
+/**
+ * 设计令牌 - 字体系统
+ * 建立清晰的字体层级，提升可读性
+ */
+
+// ================ 字体家族 ================
+$font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif
+$font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace
+
+// ================ 字体大小 ================
+$text-xs: 12px
+$text-sm: 13px
+$text-base: 14px
+$text-lg: 16px
+$text-xl: 18px
+$text-2xl: 20px
+$text-3xl: 24px
+$text-4xl: 30px
+$text-5xl: 36px
+$text-6xl: 48px
+
+// ================ 字体粗细 ================
+$font-weight-thin: 100
+$font-weight-extralight: 200
+$font-weight-light: 300
+$font-weight-normal: 400
+$font-weight-medium: 500
+$font-weight-semibold: 600
+$font-weight-bold: 700
+$font-weight-extrabold: 800
+$font-weight-black: 900
+
+// ================ 行高 ================
+$leading-tight: 1.25
+$leading-normal: 1.5
+$leading-relaxed: 1.75
+$leading-loose: 2
+
+// ================ 字间距 ================
+$tracking-tight: -0.02em
+$tracking-normal: 0
+$tracking-wide: 0.02em
+$tracking-wider: 0.05em
+$tracking-widest: 0.1em
+
+// ================ 字体层级 ================
+$font-display: (
+  size: $text-5xl,
+  weight: $font-weight-bold,
+  line-height: $leading-tight,
+  tracking: $tracking-tight
+)
+
+$font-heading-1: (
+  size: $text-4xl,
+  weight: $font-weight-bold,
+  line-height: $leading-tight,
+  tracking: $tracking-tight
+)
+
+$font-heading-2: (
+  size: $text-3xl,
+  weight: $font-weight-semibold,
+  line-height: $leading-tight,
+  tracking: $tracking-tight
+)
+
+$font-heading-3: (
+  size: $text-2xl,
+  weight: $font-weight-semibold,
+  line-height: $leading-normal,
+  tracking: $tracking-normal
+)
+
+$font-heading-4: (
+  size: $text-xl,
+  weight: $font-weight-semibold,
+  line-height: $leading-normal,
+  tracking: $tracking-normal
+)
+
+$font-body-lg: (
+  size: $text-lg,
+  weight: $font-weight-normal,
+  line-height: $leading-relaxed,
+  tracking: $tracking-normal
+)
+
+$font-body: (
+  size: $text-base,
+  weight: $font-weight-normal,
+  line-height: $leading-relaxed,
+  tracking: $tracking-normal
+)
+
+$font-body-sm: (
+  size: $text-sm,
+  weight: $font-weight-normal,
+  line-height: $leading-normal,
+  tracking: $tracking-normal
+)
+
+$font-body-xs: (
+  size: $text-xs,
+  weight: $font-weight-normal,
+  line-height: $leading-normal,
+  tracking: $tracking-wide
+)
+
+$font-caption: (
+  size: $text-xs,
+  weight: $font-weight-medium,
+  line-height: $leading-normal,
+  tracking: $tracking-wider
+)
+
+// ================ CSS 变量导出 ================
+:root {
+  --font-sans: #{$font-sans};
+  --font-mono: #{$font-mono};
+  
+  --text-xs: #{$text-xs};
+  --text-sm: #{$text-sm};
+  --text-base: #{$text-base};
+  --text-lg: #{$text-lg};
+  --text-xl: #{$text-xl};
+  --text-2xl: #{$text-2xl};
+  --text-3xl: #{$text-3xl};
+  --text-4xl: #{$text-4xl};
+  --text-5xl: #{$text-5xl};
+  --text-6xl: #{$text-6xl};
+  
+  --font-weight-thin: #{$font-weight-thin};
+  --font-weight-extralight: #{$font-weight-extralight};
+  --font-weight-light: #{$font-weight-light};
+  --font-weight-normal: #{$font-weight-normal};
+  --font-weight-medium: #{$font-weight-medium};
+  --font-weight-semibold: #{$font-weight-semibold};
+  --font-weight-bold: #{$font-weight-bold};
+  --font-weight-extrabold: #{$font-weight-extrabold};
+  --font-weight-black: #{$font-weight-black};
+  
+  --leading-tight: #{$leading-tight};
+  --leading-normal: #{$leading-normal};
+  --leading-relaxed: #{$leading-relaxed};
+  --leading-loose: #{$leading-loose};
+  
+  --tracking-tight: #{$tracking-tight};
+  --tracking-normal: #{$tracking-normal};
+  --tracking-wide: #{$tracking-wide};
+  --tracking-wider: #{$tracking-wider};
+  --tracking-widest: #{$tracking-widest};
+}

@@ -24,8 +24,7 @@
                 </div>
 
                 <div class="filter-actions">
-                    <el-button @click="resetFilters" :icon="Refresh" size="small" class="reset-btn">重置</el-button>
-                    <el-button type="primary" @click="loadFeedbackHistory" :icon="Search" size="small">刷新</el-button>
+                    <el-button @click="loadFeedbackHistory" :icon="Refresh" size="small" class="refresh-btn">刷新</el-button>
                     <el-button type="danger" @click="batchDelete" :icon="Delete" size="small"
                         :disabled="selectedRecords.length === 0" class="batch-btn">
                         批量删除({{ selectedRecords.length }})
@@ -82,7 +81,7 @@
                     </el-table-column>
 
                     <!-- 情绪对比列 -->
-                    <el-table-column label="情绪对比" min-width="280" align="center">
+                    <el-table-column label="情绪对比" min-width="250" align="center">
                         <template #default="{ row }">
                             <div class="emotion-comparison-cell">
                                 <div class="emotion-pair">
@@ -92,9 +91,6 @@
                                             :style="{ background: getEmotionColor(row.predicted_emotion) }">
                                             {{ getEmotionEmoji(row.predicted_emotion) }}
                                             {{ getEmotionName(row.predicted_emotion) }}
-                                        </span>
-                                        <span class="confidence-small" v-if="row.confidence">
-                                            {{ (row.confidence * 100).toFixed(1) }}%
                                         </span>
                                     </div>
 
@@ -109,6 +105,26 @@
                                         </span>
                                     </div>
                                 </div>
+                            </div>
+                        </template>
+                    </el-table-column>
+
+                    <!-- 置信度列 -->
+                    <el-table-column label="置信度" width="100" align="center">
+                        <template #default="{ row }">
+                            <div class="confidence-cell">
+                                <div class="confidence-bar-container">
+                                    <div 
+                                        class="confidence-bar-fill" 
+                                        :style="{ 
+                                            width: `${(row.confidence * 100).toFixed(0)}%`,
+                                            background: getConfidenceColor(row.confidence)
+                                        }"
+                                    ></div>
+                                </div>
+                                <span class="confidence-value" :style="{ color: getConfidenceColor(row.confidence) }">
+                                    {{ row.confidence ? (row.confidence * 100).toFixed(1) + '%' : '-' }}
+                                </span>
                             </div>
                         </template>
                     </el-table-column>
@@ -131,13 +147,13 @@
                     <el-table-column label="操作" width="200" align="center" fixed="right">
                         <template #default="{ row }">
                             <div class="action-buttons">
-                                <el-button size="small" type="primary" link @click.stop="showRecordDetail(row)">
+                                <el-button size="small" class="detail-btn">
                                     <el-icon>
                                         <View />
                                     </el-icon>
                                     详情
                                 </el-button>
-                                <el-button size="small" type="danger" link @click.stop="deleteRecord(row, $event)">
+                                <el-button size="small" class="delete-btn">
                                     <el-icon>
                                         <Delete />
                                     </el-icon>
@@ -278,6 +294,14 @@ import { API } from '@/api/config'
 // ✅ 使用完整的 emotion 列表（过滤别名，避免重复）
 const emotionList = EMOTION_LIST.filter(e => !['surprised', 'fearful', 'calm'].includes(e))
 
+// 置信度颜色函数
+const getConfidenceColor = (confidence) => {
+    if (!confidence) return '#6b7280'
+    if (confidence >= 0.8) return '#10b981'  // 高置信度 - 绿色
+    if (confidence >= 0.6) return '#f59e0b'  // 中等置信度 - 橙色
+    return '#ef4444'  // 低置信度 - 红色
+}
+
 // 数据状态
 const loading = ref(false)
 const feedbackRecords = ref([])
@@ -372,14 +396,6 @@ const loadFeedbackHistory = async () => {
 
 // 处理日期变化
 const handleDateChange = () => {
-    currentPage.value = 1
-    loadFeedbackHistory()
-}
-
-// 重置筛选
-const resetFilters = () => {
-    filters.value.emotion = ''
-    dateRange.value = null
     currentPage.value = 1
     loadFeedbackHistory()
 }
@@ -661,14 +677,15 @@ onMounted(() => {
 }
 
 /* ✅ 修复: 重置按钮样式 - 适配7个主题 */
-.reset-btn {
+/* ✅ 刷新按钮样式 */
+.refresh-btn {
     background: transparent !important;
     border: 1.5px solid var(--border) !important;
     color: var(--text) !important;
     backdrop-filter: blur(8px) !important;
 }
 
-.reset-btn:hover {
+.refresh-btn:hover {
     background: color-mix(in srgb, var(--primary) 12%, transparent) !important;
     border-color: var(--primary-light) !important;
     color: var(--text) !important;
@@ -676,7 +693,7 @@ onMounted(() => {
     box-shadow: 0 4px 16px rgba(113, 57, 255, 0.15) !important;
 }
 
-.reset-btn:active {
+.refresh-btn:active {
     transform: translateY(0) scale(0.98) !important;
 }
 
@@ -700,6 +717,48 @@ onMounted(() => {
     opacity: 0.4 !important;
     cursor: not-allowed !important;
     transform: none !important;
+}
+
+/* ✅ 详情按钮样式 - 与重置按钮一致 */
+.detail-btn {
+    background: transparent !important;
+    border: 1.5px solid var(--border) !important;
+    color: var(--text) !important;
+    backdrop-filter: blur(8px) !important;
+    padding: 6px 12px !important;
+}
+
+.detail-btn:hover {
+    background: color-mix(in srgb, var(--primary) 12%, transparent) !important;
+    border-color: var(--primary-light) !important;
+    color: var(--text) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(113, 57, 255, 0.15) !important;
+}
+
+.detail-btn:active {
+    transform: translateY(0) scale(0.98) !important;
+}
+
+/* ✅ 删除按钮样式 - 与批量删除按钮一致 */
+.delete-btn {
+    background: transparent !important;
+    border: 1.5px solid var(--danger) !important;
+    color: var(--danger) !important;
+    backdrop-filter: blur(8px) !important;
+    padding: 6px 12px !important;
+}
+
+.delete-btn:hover {
+    background: rgba(245, 108, 108, 0.15) !important;
+    border-color: var(--danger) !important;
+    color: var(--danger) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(245, 108, 108, 0.2) !important;
+}
+
+.delete-btn:active {
+    transform: translateY(0) scale(0.98) !important;
 }
 
 /* ===== 记录容器 ===== */
@@ -912,6 +971,34 @@ onMounted(() => {
     font-size: 12px;
     color: var(--success);
     font-weight: 100;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* 置信度列样式 */
+.confidence-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.confidence-bar-container {
+    width: 60px;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.confidence-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.confidence-value {
+    font-size: 13px;
+    font-weight: 600;
     font-family: 'Consolas', 'Monaco', monospace;
 }
 

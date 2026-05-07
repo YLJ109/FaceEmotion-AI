@@ -2,7 +2,7 @@
  * Canvas绘制工具 - 高性能渲染人脸框与情感标签
  * 使用阴影代替手动描边，减少绘制调用次数
  */
-import { getEmotionName, getEmotionEmoji } from './emotion'
+import { getEmotionName, getEmotionEmoji, getEmotionColor } from './emotion'
 
 /**
  * 绘制带发光效果的四角框
@@ -64,6 +64,7 @@ export function drawEmotionLabel(ctx, bbox, emotion, confidence, themeColors, fa
   const showIndex = totalFaces > 1
   const emotionName = getEmotionName(emotion)
   const emotionEmoji = getEmotionEmoji(emotion)
+  const emotionColor = getEmotionColor(emotion)
   const label = showIndex
     ? `人脸${faceIndex} ${emotionEmoji} ${emotionName}: ${(confidence * 100).toFixed(1)}%`
     : `${emotionEmoji} ${emotionName}: ${(confidence * 100).toFixed(1)}%`
@@ -98,7 +99,7 @@ export function drawEmotionLabel(ctx, bbox, emotion, confidence, themeColors, fa
   ctx.shadowOffsetY = 4
 
   ctx.fillStyle = themeColors.card_bg || 'rgba(26, 11, 46, 0.85)'
-  ctx.strokeStyle = themeColors.border || 'rgba(156, 78, 255, 0.4)'
+  ctx.strokeStyle = emotionColor || 'rgba(156, 78, 255, 0.4)'
   ctx.lineWidth = 1
 
   const r = fontSize * 0.7
@@ -116,9 +117,10 @@ export function drawEmotionLabel(ctx, bbox, emotion, confidence, themeColors, fa
   ctx.fill()
   ctx.stroke()
 
-  // 文本
-  ctx.shadowColor = 'transparent'
-  ctx.fillStyle = themeColors.text || '#E9DEFF'
+  // 文本 - 颜色随情绪变化
+  ctx.shadowColor = emotionColor
+  ctx.shadowBlur = 10
+  ctx.fillStyle = emotionColor || '#E9DEFF'
   ctx.textBaseline = 'middle'
   ctx.fillText(label, labelX + padding, labelY + labelHeight / 2)
 

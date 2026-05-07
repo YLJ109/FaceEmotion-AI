@@ -7,11 +7,6 @@
                 </el-icon>
                 <span>AI 生成式音乐</span>
             </div>
-            <el-button class="close-btn" circle size="small" @click="toggleVisible">
-                <el-icon>
-                    <Close />
-                </el-icon>
-            </el-button>
         </div>
 
         <div class="monitor-body">
@@ -176,8 +171,12 @@ const handleVolumeChange = (value) => {
 
 // 监听导航栏事件和WebSocket消息
 onMounted(() => {
-    const handleToggle = () => {
-        toggleVisible()
+    const handleToggle = (e) => {
+        if (e.detail !== undefined) {
+            isVisible.value = e.detail
+        } else {
+            toggleVisible()
+        }
     }
     window.addEventListener('toggle-music-panel', handleToggle)
 

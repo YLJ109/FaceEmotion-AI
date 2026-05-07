@@ -160,6 +160,18 @@
                                     <span class="slider-hint">每 {{ settingsConfig.detect_every_n_frames }} 帧检测一次</span>
                                 </div>
                             </el-form-item>
+
+                            <!-- ✅ 新增: 最大人脸数量配置 -->
+                            <el-form-item label="最大检测人脸数量">
+                                <div class="slider-group">
+                                    <el-slider v-model="settingsConfig.max_faces" :min="1" :max="10"
+                                        :step="1" show-stops @change="handleConfigChange" />
+                                    <span class="slider-hint">最多检测 {{ settingsConfig.max_faces }} 张人脸</span>
+                                </div>
+                                <p class="field-description">
+                                    设置实时检测时最多识别的人脸数量。较少的数量可提高检测速度，较多的数量可支持多人场景。
+                                </p>
+                            </el-form-item>
                         </el-form>
                     </div>
 
@@ -256,11 +268,12 @@ const settingsConfig = reactive({
     performance_mode: 'high',
 
     // AI 模型配置（✅ 修复: 移除已废弃的模型切换参数）
-    confidence_threshold: 0.45,
+    confidence_threshold: 0.25,
 
     // 检测参数
     resolution: '640x480',
     detect_every_n_frames: 2,
+    max_faces: 10,  // ✅ 新增: 最大检测人脸数量
 
     // 界面设置
     theme_mode: 'auto',
@@ -296,6 +309,7 @@ const loadConfig = async () => {
         // ✅ 修复: 移除已废弃的模型切换参数
         settingsConfig.confidence_threshold = backendConfig.confidence_threshold ?? 0.45
         settingsConfig.detect_every_n_frames = backendConfig.detect_every_n_frames ?? 2
+        settingsConfig.max_faces = backendConfig.max_faces ?? 10
         settingsConfig.theme_mode = backendConfig.theme_mode ?? 'auto'
         // AI 音乐配置
         settingsConfig.music_volume = backendConfig.music_volume ?? 70
