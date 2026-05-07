@@ -225,9 +225,16 @@ async def add_process_time_header(request: Request, call_next):
 async def global_exception_handler(request: Request, exc: Exception):
     error_traceback = traceback.format_exc()
     logger.error(f"❌ 全局异常: {exc}\n{error_traceback}")
+
+    # ✅ 优化: 生产环境隐藏详细错误信息，防止敏感信息泄露
+    if config_manager.get('debug', False):
+        detail = str(exc)
+    else:
+        detail = "服务器内部错误，请稍后重试"
+
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc), "type": type(exc).__name__}
+        content={"detail": detail, "type": type(exc).__name__}
     )
 
 # 静态文件服务

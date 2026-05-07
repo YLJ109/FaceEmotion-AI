@@ -4,6 +4,7 @@ import onnxruntime as ort
 from typing import Tuple, Dict
 import cv2
 import logging
+import multiprocessing
 
 from core.constants import EMOTION_NAMES
 
@@ -19,10 +20,23 @@ class EmotionClassifierONNX:
         provider_options = [{}]
         self.use_cuda = False
 
+        # ✅ 优化: 配置ONNX Runtime CPU多线程加速
+        session_options = ort.SessionOptions()
+        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        session_options.enable_cpu_mem_arena = True
+
+        # 根据CPU核心数配置线程数（最多4个）
+        cpu_count = multiprocessing.cpu_count()
+        session_options.intra_op_num_threads = min(cpu_count, 4)
+        session_options.inter_op_num_threads = min(cpu_count, 4)
+        logger.info(
+            f"✅ ONNX CPU线程配置: intra={session_options.intra_op_num_threads}, inter={session_options.inter_op_num_threads}")
+
         self.session = ort.InferenceSession(
             model_path,
             providers=providers,
-            provider_options=provider_options
+            provider_options=provider_options,
+            sess_options=session_options
         )
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name

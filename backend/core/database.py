@@ -40,6 +40,11 @@ class DatabaseManager:
         conn = self._get_conn()
         cursor = conn.cursor()
 
+        # ✅ 优化: 开启WAL模式，解决数据库锁死问题
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")  # 30秒超时
+        logger.info("✅ 已启用SQLite WAL模式和busy_timeout")
+
         # 扩展 detection_history 表，添加更多字段
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS detection_history (

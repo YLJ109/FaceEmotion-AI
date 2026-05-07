@@ -90,7 +90,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'submitted'])
 
-const emotionList = ['happy', 'sad', 'angry', 'surprised', 'fearful', 'disgust', 'neutral']
+const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
 const selectedEmotion = ref('')
 const notes = ref('')
 

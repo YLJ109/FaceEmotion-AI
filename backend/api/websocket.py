@@ -16,6 +16,7 @@ from core.config import ConfigManager
 from core.database import DatabaseManager
 from adaptation.active_learner import AdaptiveLearner
 from music.generative_music import MusicGenerator
+from optimizer.dynamic_inference import DynamicInferenceOptimizer
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,6 +29,7 @@ _emotion_model = None
 _adaptive_learner = None
 _shared_executor = None
 _music_generator = None
+_inference_optimizer = None  # ✅ 新增: 推理优化器
 
 
 def init_ws_router(
@@ -36,10 +38,11 @@ def init_ws_router(
     face_detector,
     emotion_model,
     adaptive_learner: AdaptiveLearner,
-    executor: concurrent.futures.ThreadPoolExecutor
+    executor: concurrent.futures.ThreadPoolExecutor,
+    inference_optimizer: DynamicInferenceOptimizer = None  # ✅ 新增参数
 ):
     """初始化路由依赖"""
-    global _config_manager, _db_manager, _face_detector, _emotion_model, _adaptive_learner, _shared_executor, _music_generator
+    global _config_manager, _db_manager, _face_detector, _emotion_model, _adaptive_learner, _shared_executor, _music_generator, _inference_optimizer
     _config_manager = config_manager
     _db_manager = db_manager
     _face_detector = face_detector
@@ -47,8 +50,11 @@ def init_ws_router(
     _adaptive_learner = adaptive_learner
     _shared_executor = executor
     _music_generator = MusicGenerator()
+    _inference_optimizer = inference_optimizer  # ✅ 保存推理优化器
     logger.info(
         f"✅ WebSocket 处理器已初始化 | 置信度阈值: {config_manager.config.get('confidence_threshold', 0.6)}")
+    if _inference_optimizer:
+        logger.info("✅ WebSocket 推理优化器已启用")
 
 
 def get_gpu_memory_usage():
@@ -154,6 +160,7 @@ async def websocket_endpoint(websocket: WebSocket):
         _save_counter = 0
         _calibration_strength = 0.0
         _last_face_bbox = None
+        _last_emotion_cache = None  # ✅ 新增: 缓存上一帧的表情结果（用于非检测帧）
         _detect_counter = 0
         # ✅ 优化: 降低检测间隔，提升响应速度
         DETECT_INTERVAL = 2  # 每 2 帧检测一次（从 3 降到 2）
@@ -363,51 +370,28 @@ async def websocket_endpoint(websocket: WebSocket):
                             pass
                         continue
                 else:
-                    # ✅ 修复: 非检测帧使用缓存的人脸框（防止闪烁）
-                    if _last_face_bbox:
-                        # ✅ 关键修复: 对缓存帧进行情绪分类
-                        x, y, w, h = _last_face_bbox
-                        hh, ww = frame.shape[:2]
-                        x = max(0, min(int(x), ww - 1))
-                        y = max(0, min(int(y), hh - 1))
-                        w = max(1, min(int(w), ww - x))
-                        h = max(1, min(int(h), hh - y))
+                    # ✅ 修复: 非检测帧直接使用上一帧的表情结果（不再重新推理）
+                    # 原因：重新推理会导致表情结果跳变，与人脸框位置不匹配
+                    if _last_face_bbox and _last_emotion_cache:
+                        # 使用缓存的表情结果，保持数据一致性
+                        response = {
+                            'type': 'result',
+                            'faces': [_last_emotion_cache],
+                            'dominant_emotion': _last_emotion_cache['emotion'],
+                            'timestamp': datetime.now().isoformat(),
+                            'process_time': time.time(),
+                            'gpu_memory': get_gpu_memory_usage(),
+                            '_cached': True
+                        }
 
-                        face_img = frame[y:y+h, x:x+w]
-                        if face_img.size > 0 and face_img.shape[0] > 0 and face_img.shape[1] > 0:
-                            try:
-                                emotion_result = await loop.run_in_executor(
-                                    executor, _emotion_model.predict, face_img)
-                                emotion, confidence, scores = emotion_result
+                        try:
+                            result_queue.put_nowait(response)
+                        except asyncio.QueueFull:
+                            pass
 
-                                cached_face = {
-                                    'bbox': _last_face_bbox.copy(),
-                                    'confidence': confidence,
-                                    'emotion': emotion,
-                                    'scores': scores,
-                                    '_cached': True
-                                }
+                        continue
 
-                                # ✅ 修复: 立即发送缓存帧结果
-                                response = {
-                                    'type': 'result',
-                                    'faces': [cached_face],
-                                    'dominant_emotion': emotion,
-                                    'timestamp': datetime.now().isoformat(),
-                                    'process_time': time.time(),
-                                    'gpu_memory': get_gpu_memory_usage()
-                                }
-
-                                try:
-                                    result_queue.put_nowait(response)
-                                except asyncio.QueueFull:
-                                    pass
-
-                                continue
-                            except Exception as e:
-                                logger.debug(f"缓存帧情绪分类失败: {e}")
-
-                    # 如果无缓存或分类失败，发送空结果
+                    # 如果无缓存，发送空结果
                     try:
                         result_queue.put_nowait({
                             'type': 'result',
@@ -439,6 +423,28 @@ async def websocket_endpoint(websocket: WebSocket):
                 if len(faces) > max_faces:
                     logger.debug(f'检测到{len(faces)}张人脸，仅处理前{max_faces}张')
                     faces = faces[:max_faces]
+
+                # ⚠️ 修复: 禁用推理缓存（与人脸检测频率冲突，导致闪烁）
+                # 原因：人脸检测每2帧一次，但推理缓存会跳帧，造成人脸框和表情不同步
+                # 解决方案：每次检测到人脸都执行推理，保证数据一致性
+                # if _inference_optimizer and _inference_optimizer.enabled:
+                #     if _inference_optimizer.check_motion(faces):
+                #         cached_result = _inference_optimizer.get_cached_result()
+                #         if cached_result:
+                #             response = {
+                #                 'type': 'result',
+                #                 'faces': cached_result,
+                #                 'dominant_emotion': cached_result[0]['emotion'] if cached_result else None,
+                #                 'timestamp': datetime.now().isoformat(),
+                #                 'process_time': time.time(),
+                #                 'gpu_memory': get_gpu_memory_usage(),
+                #                 '_cached': True
+                #             }
+                #             try:
+                #                 result_queue.put_nowait(response)
+                #             except asyncio.QueueFull:
+                #                 pass
+                #             continue
 
                 # ✅ 优化: 始终使用批量推理（即使只有 1 张人脸）
                 face_images = []
@@ -504,6 +510,14 @@ async def websocket_endpoint(websocket: WebSocket):
                         'confidence': float(calibrated_conf),
                         'scores': {k: float(v) for k, v in calibrated_scores.items()}
                     })
+
+                # ✅ 修复: 更新表情缓存（用于非检测帧）
+                if results:
+                    _last_emotion_cache = results[0].copy()  # 只缓存第一张人脸
+
+                # ⚠️ 已禁用: 推理优化器缓存（与人脸检测频率冲突，导致闪烁）
+                # if _inference_optimizer and results:
+                #     _inference_optimizer.set_cached_result(results)
 
                 dominant_emotion = max(results, key=lambda x: x['confidence'])[
                     'emotion'] if results else None

@@ -42,6 +42,9 @@ class DynamicInferenceOptimizer:
         self._prev_face_size = None
         self._motion_threshold = 20    # 像素位移阈值
 
+        # ✅ 优化: 表情结果缓存（减少重复计算）
+        self._last_emotion_result = None
+
         # GPU 监控
         self._gpu_high_load = False
         self._gpu_check_interval = 5.0  # 每 5s 检查一次
@@ -75,7 +78,8 @@ class DynamicInferenceOptimizer:
         # 跳过决策
         self.total_frames_processed += 1
         if self.current_skip > 1:
-            should_skip = (self.total_frames_processed % self.current_skip) != 0
+            should_skip = (self.total_frames_processed %
+                           self.current_skip) != 0
             if should_skip:
                 self.total_frames_skipped += 1
             return should_skip
@@ -118,6 +122,7 @@ class DynamicInferenceOptimizer:
         if not faces:
             self._prev_face_center = None
             self._prev_face_size = None
+            self._last_emotion_result = None  # ✅ 清空缓存
             return False  # 无人脸，必须检测
 
         face = faces[0]
@@ -138,6 +143,14 @@ class DynamicInferenceOptimizer:
         self._prev_face_center = center
         self._prev_face_size = size
         return False
+
+    def get_cached_result(self):
+        """获取缓存的表情结果"""
+        return self._last_emotion_result
+
+    def set_cached_result(self, result):
+        """设置缓存的表情结果"""
+        self._last_emotion_result = result
 
     # ── 推理配置生成 ─────────────────────────────────
 
@@ -164,5 +177,6 @@ class DynamicInferenceOptimizer:
         session_options.enable_cpu_mem_arena = False
         session_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         if use_fp16:
-            session_options.add_session_config_entry('session.enable_fp16', '1')
+            session_options.add_session_config_entry(
+                'session.enable_fp16', '1')
         return session_options

@@ -104,37 +104,39 @@
 
         <!-- 情感信息面板 -->
         <div class="emotion-panel glass-panel">
-            <div class="panel-header">
-                <h3>
-                    <span class="panel-icon"><el-icon>
-                            <DataAnalysis />
-                        </el-icon></span>
-                    <span>实时分析</span>
-                </h3>
-            </div>
+            <!-- 上半部分：实时分析内容 -->
+            <div class="panel-upper">
+                <div class="panel-header">
+                    <h3>
+                        <span class="panel-icon"><el-icon>
+                                <DataAnalysis />
+                            </el-icon></span>
+                        <span>实时分析</span>
+                    </h3>
+                </div>
 
-            <!-- 检测到人脸 -->
-            <div v-if="currentEmotion" class="emotion-display">
-                <!-- ✅ 移除: 大表情图标 -->
-                <!-- <div class="emotion-icon-large">
-                    <EmotionSVG :emotion="currentEmotion" size="xlarge" :animated="true" />
-                </div> -->
-                <!-- ✅ 移除: 情绪名称和置信度 -->
-                <!-- <div class="emotion-name">{{ getEmotionName(currentEmotion) }}</div>
-                <div class="emotion-confidence">{{ (currentConfidence * 100).toFixed(1) }}%</div> -->
+                <!-- 检测到人脸 -->
+                <div v-if="currentEmotion" class="emotion-display">
+                    <!-- ✅ 移除: 大表情图标 -->
+                    <!-- <div class="emotion-icon-large">
+                        <EmotionSVG :emotion="currentEmotion" size="xlarge" :animated="true" />
+                    </div> -->
+                    <!-- ✅ 移除: 情绪名称和置信度 -->
+                    <!-- <div class="emotion-name">{{ getEmotionName(currentEmotion) }}</div>
+                    <div class="emotion-confidence">{{ (currentConfidence * 100).toFixed(1) }}%</div> -->
 
 
 
-                <!-- ✅ 移除: 情绪纠正按钮 -->
-                <!-- <el-popover trigger="click" placement="bottom" width="200">
-                    <template #reference>
-                        <el-button link type="warning" size="small" class="feedback-btn">
-                            <el-icon>
-                                <Edit />
-                            </el-icon>
-                            纠正
-                        </el-button>
-                    </template>
+                    <!-- ✅ 移除: 情绪纠正按钮 -->
+                    <!-- <el-popover trigger="click" placement="bottom" width="200">
+                        <template #reference>
+                            <el-button link type="warning" size="small" class="feedback-btn">
+                                <el-icon>
+                                    <Edit />
+                                </el-icon>
+                                纠正
+                            </el-button>
+                        </template>
 <div class="feedback-popover">
     <p class="feedback-title">选择正确情绪:</p>
     <div class="emotion-options">
@@ -146,34 +148,50 @@
 </div>
 </el-popover> -->
 
-                <!-- 置信度分布条 -->
-                <div class="confidence-bars">
-                    <transition-group name="emotion-sort" tag="div">
-                        <div v-for="(item, index) in sortedEmotionScores" :key="item.emotion"
-                            class="confidence-bar-item">
-                            <span class="bar-label">
-                                <EmotionSVG :emotion="item.emotion" size="small" :animated="false" />
-                                {{ getEmotionName(item.emotion) }}
-                            </span>
-                            <div class="bar-track">
-                                <div class="bar-fill" :style="{
-                                    width: `${item.score * 100}%`, background: getEmotionColor(item.emotion),
-                                    boxShadow: `0 0 8px ${getEmotionColor(item.emotion)}`
-                                }"></div>
+                    <!-- 置信度分布条 -->
+                    <div class="confidence-bars">
+                        <transition-group name="emotion-sort" tag="div">
+                            <div v-for="(item, index) in sortedEmotionScores" :key="item.emotion"
+                                class="confidence-bar-item">
+                                <span class="bar-label">
+                                    <EmotionSVG :emotion="item.emotion" size="small" :animated="false" />
+                                    {{ getEmotionName(item.emotion) }}
+                                </span>
+                                <div class="bar-track">
+                                    <div class="bar-fill" :style="{
+                                        width: `${item.score * 100}%`, background: getEmotionColor(item.emotion),
+                                        boxShadow: `0 0 8px ${getEmotionColor(item.emotion)}`
+                                    }"></div>
+                                </div>
+                                <span class="bar-value">{{ (item.score * 100).toFixed(0) }}%</span>
                             </div>
-                            <span class="bar-value">{{ (item.score * 100).toFixed(0) }}%</span>
-                        </div>
-                    </transition-group>
+                        </transition-group>
+                    </div>
+
+
                 </div>
 
-
+                <!-- 等待状态 -->
+                <div v-if="isCameraOn && !currentEmotion" class="no-detection">
+                    <EmotionSVG emotion="neutral" size="large" :animated="false" />
+                    <p class="status-hint">等待人脸检测...</p>
+                    <p class="status-sub">将脸部对准摄像头，系统将自动分析</p>
+                </div>
             </div>
 
-            <!-- 等待状态 -->
-            <div v-else class="no-detection">
-                <EmotionSVG emotion="neutral" size="large" :animated="false" />
-                <p class="status-hint">{{ isCameraOn ? '等待人脸检测...' : '请先启动摄像头' }}</p>
-                <p class="status-sub">将脸部对准摄像头，系统将自动分析</p>
+            <!-- 下半部分：情绪趋势图表 -->
+            <div class="panel-lower">
+                <div class="emotion-trend-section">
+                    <div class="trend-section-header">
+                        <h4>
+                            <span class="section-icon"><el-icon><TrendCharts /></el-icon></span>
+                            <span>情绪趋势</span>
+                        </h4>
+                    </div>
+                    <div class="trend-chart-wrapper">
+                        <EmotionLineChart :emotion-history="emotionHistory" />
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -188,7 +206,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, onActivated, onDeactivated, reactive, computed } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, reactive, computed, nextTick } from 'vue'
 import { VideoCamera, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
@@ -201,6 +219,8 @@ import httpMonitor from '@/utils/httpMonitor'
 import { API } from '@/api/config'
 import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
 import EmotionFeedback from '@/components/feedback/EmotionFeedback.vue'
+import EmotionLineChart from '@/components/charts/EmotionLineChart.vue'
+import { TrendCharts } from '@element-plus/icons-vue'
 
 // ✅ 新增: 组件名称,用于 keep-alive 缓存
 defineOptions({
@@ -226,7 +246,12 @@ const feedbackSnapshot = ref({  // ✅ 新增: 反馈快照数据
 })
 const emotionScores = ref({})
 // ✅ 修复: 情绪列表（7种情绪，calm 合并到 neutral）
-const emotionList = ['happy', 'sad', 'angry', 'surprised', 'fearful', 'disgust', 'neutral']
+const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+
+// ✅ 新增: 情绪历史数据（用于趋势曲线图）
+const emotionHistory = ref([])  // [{ timestamp, emotions: { happy: 0.8, ... } }]
+const HISTORY_MAX_LENGTH = 60  // 最多保存60秒的数据
+let historyTimer = null  // 定时器，每秒记录一次
 
 // ✅ 新增: 情绪分数排序计算属性（从高到低）
 const sortedEmotionScores = computed(() => {
@@ -234,6 +259,39 @@ const sortedEmotionScores = computed(() => {
         .map(([emotion, score]) => ({ emotion, score }))
         .sort((a, b) => b.score - a.score)  // 降序排序
 })
+
+// ✅ 新增: 启动情绪历史记录定时器
+const startHistoryTimer = () => {
+    if (historyTimer) return
+    historyTimer = setInterval(() => {
+        if (currentEmotion.value && emotionScores.value) {
+            const record = {
+                timestamp: Date.now(),
+                emotions: { ...emotionScores.value }
+            }
+            emotionHistory.value.push(record)
+            // 限制历史记录长度
+            if (emotionHistory.value.length > HISTORY_MAX_LENGTH) {
+                emotionHistory.value = emotionHistory.value.slice(-HISTORY_MAX_LENGTH)
+            }
+        }
+    }, 1000)  // 每秒记录一次
+    console.log('⏱️ 情绪历史记录已启动 (1秒/次)')
+}
+
+// ✅ 新增: 停止情绪历史记录定时器
+const stopHistoryTimer = () => {
+    if (historyTimer) {
+        clearInterval(historyTimer)
+        historyTimer = null
+        console.log('⏹️ 情绪历史记录已停止')
+    }
+}
+
+// ✅ 新增: 清空情绪历史
+const clearEmotionHistory = () => {
+    emotionHistory.value = []
+}
 const currentFaces = ref([])
 const fps = ref(0)
 // ✅ 新增: 性能监控数据
@@ -372,7 +430,9 @@ let _analyticsLogged = false
 let _lastFaceUpdate = 0
 // ✅ 新增: 人脸框位置平滑
 let _smoothedBbox = null
-const BBOX_SMOOTH_ALPHA = 0.25  // ✅ 优化: 从0.3降到0.25,更平滑的坐标过渡
+const BBOX_SMOOTH_ALPHA = 0.4  // ✅ 修复: 从0.25提升到0.4,减少延迟感,更跟随实时位置
+// 说明: 值越大越跟随实时位置(0.8-1.0), 值越小越平滑(0.1-0.3)
+// 0.4 是平衡点：既不会闪烁，也不会有明显延迟
 // ✅ 新增: 淡出效果控制
 let _fadeOutActive = false
 let _fadeOutStartTime = 0
@@ -479,6 +539,9 @@ const startCamera = async () => {
             // ✅ 新增: 记录功能使用埋点
             logFeatureUsage('realtime', { action: 'start_camera' })
 
+            // ✅ 新增: 启动情绪历史记录
+            startHistoryTimer()
+
             startRendering()
             isCameraOn.value = true
         }
@@ -503,18 +566,31 @@ const startCamera = async () => {
 const stopCamera = () => {
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null }
     if (animationId) { cancelAnimationFrame(animationId); animationId = null }
+    // ✅ 新增: 停止情绪历史记录
+    stopHistoryTimer()
     isCameraOn.value = false
     fps.value = 0
     frameCountForFps = 0
-    // ✅ 修复: 停止摄像头时清除所有检测数据，避免残留
-    currentEmotion.value = null
-    currentConfidence.value = 0
-    emotionScores.value = {}
-    currentFaces.value = []
-    awaitingResult = false
-    _consecutiveEmpty = 0
-    _adaptiveQuality = 0.5
-    _smoothedBbox = null  // ✅ 修复: 清除人脸框平滑状态
+    // ✅ 修复: 使用 nextTick 确保 DOM 更新完成后再清理数据，避免 keep-alive 缓存时的 DOM 错误
+    nextTick(() => {
+        currentEmotion.value = null
+        currentConfidence.value = 0
+        emotionScores.value = {}
+        currentFaces.value = []
+        awaitingResult = false
+        _consecutiveEmpty = 0
+        _adaptiveQuality = 0.5
+        _smoothedBbox = null
+        clearEmotionHistory()
+    })
+    // ✅ 修改: 不再重置情绪统计，保留历史数据供图表显示
+    // emotionCounts.happy = 0
+    // emotionCounts.sad = 0
+    // emotionCounts.angry = 0
+    // emotionCounts.surprised = 0
+    // emotionCounts.fearful = 0
+    // emotionCounts.disgust = 0
+    // emotionCounts.neutral = 0
     // 重置主题到用户设置
     themeStore.resetTheme()
 }
@@ -1498,22 +1574,36 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 .emotion-panel {
     height: 100%;
-    padding: 16px;
+    /* ✅ 优化: 参考 AnalyticsDashboard.vue 的卡片内边距风格 */
+    padding: 0;
     /* ✅ 修复: 面板自身不滚动，让内部元素管理滚动 */
     overflow: hidden;
     display: flex;
     flex-direction: column;
     /* ✅ 移除: min-height，让高度完全自适应内容 */
+    gap: 0;
+}
+
+/* ✅ 新增: 上半部分样式（实时分析内容） */
+.panel-upper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 14px 14px 10px;
+    /* ✅ 优化: 参考 AnalyticsDashboard.vue 的 chart-card-header 内边距 */
+    min-height: 0;
 }
 
 .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    /* margin-bottom: 16px; */
+    /* ✅ 修复: 移除分割线，让视觉更轻盈 */
     flex-shrink: 0;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+    /* ✅ 移除: border-bottom，避免与下半部分的分隔线重叠 */
+    /* border-bottom: 1px solid var(--border); */
 }
 
 .panel-header h3 {
@@ -1537,7 +1627,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 }
 
 .emotion-display {
-    padding: 10px 10px;
+    padding: 0;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -1704,7 +1794,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     display: flex;
     flex-direction: column;
     /* gap: 6px; */
-    margin-top: 12px;
+    margin-top: 8px;
     flex-shrink: 0;
     /* ✅ 修复: 移除 overflow-y，避免未溢出时显示滚动条 */
     overflow-y: visible;
@@ -1968,4 +2058,42 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 /* 移除: 面板控制按钮样式（已迁移到视频控制栏） */
 /* .panel-controls 相关样式已删除 */
+
+/* ✅ 新增: 情绪趋势图表区域样式 */
+.panel-lower {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    padding: 10px 14px 14px;
+}
+
+.emotion-trend-section {
+    width: 100%;
+}
+
+.trend-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.trend-section-header h4 {
+    font-size: 15px;
+    font-weight: 100;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    margin: 0;
+}
+
+.section-icon {
+    display: flex;
+    color: var(--primary);
+}
+
+.trend-chart-wrapper {
+    width: 100%;
+}
 </style>

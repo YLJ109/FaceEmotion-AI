@@ -35,7 +35,8 @@ def register_all_routes(
         face_detector=face_detector,
         emotion_model=emotion_model,
         adaptive_learner=adaptive_learner,
-        executor=executor
+        executor=executor,
+        inference_optimizer=inference_optimizer  # ✅ 新增: 传递推理优化器
     )
 
     init_detection_router(
