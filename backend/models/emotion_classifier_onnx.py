@@ -1,7 +1,7 @@
-"""情感分类器 - ONNX Runtime版本（使用共享常量）"""
+"""情感分类器 - ONNX Runtime版本（支持FP16量化）"""
 import numpy as np
 import onnxruntime as ort
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 import cv2
 import logging
 import multiprocessing
@@ -12,18 +12,32 @@ logger = logging.getLogger(__name__)
 
 
 class EmotionClassifierONNX:
-    """基于ONNX的情感分类器（CPU版）"""
+    """基于ONNX的情感分类器（支持FP16量化加速）"""
 
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, use_quantized: bool = False):
+        """
+        初始化情感分类器
+        
+        Args:
+            model_path: ONNX模型路径
+            use_quantized: 是否启用FP16量化推理（可提升性能）
+        """
         # ✅ 修复: 强制使用CPU，移除CUDA逻辑
         providers = ['CPUExecutionProvider']
         provider_options = [{}]
         self.use_cuda = False
+        self.use_quantized = use_quantized
 
         # ✅ 优化: 配置ONNX Runtime CPU多线程加速
         session_options = ort.SessionOptions()
         session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.enable_cpu_mem_arena = True
+
+        # ✅ 新增: FP16量化支持
+        if use_quantized:
+            session_options.add_session_config_entry('session.enable_fp16', '1')
+            session_options.add_session_config_entry('session.intra_op_thread_spinning', '1')
+            logger.info("✅ 已启用FP16量化推理")
 
         # 根据CPU核心数配置线程数（最多4个）
         cpu_count = multiprocessing.cpu_count()
@@ -42,7 +56,7 @@ class EmotionClassifierONNX:
         self.output_name = self.session.get_outputs()[0].name
         logger.info(
             f"📊 ONNX Input: {self.input_name}, Output: {self.output_name}")
-        logger.info(f"✅ ONNX情绪识别模型加载成功 (CPU)")
+        logger.info(f"✅ ONNX情绪识别模型加载成功 (CPU{' + FP16' if use_quantized else ''})")
 
     def predict(self, face_image: np.ndarray) -> Tuple[str, float, Dict[str, float]]:
         """

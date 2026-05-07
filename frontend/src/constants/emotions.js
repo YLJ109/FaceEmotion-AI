@@ -1,122 +1,112 @@
 /**
- * 情绪相关常量定义
- * 统一管理所有情绪映射、颜色、图标等数据
+ * 情绪常量定义
+ * 统一管理情绪相关的配置和映射
  */
 
-// 情绪中文名称映射
-export const EMOTION_NAMES = {
-    happy: '开心',
-    enjoy: '开心',      // enjoy 别名映射到 happy
-    sad: '悲伤',
-    angry: '愤怒',
-    surprise: '惊讶',
-    surprised: '惊讶',  // 兼容后端数据库
-    fear: '恐惧',
-    fearful: '恐惧',    // 兼容后端数据库
-    disgust: '厌恶',
-    disgusted: '厌恶',  // 兼容后端数据库
-    neutral: '平静',
-    calm: '平静'        // wav2vec2 模型标签
+// 情绪键名（与后端一致）
+export const EMOTION_KEYS = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+
+// 情绪中文名映射
+export const EMOTION_NAME_MAP = {
+  happy: '开心',
+  sad: '悲伤',
+  angry: '愤怒',
+  surprise: '惊讶',
+  fear: '恐惧',
+  disgust: '厌恶',
+  neutral: '平静'
 }
 
-// 情绪 Emoji 图标映射
-export const EMOTION_EMOJI = {
-    happy: '😊',
-    sad: '😢',
-    angry: '😠',
-    surprise: '😲',
-    surprised: '😲',    // 兼容 surprised 标签
-    fear: '😰',
-    fearful: '😰',      // 兼容 fearful 标签
-    disgust: '🤢',
-    disgusted: '🤢',    // 兼容 disgusted 标签
-    neutral: '😐',          // 平静表情（中性）
-    calm: '😌'              // calm 表情
+// 情绪图标映射（使用emoji）
+export const EMOTION_EMOJI_MAP = {
+  happy: '😊',
+  sad: '😢',
+  angry: '😠',
+  surprise: '😮',
+  fear: '😨',
+  disgust: '🤢',
+  neutral: '😐'
 }
 
-// 情绪颜色映射（与主题配色统一）
-export const EMOTION_COLORS = {
-    happy: '#26DE81',
-    enjoy: '#26DE81',   // enjoy 使用 happy 的颜色
-    sad: '#0ABDE3',
-    angry: '#FF6348',
-    surprise: '#E056FD',
-    surprised: '#E056FD',  // 兼容后端数据库
-    fear: '#9B59B6',       // 恐惧使用明亮的紫色
-    fearful: '#9B59B6',    // 兼容后端数据库
-    disgust: '#FFA502',
-    disgusted: '#FFA502',  // 兼容后端数据库
-    neutral: '#747D8C',
-    calm: '#A4B0BE'        // calm 颜色（浅灰色）
+// 情绪颜色映射（主题色）
+export const EMOTION_COLOR_MAP = {
+  happy: '#10B981',    // 绿色
+  sad: '#3B82F6',      // 蓝色
+  angry: '#EF4444',    // 红色
+  surprise: '#8B5CF6', // 紫色
+  fear: '#9333EA',     // 深紫色
+  disgust: '#F59E0B',  // 橙色
+  neutral: '#6B7280'   // 灰色
 }
 
-// 情绪列表（用于遍历）
-export const EMOTION_LIST = [
-    'happy', 'sad', 'angry', 'surprise', 'surprised',
-    'fear', 'fearful', 'disgust', 'neutral', 'calm'
+// 情绪颜色十六进制数组（用于图表）
+export const EMOTION_COLORS = [
+  '#10B981',  // happy - 绿色
+  '#3B82F6',  // sad - 蓝色
+  '#EF4444',  // angry - 红色
+  '#8B5CF6',  // surprise - 紫色
+  '#9333EA',  // fear - 深紫色
+  '#F59E0B',  // disgust - 橙色
+  '#6B7280'   // neutral - 灰色
 ]
 
-// 情绪渐变色（用于进度条等）
-export const EMOTION_GRADIENTS = {
-    happy: ['#26DE81', '#20E3B2'],
-    enjoy: ['#26DE81', '#20E3B2'],
-    sad: ['#0ABDE3', '#48DBFB'],
-    angry: ['#FF6348', '#FF7979'],
-    surprise: ['#E056FD', '#BE2EDD'],
-    surprised: ['#E056FD', '#BE2EDD'],
-    fear: ['#2F3542', '#57606F'],
-    fearful: ['#2F3542', '#57606F'],
-    disgust: ['#FFA502', '#FFBE76'],
-    disgusted: ['#FFA502', '#FFBE76'],
-    neutral: ['#747D8C', '#A4B0BE'],
-    calm: ['#A4B0BE', '#D1D8E0']
+// 兼容性导出 - 保持与旧代码的兼容性
+export const EMOTION_NAMES = EMOTION_KEYS
+export const EMOTION_EMOJI = EMOTION_EMOJI_MAP
+export const EMOTION_LIST = EMOTION_KEYS.map(key => ({
+  key,
+  name: EMOTION_NAME_MAP[key],
+  emoji: EMOTION_EMOJI_MAP[key],
+  color: EMOTION_COLOR_MAP[key]
+}))
+
+// 获取情绪中文名
+export function getEmotionName(key) {
+  return EMOTION_NAME_MAP[key] || key
 }
 
-/**
- * 获取情绪的完整信息（名称 + Emoji + 颜色）
- * @param {string} emotion - 情绪标识
- * @returns {{ name: string, emoji: string, color: string }}
- */
-export function getEmotionInfo(emotion) {
-    return {
-        name: EMOTION_NAMES[emotion] || emotion,
-        emoji: EMOTION_EMOJI[emotion] || '',
-        color: EMOTION_COLORS[emotion] || '#999'
-    }
+// 获取情绪图标
+export function getEmotionEmoji(key) {
+  return EMOTION_EMOJI_MAP[key] || '😐'
 }
 
-/**
- * 获取情绪中文名称
- * @param {string} emotion - 情绪标识
- * @returns {string}
- */
-export function getEmotionName(emotion) {
-    return EMOTION_NAMES[emotion] || emotion
+// 获取情绪颜色
+export function getEmotionColor(key) {
+  return EMOTION_COLOR_MAP[key] || '#6B7280'
 }
 
-/**
- * 获取情绪 Emoji 图标
- * @param {string} emotion - 情绪标识
- * @returns {string}
- */
-export function getEmotionEmoji(emotion) {
-    return EMOTION_EMOJI[emotion] || ''
+// 获取情绪索引
+export function getEmotionIndex(key) {
+  return EMOTION_KEYS.indexOf(key)
 }
 
-/**
- * 获取情绪颜色
- * @param {string} emotion - 情绪标识
- * @returns {string}
- */
-export function getEmotionColor(emotion) {
-    return EMOTION_COLORS[emotion] || '#999'
+// 获取所有情绪名称列表
+export function getEmotionNames() {
+  return EMOTION_KEYS.map(key => EMOTION_NAME_MAP[key])
 }
 
-/**
- * 获取情绪渐变色
- * @param {string} emotion - 情绪标识
- * @returns {string[]}
- */
-export function getEmotionGradient(emotion) {
-    return EMOTION_GRADIENTS[emotion] || ['#747D8C', '#A4B0BE']
+// 获取情绪完整信息
+export function getEmotionInfo(key) {
+  return {
+    key,
+    name: EMOTION_NAME_MAP[key] || key,
+    emoji: EMOTION_EMOJI_MAP[key] || '😐',
+    color: EMOTION_COLOR_MAP[key] || '#6B7280'
+  }
+}
+
+// 获取情绪渐变颜色
+export function getEmotionGradient(key, direction = 'to bottom') {
+  const color = EMOTION_COLOR_MAP[key] || '#6B7280'
+  return `linear-gradient(${direction}, ${color}, ${adjustBrightness(color, -30)})`
+}
+
+// 辅助函数：调整颜色亮度
+function adjustBrightness(hex, percent) {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const amt = Math.round(2.55 * percent)
+  const R = Math.min(255, Math.max(0, (num >> 16) + amt))
+  const G = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amt))
+  const B = Math.min(255, Math.max(0, (num & 0x0000ff) + amt))
+  return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`
 }

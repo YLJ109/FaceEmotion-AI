@@ -26,32 +26,61 @@
                         <el-form label-position="top" size="large">
                             <!-- 性能模式选择器 -->
                             <el-form-item label="性能模式">
-                                <el-select v-model="settingsConfig.performance_mode" style="width:100%"
-                                    @change="handlePerformanceModeChange" class="compact-select">
-                                    <el-option label="🚀 超高 (Ultra) - 高分辨率 + 无跳帧 + 极速响应" value="ultra" />
-                                    <el-option label="⚡ 高 (High) - 标准分辨率 + 适度跳帧 + 平衡性能" value="high" />
-                                    <el-option label="💻 中 (Medium) - 低分辨率 + 较大跳帧 + 稳定运行" value="medium" />
-                                    <el-option label="🐢 低 (Low) - 最低分辨率 + 最大跳帧 + 轻量运行" value="low" />
-                                </el-select>
+                                <div class="mode-selector-row">
+                                    <el-select v-model="settingsConfig.performance_mode"
+                                        @change="handlePerformanceModeChange" class="compact-select">
+                                        <el-option label="🚀 极致模式 (Ultra)" value="ultra" />
+                                        <el-option label="⚡ 高性能模式 (High)" value="high" />
+                                        <el-option label="🔄 平衡模式 (Medium)" value="medium" />
+                                        <el-option label="🌙 节能模式 (Low)" value="low" />
+                                    </el-select>
+                                    <el-button type="primary" round @click="detectAndRecommendMode"
+                                        :loading="detecting" size="small">
+                                        <el-icon>
+                                            <Odometer />
+                                        </el-icon>
+                                        {{ detecting ? '检测中...' : '智能推荐' }}
+                                    </el-button>
+                                </div>
                                 <div class="mode-description">
                                     <div v-if="settingsConfig.performance_mode === 'ultra'">
-                                        <p><strong>适用场景：</strong>高端 CPU (Intel i7+ / AMD Ryzen 7+)</p>
-                                        <p><strong>性能表现：</strong>25-40 FPS，最佳画质和响应速度</p>
+                                        <div class="mode-stats">
+                                            <span class="stat-item"><strong>分辨率:</strong> 256×192</span>
+                                            <span class="stat-item"><strong>跳帧:</strong> 无</span>
+                                            <span class="stat-item"><strong>线程:</strong> 4</span>
+                                        </div>
+                                        <p><strong>适用场景：</strong>高端游戏本/台式机 (Intel i7+ / AMD Ryzen 7+)</p>
+                                        <p><strong>特点：</strong>极致画质，每帧检测，最低延迟，适合专业场景</p>
                                         <p><strong>硬件要求：</strong>CPU 6核心以上，内存 ≥ 8GB</p>
                                     </div>
                                     <div v-else-if="settingsConfig.performance_mode === 'high'">
-                                        <p><strong>适用场景：</strong>中端 CPU (Intel i5 / AMD Ryzen 5)</p>
-                                        <p><strong>性能表现：</strong>15-25 FPS，平衡性能和流畅度</p>
+                                        <div class="mode-stats">
+                                            <span class="stat-item"><strong>分辨率:</strong> 192×144</span>
+                                            <span class="stat-item"><strong>跳帧:</strong> 1/2</span>
+                                            <span class="stat-item"><strong>线程:</strong> 3</span>
+                                        </div>
+                                        <p><strong>适用场景：</strong>主流笔记本/台式机 (Intel i5 / AMD Ryzen 5)</p>
+                                        <p><strong>特点：</strong>高性能，平衡画质与流畅度，适合日常使用</p>
                                         <p><strong>硬件要求：</strong>CPU 4核心以上，内存 ≥ 4GB</p>
                                     </div>
                                     <div v-else-if="settingsConfig.performance_mode === 'medium'">
-                                        <p><strong>适用场景：</strong>入门 CPU (Intel i3 / AMD Ryzen 3)</p>
-                                        <p><strong>性能表现：</strong>8-15 FPS，CPU 推理，稳定运行</p>
+                                        <div class="mode-stats">
+                                            <span class="stat-item"><strong>分辨率:</strong> 128×96</span>
+                                            <span class="stat-item"><strong>跳帧:</strong> 1/4</span>
+                                            <span class="stat-item"><strong>线程:</strong> 2</span>
+                                        </div>
+                                        <p><strong>适用场景：</strong>入门级设备 (Intel i3 / AMD Ryzen 3)</p>
+                                        <p><strong>特点：</strong>CPU推理模式，禁用高级特性，稳定运行</p>
                                         <p><strong>硬件要求：</strong>CPU 2核心以上，内存 ≥ 4GB</p>
                                     </div>
                                     <div v-else>
-                                        <p><strong>适用场景：</strong>老旧硬件或低功耗设备 (Intel i3 / 集成显卡)</p>
-                                        <p><strong>性能表现：</strong>5-8 FPS，确保流畅运行</p>
+                                        <div class="mode-stats">
+                                            <span class="stat-item"><strong>分辨率:</strong> 80×60</span>
+                                            <span class="stat-item"><strong>跳帧:</strong> 1/8</span>
+                                            <span class="stat-item"><strong>线程:</strong> 1</span>
+                                        </div>
+                                        <p><strong>适用场景：</strong>老旧设备或低功耗笔记本</p>
+                                        <p><strong>特点：</strong>节能优先，禁用实时图表，最低资源占用</p>
                                         <p><strong>硬件要求：</strong>任意 CPU，内存 ≥ 2GB</p>
                                     </div>
                                 </div>
@@ -188,14 +217,6 @@
 
                     <!-- 操作按钮 -->
                     <div class="settings-actions">
-                        <!-- ✅ 性能优化选项卡专属按钮 -->
-                        <el-button v-if="activeTab === 'performance'" type="primary" round
-                            @click="detectAndRecommendMode" :loading="detecting" size="large">
-                            <el-icon>
-                                <Odometer />
-                            </el-icon>
-                            {{ detecting ? '检测中...' : ' 智能推荐最佳模式' }}
-                        </el-button>
                         <el-button type="primary" plain round @click="resetConfig" size="large">
                             恢复默认
                         </el-button>
@@ -443,10 +464,27 @@ watch(
 </script>
 
 <style scoped>
+/* ✅ 模式选择器行布局 */
+.mode-selector-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.mode-selector-row .compact-select {
+    flex: 1;
+    min-width: 0;
+}
+
+.mode-selector-row .el-button {
+    flex-shrink: 0;
+}
+
 /* ✅ 性能模式描述样式 */
 .mode-description {
     margin-top: 12px;
-    padding: 10px 12px;
+    padding: 12px 14px;
     background: linear-gradient(135deg, rgba(113, 57, 255, 0.08), rgba(156, 78, 255, 0.05));
     border-left: 3px solid var(--primary);
     border-radius: 6px;
@@ -454,15 +492,34 @@ watch(
 }
 
 .mode-description p {
-    margin: 4px 0;
+    margin: 6px 0;
     font-size: 13px;
     color: var(--text-secondary);
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
 .mode-description strong {
     color: var(--primary);
     font-weight: 600;
+}
+
+/* ✅ 模式统计信息 */
+.mode-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.mode-stats .stat-item {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 4px 8px;
+    background: rgba(113, 57, 255, 0.1);
+    border-radius: 4px;
 }
 
 /* ✅ 新增: 硬件信息展示样式 */

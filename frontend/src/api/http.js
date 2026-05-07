@@ -5,6 +5,7 @@
 import axios from 'axios'
 import { API_BASE_URL } from './config'
 import { ElMessage } from 'element-plus'
+import logger from '@/utils/logger'
 
 // 创建 Axios 实例
 const http = axios.create({
@@ -24,15 +25,13 @@ http.interceptors.request.use(
         //   config.headers.Authorization = `Bearer ${token}`
         // }
 
-        // 开发环境打印请求信息
-        if (import.meta.env.DEV) {
-            console.log(`📤 [API Request] ${config.method?.toUpperCase()} ${config.url}`)
-        }
+        // 使用统一日志工具
+        logger.apiRequest(config.method, config.url)
 
         return config
     },
     error => {
-        console.error('❌ [Request Error]', error)
+        logger.error('[Request Error]', error)
         return Promise.reject(error)
     }
 )
@@ -40,10 +39,8 @@ http.interceptors.request.use(
 // ==================== 响应拦截器 ====================
 http.interceptors.response.use(
     response => {
-        // 开发环境打印响应信息
-        if (import.meta.env.DEV) {
-            console.log(`📥 [API Response] ${response.status} ${response.config.url}`)
-        }
+        // 使用统一日志工具
+        logger.apiResponse(response.status, response.config.url)
 
         // 直接返回 data，简化调用
         return response.data
@@ -57,7 +54,7 @@ http.interceptors.response.use(
             ElMessage.error(message)
         }
 
-        console.error(`❌ [API Error] ${message}`, error)
+        logger.error(`[API Error] ${message}`, error)
 
         return Promise.reject(error)
     }

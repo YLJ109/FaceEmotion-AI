@@ -8,27 +8,23 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
-import * as echarts from 'echarts'
-import { getEmotionName, getEmotionColor } from '@/utils/emotion'
-import { useThemeStore } from '@/stores/theme'
-
+<script setup>import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import * as echarts from 'echarts';
+import { getEmotionName, getEmotionColor } from '@/constants/emotions';
+import { useThemeStore } from '@/stores/theme';
 const props = defineProps({
-  // 时间序列数据：[{ timestamp, emotions: { happy: 0.8, sad: 0.1, ... } }]
-  emotionHistory: {
-    type: Array,
-    default: () => []
-  }
-})
-
-const chartRef = ref(null)
-const themeStore = useThemeStore()
-let chartInstance = null
-let isUnmounted = false  // ✅ 修复: 跟踪组件卸载状态，防止 keep-alive 缓存时的 DOM 错误
-
-// 7种情绪列表
-const EMOTION_KEYS = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+ // 时间序列数据：[{ timestamp, emotions: { happy: 0.8, sad: 0.1, ... } }]
+ emotionHistory: {
+ type: Array,
+ default: () => []
+ }
+});
+const chartRef = ref(null);
+const themeStore = useThemeStore();
+let chartInstance = null;
+let isUnmounted = false; // ✅ 修复: 跟踪组件卸载状态，防止 keep-alive 缓存时的 DOM 错误
+// 从统一常量导入情绪列表
+import { EMOTION_KEYS } from '@/constants/emotions';
 
 // 判断是否为空数据
 const isEmpty = computed(() => props.emotionHistory.length === 0)
@@ -159,7 +155,7 @@ const updateChart = () => {
     },
     legend: {
       data: EMOTION_KEYS.map(key => getEmotionName(key)),
-      bottom: 5,
+      bottom: 8,
       left: 'center',
       textStyle: { 
         color: hexToRgba(textColor, 0.7), 
@@ -177,7 +173,7 @@ const updateChart = () => {
       left: 35,
       right: 15,
       top: 15,
-      bottom: 40
+      bottom: 55
     },
     xAxis: {
       type: 'category',

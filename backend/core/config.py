@@ -54,47 +54,59 @@ class ConfigManager:
         """根据当前性能模式返回对应的配置参数"""
         mode = self.config.get('performance_mode', 'high')
 
-        # 四级性能模式配置表
+        # 四级性能模式配置表 - 差异更明显
         PERFORMANCE_PROFILES = {
             'ultra': {
                 'use_gpu': True,
-                'send_width': 224,
-                'send_height': 168,
-                'frame_skip_threshold': 1,  # 不跳帧
-                'ema_alpha': 0.15,  # 快速响应
+                'send_width': 256,
+                'send_height': 192,
+                'frame_skip_threshold': 1,  # 不跳帧，每帧都检测
+                'ema_alpha': 0.3,  # 快速响应，低延迟
+                'inference_threads': 4,
                 'enable_multimodal': True,
                 'enable_adaptive_learning': True,
                 'enable_realtime_charts': True,
+                'quality_preset': 'high',
+                'description': '极致画质，零延迟'
             },
             'high': {
                 'use_gpu': True,
-                'send_width': 160,
-                'send_height': 120,
-                'frame_skip_threshold': 2,  # 适度跳帧
-                'ema_alpha': 0.15,
+                'send_width': 192,
+                'send_height': 144,
+                'frame_skip_threshold': 2,  # 每2帧检测一次
+                'ema_alpha': 0.2,  # 平衡响应与平滑
+                'inference_threads': 3,
                 'enable_multimodal': True,
                 'enable_adaptive_learning': True,
                 'enable_realtime_charts': True,
+                'quality_preset': 'medium',
+                'description': '高性能，流畅体验'
             },
             'medium': {
-                'use_gpu': False,  # 强制CPU
+                'use_gpu': False,  # 强制CPU模式
                 'send_width': 128,
                 'send_height': 96,
-                'frame_skip_threshold': 3,  # 较大跳帧
-                'ema_alpha': 0.2,  # 更平滑但响应稍慢
-                'enable_multimodal': False,  # 禁用多模态
+                'frame_skip_threshold': 4,  # 每4帧检测一次
+                'ema_alpha': 0.15,  # 更平滑，响应稍慢
+                'inference_threads': 2,
+                'enable_multimodal': False,  # 禁用多模态处理
                 'enable_adaptive_learning': False,  # 禁用自适应学习
                 'enable_realtime_charts': True,
+                'quality_preset': 'low',
+                'description': '平衡性能，稳定运行'
             },
             'low': {
-                'use_gpu': False,  # 强制CPU
-                'send_width': 96,
-                'send_height': 72,
-                'frame_skip_threshold': 5,  # 最大跳帧
-                'ema_alpha': 0.25,  # 极致平滑
+                'use_gpu': False,  # 强制CPU模式
+                'send_width': 80,
+                'send_height': 60,
+                'frame_skip_threshold': 8,  # 每8帧检测一次
+                'ema_alpha': 0.1,  # 极致平滑，响应较慢
+                'inference_threads': 1,
                 'enable_multimodal': False,
                 'enable_adaptive_learning': False,
                 'enable_realtime_charts': False,  # 禁用实时图表
+                'quality_preset': 'basic',
+                'description': '节能模式，最低资源占用'
             }
         }
 

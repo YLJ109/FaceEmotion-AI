@@ -2,7 +2,7 @@
  * Canvas绘制工具 - 高性能渲染人脸框与情感标签
  * 使用阴影代替手动描边，减少绘制调用次数
  */
-import { EMOTION_NAMES, EMOTION_EMOJI } from './emotion'
+import { getEmotionName, getEmotionEmoji } from './emotion'
 
 /**
  * 绘制带发光效果的四角框
@@ -62,9 +62,11 @@ export function drawEmotionLabel(ctx, bbox, emotion, confidence, themeColors, fa
 
   // 根据人脸数量决定是否显示编号
   const showIndex = totalFaces > 1
+  const emotionName = getEmotionName(emotion)
+  const emotionEmoji = getEmotionEmoji(emotion)
   const label = showIndex
-    ? `人脸${faceIndex} ${EMOTION_EMOJI[emotion] || ''} ${EMOTION_NAMES[emotion] || emotion}: ${(confidence * 100).toFixed(1)}%`
-    : `${EMOTION_EMOJI[emotion] || ''} ${EMOTION_NAMES[emotion] || emotion}: ${(confidence * 100).toFixed(1)}%`
+    ? `人脸${faceIndex} ${emotionEmoji} ${emotionName}: ${(confidence * 100).toFixed(1)}%`
+    : `${emotionEmoji} ${emotionName}: ${(confidence * 100).toFixed(1)}%`
 
   ctx.save()
 
