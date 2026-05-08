@@ -11,29 +11,29 @@ import { useRouter, useRoute } from 'vue-router'
 const NAVIGATION_CONFIG = {
     // 数据模式分组
     data: [
-        { key: 'analytics', label: '数据看板', icon: 'DataAnalysis', path: '/analytics' },
-        { key: 'adaptive-learning', label: 'AI学习监控', icon: 'Cpu', path: '/adaptive-learning' }
+        { key: 'analytics', label: '数据看板', enLabel: 'Analytics', icon: 'DataAnalysis', path: '/analytics' },
+        { key: 'adaptive-learning', label: 'AI学习监控', enLabel: 'AI Learning', icon: 'Cpu', path: '/adaptive-learning' }
     ],
 
     // 检测模式分组
     detection: [
-        { key: 'realtime', label: '实时检测', icon: 'VideoCamera', path: '/realtime' },
-        { key: 'image', label: '图片检测', icon: 'Picture', path: '/image' },
-        { key: 'batch', label: '图片批量检测', icon: 'Files', path: '/batch', badge: '3并发' },
-        { key: 'video', label: '视频检测', icon: 'VideoPlay', path: '/video', badge: 'Beta' },
-        { key: 'batch-video', label: '批量视频检测', icon: 'Film', path: '/batch-video', badge: '3并发' }
+        { key: 'realtime', label: '实时检测', enLabel: 'Real-time', icon: 'VideoCamera', path: '/realtime' },
+        { key: 'image', label: '图片检测', enLabel: 'Image', icon: 'Picture', path: '/image' },
+        { key: 'batch', label: '图片批量检测', enLabel: 'Batch', icon: 'Files', path: '/batch', badge: '3并发' },
+        { key: 'video', label: '视频检测', enLabel: 'Video', icon: 'VideoPlay', path: '/video', badge: 'Beta' },
+        { key: 'batch-video', label: '批量视频检测', enLabel: 'Batch Video', icon: 'Film', path: '/batch-video', badge: '3并发' }
     ],
 
     // 记录模式分组
     record: [
-        { key: 'history', label: '历史档案', icon: 'Clock', path: '/history' },
-        { key: 'feedback-history', label: '反馈历史', icon: 'DocumentChecked', path: '/feedback-history' }
+        { key: 'history', label: '历史档案', enLabel: 'History', icon: 'Clock', path: '/history' },
+        { key: 'feedback-history', label: '反馈历史', enLabel: 'Feedback', icon: 'DocumentChecked', path: '/feedback-history' }
     ],
 
     // 管理分组
     manage: [
-        { key: 'theme', label: '主题切换', icon: 'Brush', path: '/theme' },
-        { key: 'settings', label: '系统设置', icon: 'Setting', path: '/settings' }
+        { key: 'theme', label: '主题切换', enLabel: 'Theme', icon: 'Brush', path: '/theme' },
+        { key: 'settings', label: '系统设置', enLabel: 'Settings', icon: 'Setting', path: '/settings' }
     ]
 }
 
@@ -113,11 +113,37 @@ export function useNavigation() {
         return descriptions[themeKey] || ''
     }
 
+    /**
+     * 获取当前激活菜单的标签
+     * @returns {string} 当前激活菜单项的标签
+     */
+    const getActiveMenuLabel = computed(() => {
+        for (const group of Object.values(NAVIGATION_CONFIG)) {
+            const item = group.find(i => i.key === activeMenu.value)
+            if (item) return item.label
+        }
+        return ''
+    })
+
+    /**
+     * 获取当前激活菜单的英文标签
+     * @returns {string} 当前激活菜单项的英文标签
+     */
+    const getActiveMenuEnLabel = computed(() => {
+        for (const group of Object.values(NAVIGATION_CONFIG)) {
+            const item = group.find(i => i.key === activeMenu.value)
+            if (item) return item.enLabel
+        }
+        return ''
+    })
+
     return {
         activeMenu,
         navigateTo,
         isActive,
         navigationMenus,
-        getThemeDesc
+        getThemeDesc,
+        getActiveMenuLabel,
+        getActiveMenuEnLabel
     }
 }

@@ -28,6 +28,7 @@ def register_all_routes(
     from api.ai_features import router as ai_router, init_ai_router
     from api.system import router as system_router, init_system_router
     from api.text_analysis import router as text_analysis_router, init_text_analysis_router
+    from api.emotion_trend_analysis import router as emotion_trend_router
 
     # 2. 初始化各路由依赖
     init_ws_router(
@@ -72,3 +73,4 @@ def register_all_routes(
     app.include_router(ai_router)
     app.include_router(system_router)
     app.include_router(text_analysis_router)
+    app.include_router(emotion_trend_router)

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <div class="video-detector">
         <div class="detector-layout">
             <!-- 左侧：视频上传和播放 -->
@@ -309,8 +309,8 @@ const onVideoTimeUpdate = () => {
                     detail: currentFrame.music_params
                 }))
 
-                // 直接调用音乐引擎播放（先检查是否已初始化）
-                if (generativeAudio.isInitialized) {
+                // ✅ 修复: 只在用户没有手动关闭音乐时自动播放
+                if (generativeAudio.isInitialized && generativeAudio.isPlaying) {
                     generativeAudio.playMusic(currentFrame.music_params)
                 }
             }
@@ -332,6 +332,10 @@ const onVideoPause = () => {
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId)
         animationFrameId = null
+    }
+    // ✅ 新增: 视频暂停时自动停止音乐
+    if (generativeAudio.isInitialized && generativeAudio.isPlaying) {
+        generativeAudio.stop()
     }
 }
 
@@ -514,6 +518,16 @@ const startDetection = async () => {
     processing.value = true; progress.value = 0
     statusText.value = '正在上传...'; results.value = []
 
+    // ✅ 新增: 在用户交互时初始化音频引擎（浏览器策略要求）
+    if (!generativeAudio.isInitialized) {
+        try {
+            await generativeAudio.init()
+            console.log('✅ 音频引擎已初始化')
+        } catch (error) {
+            console.warn('音频引擎初始化失败:', error)
+        }
+    }
+
     const startTime = performance.now()
 
     try {
@@ -560,8 +574,8 @@ const startDetection = async () => {
                         detail: musicParams
                     }))
 
-                    // 直接调用音乐引擎播放（先检查是否已初始化）
-                    if (generativeAudio.isInitialized) {
+                    // ✅ 修复: 只在用户没有手动关闭音乐时自动播放
+                    if (generativeAudio.isInitialized && generativeAudio.isPlaying) {
                         generativeAudio.playMusic(musicParams)
                     }
                 }
@@ -598,6 +612,10 @@ const startDetection = async () => {
 const reset = () => {
     videoUrl.value = null; selectedFile.value = null; results.value = []
     progress.value = 0; if (videoRef.value) videoRef.value.pause()
+    // ✅ 新增: 停止检测时自动停止音乐
+    if (generativeAudio.isInitialized && generativeAudio.isPlaying) {
+        generativeAudio.stop()
+    }
 }
 
 // 保存视频检测到历史记录

@@ -602,7 +602,7 @@ class GenerativeAudioEngine {
         this.currentOscillators = [];
         this.currentGainNodes = [];
 
-        console.log('⏹️ 音乐已停止');
+        console.log('[音频] 音乐已停止');
     }
 
     /**
@@ -664,7 +664,7 @@ class GenerativeAudioEngine {
 
         if (this.audioContext) {
             this.audioContext.close().then(() => {
-                console.log('🗑️ 音频引擎已销毁');
+                console.log('[音频] 音频引擎已销毁');
             });
         }
 

@@ -15,11 +15,21 @@
                 <span class="logo-sub">智能情绪识别平台</span>
             </div>
         </div>
+
+        <!-- 当前页面面包屑导航 -->
+        <div class="navbar-title">
+            <nav class="breadcrumb">
+                <span class="breadcrumb-item en">{{ getActiveMenuEnLabel }}</span>
+                <span class="breadcrumb-separator">/</span>
+                <span class="breadcrumb-item active">{{ getActiveMenuLabel }}</span>
+            </nav>
+        </div>
+
         <div class="navbar-right">
             <!-- ✅ 性能监控按钮 -->
             <el-tooltip content="性能监控 (Ctrl+P)" placement="bottom">
                 <button class="nav-tool-btn" :class="{ active: performancePanelVisible }" @click="togglePerformanceMonitor">
-                    <span class="btn-icon">🖥️</span>
+                    <SvgIcon name="monitor" :size="16" class="btn-icon" />
                     <span class="btn-label">性能监控</span>
                     <span class="btn-arrow">{{ performancePanelVisible ? '▲' : '▼' }}</span>
                 </button>
@@ -28,7 +38,7 @@
             <!-- ✅ 新增: AI音乐按钮 -->
             <el-tooltip :content="musicOn ? 'AI音乐控制面板' : '开启AI音乐'" placement="bottom">
                 <button class="nav-tool-btn" :class="{ active: musicPanelVisible }" @click="toggleMusicPanel">
-                    <span class="btn-icon">🎵</span>
+                    <SvgIcon name="music" :size="16" class="btn-icon" />
                     <span class="btn-label">{{ musicOn ? 'AI音乐 ON' : 'AI音乐' }}</span>
                     <span v-if="musicOn" class="music-badge"></span>
                     <span class="btn-arrow">{{ musicPanelVisible ? '▲' : '▼' }}</span>
@@ -48,6 +58,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import EmotionAnalyzer from '@/components/header/EmotionAnalyzer.vue'
+import { useNavigation } from '@/composables/useNavigation'
+import SvgIcon from '@/components/icons/SvgIcons.vue'
+
+const { getActiveMenuLabel, getActiveMenuEnLabel } = useNavigation()
 
 // ✅ 新增: 音乐状态
 defineProps({
@@ -229,6 +243,49 @@ onUnmounted(() => {
     align-items: center;
 }
 
+/* 当前页面标题 */
+.navbar-title {
+    position: absolute;
+    left: 200px;
+    display: flex;
+    align-items: center;
+    padding: 4px 12px;
+    background: transparent;
+    border-radius: 0;
+    border: none;
+}
+
+/* 面包屑导航 */
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.breadcrumb-item {
+    font-size: 16px;
+    color: var(--text-secondary);
+    transition: color 0.2s ease;
+}
+
+.breadcrumb-item.en {
+    font-size: 18px;
+    /* font-weight: 400; */
+    color: rgba(139, 92, 246, 0.7);
+}
+
+.breadcrumb-item.active {
+    color: var(--text);
+    font-weight: 400;
+    font-size: 20px;
+}
+
+.breadcrumb-separator {
+    color: var(--primary);
+    font-size: 18px;
+    opacity: 0.5;
+}
+
 /* ✅ 工具按钮样式 - 与情绪分析按钮保持一致 */
 .nav-tool-btn {
     display: flex;
@@ -257,6 +314,9 @@ onUnmounted(() => {
 
 .nav-tool-btn .btn-icon {
     font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .nav-tool-btn .btn-label {

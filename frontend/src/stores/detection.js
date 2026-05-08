@@ -169,22 +169,22 @@ export const useDetectionStore = defineStore('detection', () => {
     // ✅ 新增: 清除特定模块的状态
     const clearImageState = () => {
         imageDetectionState.value = null
-        console.log('🗑️ 清除图片检测状态')
+        console.log('[检测] 清除图片检测状态')
     }
 
     const clearVideoState = () => {
         videoDetectionState.value = null
-        console.log('🗑️ 清除视频检测状态')
+        console.log('[检测] 清除视频检测状态')
     }
 
     const clearBatchState = () => {
         batchDetectionState.value = null
-        console.log('️ 清除批量检测状态')
+        console.log('[检测] 清除批量检测状态')
     }
 
     const clearRealtimeState = () => {
         realtimeDetectionState.value = null
-        console.log('🗑️ 清除实时检测状态')
+        console.log('[检测] 清除实时检测状态')
     }
 
     // ✅ 新增: 清除所有检测状态
@@ -193,7 +193,7 @@ export const useDetectionStore = defineStore('detection', () => {
         clearVideoState()
         clearBatchState()
         clearRealtimeState()
-        console.log('🗑️ 清除所有检测状态')
+        console.log('[检测] 清除所有检测状态')
     }
 
     return {

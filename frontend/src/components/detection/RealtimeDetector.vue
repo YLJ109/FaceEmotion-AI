@@ -197,6 +197,7 @@ import { ref, onMounted, onUnmounted, onActivated, onDeactivated, reactive, comp
 import { VideoCamera, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
+import { useDetectionStore } from '@/stores/detection'
 import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotion'
 import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
 import wsManager from '@/api/websocket'
@@ -204,11 +205,14 @@ import EmotionSVG from '@/components/common/EmotionSVG.vue'
 import { logFeatureUsage } from '@/utils/analytics'
 import httpMonitor from '@/utils/httpMonitor'
 import { API } from '@/api/config'
+import generativeAudio from '@/utils/generativeAudio'
 import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
 import EmotionFeedback from '@/components/feedback/EmotionFeedback.vue'
 import EmotionLineChart from '@/components/charts/EmotionLineChart.vue'
+import EmotionTrendPanel from '@/components/analysis/EmotionTrendPanel.vue'
 import { TrendCharts } from '@element-plus/icons-vue'
 import logger from '@/utils/logger'
+import { analyze3SecondWindow, prepareBackendData } from '@/utils/emotionTrendAnalyzer'
 
 // ✅ 新增: 组件名称,用于 keep-alive 缓存
 defineOptions({
@@ -216,6 +220,7 @@ defineOptions({
 })
 
 const themeStore = useThemeStore()
+const detectionStore = useDetectionStore()  // 新增：检测状态store
 const videoElement = ref(null)
 const canvasElement = ref(null)
 const videoContainer = ref(null)
@@ -240,6 +245,13 @@ const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'ne
 const emotionHistory = ref([])  // [{ timestamp, emotions: { happy: 0.8, ... } }]
 const HISTORY_MAX_LENGTH = 60  // 最多保存60秒的数据
 let historyTimer = null  // 定时器，每秒记录一次
+
+// ✅ 新增: 情绪趋势分析数据
+const trendAnalysis = ref({})
+const textAnalysis = ref({})
+const comprehensiveAnalysis = ref({})
+const showTrendPanel = ref(true)
+let trendAnalysisTimer = null  // 情绪趋势分析定时器
 
 // ✅ 新增: 情绪分数排序计算属性（从高到低）
 const sortedEmotionScores = computed(() => {
@@ -277,6 +289,58 @@ const stopHistoryTimer = () => {
 // ✅ 新增: 清空情绪历史
 const clearEmotionHistory = () => {
     emotionHistory.value = []
+}
+
+// ✅ 新增: 启动情绪趋势分析定时器
+const startTrendAnalysisTimer = () => {
+    if (trendAnalysisTimer) return
+    trendAnalysisTimer = setInterval(() => {
+        if (emotionHistory.value.length >= 3) {
+            performTrendAnalysis()
+        }
+    }, 2000)  // 每2秒分析一次
+}
+
+// ✅ 新增: 停止情绪趋势分析定时器
+const stopTrendAnalysisTimer = () => {
+    if (trendAnalysisTimer) {
+        clearInterval(trendAnalysisTimer)
+        trendAnalysisTimer = null
+    }
+}
+
+// ✅ 新增: 执行情绪趋势分析
+const performTrendAnalysis = async () => {
+    try {
+        const currentEmotionData = {
+            emotion: currentEmotion.value,
+            confidence: currentConfidence.value,
+            scores: emotionScores.value
+        }
+
+        const windowAnalysis = analyze3SecondWindow(emotionHistory.value, currentEmotionData)
+
+        if (windowAnalysis.hasData && windowAnalysis.dataPoints >= 3) {
+            const backendData = prepareBackendData(windowAnalysis)
+
+            const response = await fetch(API.emotionTrendAnalyze, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(backendData)
+            })
+
+            if (response.ok) {
+                const result = await response.json()
+                if (result.status === 'success') {
+                    trendAnalysis.value = result.emotion_trend_analysis
+                    textAnalysis.value = result.text_analysis
+                    comprehensiveAnalysis.value = result.comprehensive_analysis
+                }
+            }
+        }
+    } catch (error) {
+        logger.error('情绪趋势分析失败:', error)
+    }
 }
 const currentFaces = ref([])
 const fps = ref(0)
@@ -504,6 +568,8 @@ const cleanupCanvas = () => {
 
 const startCamera = async () => {
     try {
+        // ✅ 重置重连状态，确保重新连接
+        wsManager.resetReconnect()
         if (!wsManager.isConnected) {
             await wsManager.connect()
         }
@@ -522,6 +588,7 @@ const startCamera = async () => {
             logFeatureUsage('realtime', { action: 'start_camera' })
 
             startHistoryTimer()
+            startTrendAnalysisTimer()
 
             startRendering()
             isCameraOn.value = true
@@ -549,6 +616,12 @@ const stopCamera = () => {
     if (animationId) { cancelAnimationFrame(animationId); animationId = null }
     // ✅ 新增: 停止情绪历史记录
     stopHistoryTimer()
+    // ✅ 新增: 停止情绪趋势分析
+    stopTrendAnalysisTimer()
+    // ✅ 新增: 断开WebSocket连接，防止继续接收消息触发音乐
+    if (wsManager.isConnected) {
+        wsManager.close()
+    }
     isCameraOn.value = false
     fps.value = 0
     frameCountForFps = 0
@@ -562,6 +635,10 @@ const stopCamera = () => {
     _adaptiveQuality = 0.5
     _smoothedBbox = null
     clearEmotionHistory()
+    // ✅ 新增: 停止检测时自动停止音乐
+    if (generativeAudio.isInitialized) {
+        generativeAudio.stop()
+    }
     // ✅ 修改: 不再重置情绪统计，保留历史数据供图表显示
     // emotionCounts.happy = 0
     // emotionCounts.sad = 0
@@ -661,7 +738,7 @@ const startRendering = () => {
     const canvas = canvasElement.value
     const video = videoElement.value
     if (!canvas || !video) {
-        logger.error('❌ startRendering: canvas或video元素不存在')
+        logger.error('[渲染] startRendering: canvas或video元素不存在')
         return
     }
 
@@ -923,6 +1000,9 @@ const handleWsMessage = (data) => {
         currentConfidence.value = smoothedConf
         emotionScores.value = { ..._emaScores }
         currentFaces.value = validFaces
+
+        // ✅ 新增: 更新 Pinia store，使顶部情绪分析面板能获取数据
+        detectionStore.updateDetection(validFaces, smoothedEmotion, { ..._emaScores })
 
         // ✅ 优化: 移除延迟,立即触发主题更新(防抖在 themeStore 内部处理)
         themeStore.updateThemeByEmotion(smoothedEmotion)

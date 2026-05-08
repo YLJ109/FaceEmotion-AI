@@ -286,11 +286,25 @@ const backToSelection = () => {
         animationFrameId = null
     }
     isPlaying = false
+    // ✅ 新增: 返回选择列表时自动停止音乐
+    if (generativeAudio.isInitialized && generativeAudio.isPlaying) {
+        generativeAudio.stop()
+    }
 }
 
 const startBatchDetection = async () => {
     if (!fileList.value.length) { ElMessage.warning('请先选择视频'); return }
     detecting.value = true; progress.value = 0; currentIndex.value = 0; results.value = []
+
+    // ✅ 新增: 在用户交互时初始化音频引擎（浏览器策略要求）
+    if (!generativeAudio.isInitialized) {
+        try {
+            await generativeAudio.init()
+            console.log('✅ 音频引擎已初始化')
+        } catch (error) {
+            console.warn('音频引擎初始化失败:', error)
+        }
+    }
 
     const startTime = performance.now()
 
@@ -342,7 +356,8 @@ const startBatchDetection = async () => {
                         detail: musicParams
                     }))
 
-                    if (generativeAudio.isInitialized) {
+                    // ✅ 修复: 只在用户没有手动关闭音乐时自动播放
+                    if (generativeAudio.isInitialized && generativeAudio.isPlaying) {
                         generativeAudio.playMusic(musicParams)
                     }
                 }
@@ -436,8 +451,8 @@ const onVideoTimeUpdate = () => {
                     detail: currentFrame.music_params
                 }))
 
-                // 直接调用音乐引擎播放（先检查是否已初始化）
-                if (generativeAudio.isInitialized) {
+                // ✅ 修复: 只在用户没有手动关闭音乐时自动播放
+                if (generativeAudio.isInitialized && generativeAudio.isPlaying) {
                     generativeAudio.playMusic(currentFrame.music_params)
                 }
             }
@@ -459,6 +474,10 @@ const onVideoPause = () => {
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId)
         animationFrameId = null
+    }
+    // ✅ 新增: 视频暂停时自动停止音乐
+    if (generativeAudio.isInitialized && generativeAudio.isPlaying) {
+        generativeAudio.stop()
     }
 }
 

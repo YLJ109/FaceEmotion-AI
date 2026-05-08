@@ -78,6 +78,7 @@ async def websocket_endpoint(websocket: WebSocket):
     result_queue = asyncio.Queue(maxsize=5)
     stop_event = asyncio.Event()
     last_pong = time.time()
+    connection_closed = False
 
     global_state_lock = asyncio.Lock()
     detection_state = {'enabled': True}
@@ -86,6 +87,8 @@ async def websocket_endpoint(websocket: WebSocket):
         """心跳检测"""
         while not stop_event.is_set():
             await asyncio.sleep(15)
+            if connection_closed:
+                break
             try:
                 await websocket.send_json({"type": "ping"})
             except Exception:
@@ -95,6 +98,7 @@ async def websocket_endpoint(websocket: WebSocket):
     async def receiver():
         """接收帧数据"""
         nonlocal last_pong
+        nonlocal connection_closed
         frame_count = 0
         try:
             while not stop_event.is_set():
@@ -140,7 +144,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         message = json.loads(msg["text"])
                     except (json.JSONDecodeError, TypeError):
                         continue
-                    if message.get('type') == 'pong':
+                    if message.get('type') == 'ping':
+                        await websocket.send_json({'type': 'pong'})
+                    elif message.get('type') == 'pong':
                         last_pong = time.time()
                     elif message.get('type') == 'config_update':
                         _config_manager.update_config(
@@ -152,9 +158,11 @@ async def websocket_endpoint(websocket: WebSocket):
                         logger.info(
                             f"🎛️ 检测开关: {'开启' if detection_state['enabled'] else '关闭'}")
         except (WebSocketDisconnect, RuntimeError):
+            connection_closed = True
             stop_event.set()
         except Exception as e:
             logger.error(f"❌ Receiver 异常: {e}")
+            connection_closed = True
             stop_event.set()
 
     async def processor():
@@ -520,13 +528,19 @@ async def websocket_endpoint(websocket: WebSocket):
 
     async def result_sender():
         """异步发送结果"""
+        nonlocal connection_closed
         try:
             while not stop_event.is_set():
+                if connection_closed:
+                    break
                 try:
                     result_data = await asyncio.wait_for(result_queue.get(), timeout=1.0)
+                    if connection_closed:
+                        break
                     try:
                         await websocket.send_json(result_data)
                     except WebSocketDisconnect:
+                        connection_closed = True
                         logger.warning("🔌 WebSocket 连接已断开，停止发送")
                         stop_event.set()
                         break
@@ -545,7 +559,11 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         await asyncio.gather(receiver_task, processor_task, sender_task)
     except (WebSocketDisconnect, Exception) as e:
+        connection_closed = True
         logger.error(f"❌ WebSocket主循环异常: {e}")
+        stop_event.set()
+    finally:
+        connection_closed = True
         stop_event.set()
         for t in [receiver_task, processor_task, sender_task, heartbeat_task]:
             t.cancel()

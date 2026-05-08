@@ -15,7 +15,10 @@ class WebSocketManager {
     this._onDisconnectCallbacks = []
     this._pingTimer = null
     this._expectingPong = false
+    this._pongTimeout = null
     this.url = url
+    this._isReconnecting = false
+    this._shouldReconnect = true
   }
 
   getUrl() {
@@ -58,7 +61,14 @@ class WebSocketManager {
                 this.ws.send(JSON.stringify({ type: 'pong' }))
                 return
               }
-              if (data.type === 'pong') return
+              if (data.type === 'pong') {
+                this._expectingPong = false
+                if (this._pongTimeout) {
+                  clearTimeout(this._pongTimeout)
+                  this._pongTimeout = null
+                }
+                return
+              }
               this.notifyHandlers(data)
             } catch (e) {
               console.warn('WebSocket消息解析失败:', e)
@@ -73,7 +83,9 @@ class WebSocketManager {
           this._stopHeartbeat()
           this.notifyHandlers({ type: 'disconnected' })
           this._onDisconnectCallbacks.forEach(cb => cb())
-          this.reconnect()
+          if (this._shouldReconnect) {
+            this.reconnect()
+          }
         }
       } catch (error) {
         console.error('WebSocket连接失败:', error)
@@ -83,16 +95,24 @@ class WebSocketManager {
   }
 
   reconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++
-      const delay = Math.min(10000, this.reconnectInterval * Math.pow(1.3, this.reconnectAttempts - 1))
-      setTimeout(() => {
-        this.connect().catch(() => { })
-      }, delay)
-    } else {
-      console.error('❌ 达到最大重连次数')
+    if (this._isReconnecting) return
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('[WebSocket] 达到最大重连次数')
       ElMessage.error('WebSocket连接失败，请刷新页面重试')
+      return
     }
+    
+    this._isReconnecting = true
+    this.reconnectAttempts++
+    const delay = Math.min(10000, this.reconnectInterval * Math.pow(1.3, this.reconnectAttempts - 1))
+    
+    setTimeout(() => {
+      this.connect().catch((error) => {
+        console.warn(`[WebSocket] 重连失败 (${this.reconnectAttempts}/${this.maxReconnectAttempts}):`, error)
+      }).finally(() => {
+        this._isReconnecting = false
+      })
+    }, delay)
   }
 
   send(data) {
@@ -113,6 +133,20 @@ class WebSocketManager {
       return true
     }
     return false
+  }
+
+  close() {
+    this._shouldReconnect = false
+    this._stopHeartbeat()
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      this.ws.close(1000, '主动关闭')
+    }
+    this.ws = null
+  }
+
+  resetReconnect() {
+    this._shouldReconnect = true
+    this.reconnectAttempts = 0
   }
 
   onMessage(handler) {
@@ -152,10 +186,28 @@ class WebSocketManager {
 
   _startHeartbeat() {
     this._stopHeartbeat()
+    this._expectingPong = false
     this._pingTimer = setInterval(() => {
       if (!this.isConnected || !this.ws || this.ws.readyState !== WebSocket.OPEN) {
         this._stopHeartbeat()
+        return
       }
+      
+      if (this._expectingPong) {
+        console.warn('[WebSocket] 未收到pong响应，断开连接')
+        this.ws.close(1000, '心跳超时')
+        return
+      }
+      
+      this._expectingPong = true
+      this.ws.send(JSON.stringify({ type: 'ping' }))
+      
+      this._pongTimeout = setTimeout(() => {
+        if (this._expectingPong && this.isConnected) {
+          console.warn('[WebSocket] Pong超时，断开连接')
+          this.ws.close(1000, 'Pong超时')
+        }
+      }, 5000)
     }, 10000)
   }
 
@@ -164,6 +216,11 @@ class WebSocketManager {
       clearInterval(this._pingTimer)
       this._pingTimer = null
     }
+    if (this._pongTimeout) {
+      clearTimeout(this._pongTimeout)
+      this._pongTimeout = null
+    }
+    this._expectingPong = false
   }
 }
 

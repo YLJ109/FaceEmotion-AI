@@ -470,7 +470,7 @@ watch(
         // 同步到音频引擎
         if (generativeAudio.isInitialized) {
             generativeAudio.updateConfig(newConfig);
-            console.log('🎵 音乐配置已同步到音频引擎:', newConfig);
+            console.log('[音乐] 音乐配置已同步到音频引擎:', newConfig);
         }
     },
     { deep: true }

@@ -18,4 +18,5 @@ export const API = {
   feedback: `${API_BASE_URL}/api/feedback`,
   feedbackHistory: `${API_BASE_URL}/api/feedback/history`, // ✅ 新增: 反馈历史
   health: `${API_BASE_URL}/api/health`,
+  emotionTrendAnalyze: `${API_BASE_URL}/api/emotion-trend/analyze`, // ✅ 新增: 情绪趋势分析
 }

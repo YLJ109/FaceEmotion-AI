@@ -1,0 +1,24 @@
+{
+  "emotion_analysis": {
+    "time_window": 3,
+    "data_points": 3,
+    "fluctuation_pattern": "stable",
+    "main_emotion": "happy",
+    "main_emotion_intensity": 0.8,
+    "intensity_change": "increasing",
+    "emotion_changes": [],
+    "intensity_trends": {},
+    "key_info": [
+      "数据点: 3个",
+      "波动状态: 情绪稳定"
+    ],
+    "analysis": "最后3秒内情绪稳定，主要情绪为开心，平均强度80%，情绪强度呈上升。"
+  },
+  "text_content": "我今天很开心，感觉生活很美好",
+  "risk_info": {
+    "has_risk": false,
+    "risk_level": "none",
+    "risk_message": ""
+  },
+  "timestamp": 1715145600000
+}
