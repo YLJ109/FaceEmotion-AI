@@ -250,11 +250,11 @@ onMounted(() => {
 /* ===== 收缩/展开切换按钮 ===== */
 .collapse-toggle {
     position: absolute;
-    bottom: 16px;
+    bottom: 12px;
     left: 50%;
     transform: translateX(-50%);
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     background: var(--card-bg);
     border: 1px solid var(--primary);
@@ -264,22 +264,22 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
     z-index: 10;
 }
 
 .collapse-toggle:hover {
-    background: color-mix(in srgb, var(--primary) 15%, transparent);
-    transform: translateX(-50%) scale(1.1);
-    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    transform: translateX(-50%) scale(1.08);
+    box-shadow: 0 3px 12px rgba(139, 92, 246, 0.25);
 }
 
 .collapse-toggle:active {
-    transform: translateX(-50%) scale(0.95);
+    transform: translateX(-50%) scale(0.96);
 }
 
 .collapse-toggle .el-icon {
-    font-size: 18px;
+    font-size: 14px;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

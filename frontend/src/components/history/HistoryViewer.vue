@@ -195,13 +195,13 @@
                 <el-table-column label="操作" width="200" align="center" fixed="right">
                     <template #default="{ row }">
                         <div class="action-buttons">
-                            <el-button size="small" class="detail-btn">
+                            <el-button size="small" class="detail-btn" @click="showDetail(row)">
                                 <el-icon>
                                     <View />
                                 </el-icon>
                                 详情
                             </el-button>
-                            <el-button size="small" class="delete-btn">
+                            <el-button size="small" class="delete-btn" @click="deleteRecord(row)">
                                 <el-icon>
                                     <Delete />
                                 </el-icon>
