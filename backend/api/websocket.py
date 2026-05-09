@@ -171,13 +171,35 @@ async def websocket_endpoint(websocket: WebSocket):
         loop = asyncio.get_event_loop()
         executor = _shared_executor
         _save_counter = 0
-        _calibration_strength = 0.0
+        _calibration_strength = 0.0  # ✅ 禁用自适应校准，使用原始置信度
         _last_face_bbox = None
         _last_emotion_cache = None
         _detect_counter = 0
-        DETECT_INTERVAL = 2
+        
+        # ✅ 帧间隔配置
+        # GPU模式: 不调帧，每帧都检测和识别
+        # CPU模式: 帧间隔优化（行业标准）
+        #   人脸检测: 每 4 帧检测 1 次 → 15fps 检测
+        #   情绪识别: 每 2 帧识别 1 次 → 30fps 识别
+        
+        # 判断是否使用GPU模式
+        use_gpu_mode = _config_manager.get('use_gpu', False) or _config_manager.get('performance_mode', 'cpu') == 'gpu'
+        
+        if use_gpu_mode:
+            # GPU模式: 不调帧，每帧都处理
+            FACE_DETECT_INTERVAL = 1  # 每帧都检测
+            EMOTION_INFER_INTERVAL = 1  # 每帧都识别
+            logger.info("🎮 GPU模式: 不调帧，每帧都进行人脸检测和情绪识别")
+        else:
+            # CPU模式: 使用帧间隔优化
+            FACE_DETECT_INTERVAL = 4  # CPU 人脸检测间隔
+            EMOTION_INFER_INTERVAL = 2  # CPU 情绪识别间隔
+            logger.info("💻 CPU模式: 使用帧间隔优化")
+        
         TRACKING_THRESHOLD = 5
-        SMOOTH_ALPHA = 0.7
+        # ✅ 人脸框平滑系数（降低以减少框飞）
+        # SMOOTH_ALPHA 越低，平滑效果越强，框越稳定
+        SMOOTH_ALPHA = 0.7  # 从 0.95 降低到 0.7，增强平滑
         _smoothed_bbox = None
         _last_process_time = 0
         _last_result_cache = None
@@ -190,6 +212,21 @@ async def websocket_endpoint(websocket: WebSocket):
         MAX_THRESHOLD = 0.40
         _max_cache_frames = 8
         _last_confidence_history = []
+        
+        # ✅ 启动阶段稳定性检查（防止初始帧框飞）
+        _startup_frames = 0  # 启动阶段帧数计数
+        _startup_stable_count = 0  # 连续稳定检测计数
+        _startup_threshold = 3  # 需要连续稳定检测3次才确认人脸框
+        _startup_bbox_history = []  # 启动阶段检测框历史
+        _startup_max_jump = 50  # 启动阶段框跳变阈值（像素）
+        
+        # ✅ 情绪标签防抖机制
+        _emotion_history = []  # 情绪历史记录
+        _emotion_history_maxlen = 5  # 历史记录长度
+        _emotion_ema_alpha = 0.3  # EMA平滑系数
+        _emotion_ema_probs = None  # EMA平滑后的概率
+        _current_emotion = None  # 当前保持的情绪
+        _emotion_hysteresis = 0.15  # 迟滞切换阈值（15%）
 
         try:
             while not stop_event.is_set():
@@ -227,7 +264,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 if not detection_state['enabled']:
                     continue
 
-                should_detect = (_detect_counter % DETECT_INTERVAL == 0) or (
+                # ✅ 人脸检测：每 4 帧检测 1 次（15fps），初始状态立即检测
+                should_detect = (_detect_counter % FACE_DETECT_INTERVAL == 0) or (
                     _last_face_bbox is None)
 
                 if should_detect:
@@ -243,25 +281,70 @@ async def websocket_endpoint(websocket: WebSocket):
                         _consecutive_misses = 0
 
                         face_conf = faces[0].get('confidence', 0)
-                        _last_confidence_history.append(face_conf)
-                        if len(_last_confidence_history) > 5:
-                            _last_confidence_history.pop(0)
-
-                        if _smoothed_bbox is None:
-                            _smoothed_bbox = faces[0]['bbox'].copy()
+                        current_bbox = faces[0]['bbox']
+                        
+                        # ✅ 启动阶段稳定性检查
+                        if _last_face_bbox is None:
+                            _startup_frames += 1
+                            _startup_bbox_history.append(current_bbox.copy())
+                            
+                            # 检查是否连续稳定检测
+                            if len(_startup_bbox_history) >= 2:
+                                prev_bbox = _startup_bbox_history[-2]
+                                # 计算框的移动距离
+                                center_x_prev = (prev_bbox[0] + prev_bbox[2]) / 2
+                                center_y_prev = (prev_bbox[1] + prev_bbox[3]) / 2
+                                center_x_curr = (current_bbox[0] + current_bbox[2]) / 2
+                                center_y_curr = (current_bbox[1] + current_bbox[3]) / 2
+                                distance = ((center_x_curr - center_x_prev)**2 + 
+                                           (center_y_curr - center_y_prev)**2)**0.5
+                                
+                                if distance < _startup_max_jump:
+                                    _startup_stable_count += 1
+                                else:
+                                    _startup_stable_count = 0  # 跳变过大，重置计数
+                                    _startup_bbox_history = [current_bbox.copy()]
+                            
+                            # 只有连续稳定检测达到阈值，才确认人脸框
+                            if _startup_stable_count >= _startup_threshold:
+                                logger.info(f"✅ 启动阶段稳定检测完成，确认人脸框")
+                                _smoothed_bbox = current_bbox.copy()
+                                _last_face_bbox = current_bbox.copy()
+                                _last_confidence_history.append(face_conf)
+                                _consecutive_detections = 1
+                                # ✅ 启动阶段完成，重置情绪防抖状态
+                                _emotion_history.clear()
+                                _emotion_ema_probs = None
+                                _current_emotion = None
+                            else:
+                                # 启动阶段未稳定，不更新人脸框
+                                logger.debug(f"⏳ 启动阶段第{_startup_frames}帧，稳定计数: {_startup_stable_count}/{_startup_threshold}")
+                                _last_face_bbox = None  # 保持未确认状态
+                                # ✅ 启动阶段重置情绪防抖状态
+                                _emotion_history.clear()
+                                _emotion_ema_probs = None
+                                _current_emotion = None
+                                continue  # 跳过后续处理
                         else:
-                            current_bbox = faces[0]['bbox']
-                            _smoothed_bbox = [
-                                int(SMOOTH_ALPHA *
-                                    current_bbox[i] + (1 - SMOOTH_ALPHA) * _smoothed_bbox[i])
-                                for i in range(4)
-                            ]
+                            # 正常跟踪阶段
+                            _last_confidence_history.append(face_conf)
+                            if len(_last_confidence_history) > 5:
+                                _last_confidence_history.pop(0)
 
-                        _last_face_bbox = _smoothed_bbox.copy()
+                            if _smoothed_bbox is None:
+                                _smoothed_bbox = current_bbox.copy()
+                            else:
+                                _smoothed_bbox = [
+                                    int(SMOOTH_ALPHA *
+                                        current_bbox[i] + (1 - SMOOTH_ALPHA) * _smoothed_bbox[i])
+                                    for i in range(4)
+                                ]
 
-                        _consecutive_detections += 1
-                        if _consecutive_detections >= 8:
-                            _consecutive_detections = 0
+                            _last_face_bbox = _smoothed_bbox.copy()
+
+                            _consecutive_detections += 1
+                            if _consecutive_detections >= 8:
+                                _consecutive_detections = 0
                     else:
                         _consecutive_detections = 0
                         _consecutive_misses += 1
@@ -269,6 +352,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         if _consecutive_misses > _max_cache_frames:
                             _last_face_bbox = None
                             _smoothed_bbox = None
+                            # ✅ 重置情绪防抖状态
+                            _emotion_history.clear()
+                            _emotion_ema_probs = None
+                            _current_emotion = None
 
                         if _last_face_bbox and _consecutive_misses <= _max_cache_frames:
                             avg_confidence = sum(_last_confidence_history) / len(
@@ -278,6 +365,10 @@ async def websocket_endpoint(websocket: WebSocket):
                                 _last_face_bbox = None
                                 _smoothed_bbox = None
                                 _last_confidence_history.clear()
+                                # ✅ 重置情绪防抖状态
+                                _emotion_history.clear()
+                                _emotion_ema_probs = None
+                                _current_emotion = None
                             else:
                                 cached_face = {
                                     'bbox': _last_face_bbox.copy(),
@@ -296,7 +387,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 if face_img.size > 0 and face_img.shape[0] > 0 and face_img.shape[1] > 0:
                                     try:
                                         emotion_result = await loop.run_in_executor(
-                                            executor, _emotion_model.predict, face_img)
+                                            executor, lambda: _emotion_model.predict(face_img, use_stabilization=False))
                                         emotion, confidence, scores = emotion_result
 
                                         cached_face['emotion'] = emotion
@@ -325,6 +416,10 @@ async def websocket_endpoint(websocket: WebSocket):
                         if _consecutive_misses > _max_cache_frames:
                             _last_face_bbox = None
                             _smoothed_bbox = None
+                            # ✅ 重置情绪防抖状态
+                            _emotion_history.clear()
+                            _emotion_ema_probs = None
+                            _current_emotion = None
 
                         try:
                             result_queue.put_nowait({
@@ -383,6 +478,26 @@ async def websocket_endpoint(websocket: WebSocket):
                         pass
                     continue
 
+                # ✅ 情绪识别：每 2 帧识别 1 次（30fps），使用缓存结果
+                should_infer_emotion = (_detect_counter % EMOTION_INFER_INTERVAL == 0)
+                
+                if not should_infer_emotion and _last_emotion_cache:
+                    # 使用缓存的情绪结果
+                    response = {
+                        'type': 'result',
+                        'faces': [_last_emotion_cache],
+                        'dominant_emotion': _last_emotion_cache['emotion'],
+                        'timestamp': datetime.now().isoformat(),
+                        'process_time': time.time(),
+                        'gpu_memory': get_gpu_memory_usage(),
+                        '_cached': True
+                    }
+                    try:
+                        result_queue.put_nowait(response)
+                    except asyncio.QueueFull:
+                        pass
+                    continue
+
                 max_faces = _config_manager.get('max_faces', 10)
                 if len(faces) > max_faces:
                     logger.debug(f'检测到{len(faces)}张人脸，仅处理前{max_faces}张')
@@ -405,6 +520,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 emotions = []
                 try:
                     if face_images and hasattr(_emotion_model, 'predict_batch'):
+                        # ✅ WebSocket有自己的防抖逻辑，批量检测不使用模型级防抖
                         emotions = await asyncio.wait_for(
                             asyncio.to_thread(_emotion_model.predict_batch, face_images),
                             timeout=2.0
@@ -412,7 +528,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     elif face_images:
                         tasks = []
                         for face_img in face_images:
-                            tasks.append(asyncio.to_thread(_emotion_model.predict, face_img))
+                            # ✅ WebSocket有自己的防抖逻辑，单个检测不使用模型级防抖
+                            tasks.append(asyncio.to_thread(lambda img=face_img: _emotion_model.predict(img, use_stabilization=False)))
                         emotions = await asyncio.wait_for(
                             asyncio.gather(*tasks),
                             timeout=2.0
@@ -431,35 +548,79 @@ async def websocket_endpoint(websocket: WebSocket):
                     emotions = [('neutral', 0.0, {name: 0.0 for name in ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']}) for _ in faces]
 
                 results = []
-                if _adaptive_learner and _adaptive_learner.total_corrections >= 3:
-                    _calibration_strength = min(
-                        1.0, _calibration_strength + 0.1)
+                
+                # ✅ 根据配置动态调整校准强度
+                enable_calibration = _config_manager.get('enable_adaptive_calibration', False)
+                if enable_calibration and _adaptive_learner and _adaptive_learner.total_corrections >= 3:
+                    _calibration_strength = min(1.0, _calibration_strength + 0.1)
+                elif enable_calibration:
+                    _calibration_strength = max(0.0, _calibration_strength - 0.05)
                 else:
-                    _calibration_strength = max(
-                        0.0, _calibration_strength - 0.05)
+                    _calibration_strength = 0.0  # 禁用校准
 
                 for face, (emotion, confidence, scores) in zip(faces, emotions):
                     x, y, w, h = face['bbox']
+                    
+                    # ✅ 情绪标签防抖处理
+                    # 1. EMA平滑
+                    if _emotion_ema_probs is None:
+                        _emotion_ema_probs = np.array(list(scores.values()))
+                    else:
+                        current_probs = np.array(list(scores.values()))
+                        _emotion_ema_probs = _emotion_ema_alpha * current_probs + \
+                                            (1 - _emotion_ema_alpha) * _emotion_ema_probs
+                    
+                    # 2. 历史帧平均
+                    _emotion_history.append(_emotion_ema_probs.copy())
+                    if len(_emotion_history) > _emotion_history_maxlen:
+                        _emotion_history.pop(0)
+                    
+                    # 计算平均概率
+                    avg_probs = np.mean(_emotion_history, axis=0)
+                    emotion_names = list(scores.keys())
+                    
+                    # 找出平均概率最高的情绪
+                    new_emotion_idx = int(np.argmax(avg_probs))
+                    new_emotion = emotion_names[new_emotion_idx]
+                    
+                    # 3. 迟滞切换机制
+                    if _current_emotion is None:
+                        _current_emotion = new_emotion
+                    
+                    current_idx = emotion_names.index(_current_emotion)
+                    current_prob = avg_probs[current_idx]
+                    new_prob = avg_probs[new_emotion_idx]
+                    
+                    if new_emotion != _current_emotion:
+                        # 只有新情绪概率明显高于当前情绪时才切换
+                        if (new_prob - current_prob) >= _emotion_hysteresis:
+                            _current_emotion = new_emotion
+                    
+                    # 使用防抖后的情绪作为输出
+                    smoothed_emotion = _current_emotion
+                    smoothed_idx = emotion_names.index(smoothed_emotion)
+                    smoothed_conf = avg_probs[smoothed_idx]
+                    
+                    # 构建平滑后的scores
+                    smoothed_scores = {name: float(avg_probs[i]) for i, name in enumerate(emotion_names)}
 
-                    if _calibration_strength > 0 and _adaptive_learner:
-                        raw_calibrated = _adaptive_learner.calibrate(scores)
+                    # ✅ 根据配置决定是否使用自适应校准
+                    if enable_calibration and _calibration_strength > 0 and _adaptive_learner:
+                        raw_calibrated = _adaptive_learner.calibrate(smoothed_scores)
                         calibrated_scores = {}
-                        for k in scores:
-                            raw_val = raw_calibrated.get(
-                                k, scores[k]) if raw_calibrated else scores[k]
-                            orig_val = scores[k]
-                            calibrated_scores[k] = orig_val * (
-                                1 - _calibration_strength) + raw_val * _calibration_strength
-                        calibrated_emotion = max(
-                            calibrated_scores, key=calibrated_scores.get)
+                        for k in smoothed_scores:
+                            raw_val = raw_calibrated.get(k, smoothed_scores[k]) if raw_calibrated else smoothed_scores[k]
+                            orig_val = smoothed_scores[k]
+                            calibrated_scores[k] = orig_val * (1 - _calibration_strength) + raw_val * _calibration_strength
+                        calibrated_emotion = max(calibrated_scores, key=calibrated_scores.get)
                         calibrated_conf = calibrated_scores[calibrated_emotion]
                     else:
-                        calibrated_scores = scores
-                        calibrated_emotion = emotion
-                        calibrated_conf = confidence
+                        calibrated_scores = smoothed_scores
+                        calibrated_emotion = smoothed_emotion
+                        calibrated_conf = smoothed_conf
 
                     results.append({
-                        'bbox': [int(x), int(y), int(w), int(h)],
+                        'bbox': [int(x), int(int(y)), int(w), int(h)],
                         'emotion': calibrated_emotion,
                         'confidence': float(calibrated_conf),
                         'scores': {k: float(v) for k, v in calibrated_scores.items()}
@@ -471,13 +632,22 @@ async def websocket_endpoint(websocket: WebSocket):
                 dominant_emotion = max(results, key=lambda x: x['confidence'])[
                     'emotion'] if results else None
 
+                # ✅ 计算实际处理时间
+                current_time = time.time()
+                process_duration_ms = (current_time - _last_process_time) * 1000 if _last_process_time > 0 else 0
+                _last_process_time = current_time
+                
                 response = {
                     'type': 'result',
                     'faces': results,
                     'dominant_emotion': dominant_emotion,
                     'timestamp': datetime.now().isoformat(),
-                    'process_time': time.time(),
-                    'gpu_memory': get_gpu_memory_usage()
+                    'process_time': current_time,
+                    'process_duration_ms': process_duration_ms,  # ✅ 实际处理耗时(ms)
+                    'gpu_memory': get_gpu_memory_usage(),
+                    'frame_count': _detect_counter,  # ✅ 当前帧计数
+                    'detection_interval': FACE_DETECT_INTERVAL,  # ✅ 人脸检测间隔
+                    'inference_interval': EMOTION_INFER_INTERVAL  # ✅ 情绪识别间隔
                 }
 
                 should_send = True

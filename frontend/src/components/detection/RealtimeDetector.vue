@@ -4,7 +4,19 @@
         <div class="video-section">
             <div class="video-container glass-panel" ref="videoContainer">
                 <video ref="videoElement" autoplay playsinline style="display:none"></video>
-                <canvas ref="canvasElement" class="video-canvas"></canvas>
+                <canvas ref="canvasElement" class="video-canvas" :class="{ 'camera-switch-transition': isSwitchingCamera }"></canvas>
+                <!-- 摄像头切换过渡遮罩 -->
+                <div v-if="isSwitchingCamera" class="camera-transition-overlay">
+                    <div class="transition-content">
+                        <div class="transition-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transition-spinner">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                            </svg>
+                        </div>
+                        <span class="transition-text">切换摄像头中...</span>
+                    </div>
+                </div>
 
                 <!-- FPS显示 -->
                 <div class="fps-badge" v-if="fps > 0 && isCameraOn">
@@ -80,6 +92,56 @@
                         </button>
                     </el-tooltip>
 
+                    <!-- ✅ 新增: 摄像头切换下拉菜单 -->
+                    <div class="ctrl-divider"></div>
+                    <el-dropdown 
+                        trigger="click" 
+                        @command="switchCamera"
+                        placement="bottom-end"
+                    >
+                        <div class="camera-switch-wrapper" :class="{ 'switching': isSwitchingCamera }">
+                            <div class="camera-icon-wrapper">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="camera-icon">
+                                    <path d="M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14M6 18H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2m5.658 0L12 2.342a1 1 0 0 1 1.707 0L14.342 4M6 18a2 2 0 0 0 2 2h2.342a1 1 0 0 1 .707 1.293l1.314 2.626a1 1 0 0 1-.553 1.361l-2.573 1.286a11.042 11.042 0 0 1-5.516 0l-2.573-1.286a1 1 0 0 1-.553-1.361l1.314-2.626A1 1 0 0 1 6.342 20H8a2 2 0 0 0 2-2z" />
+                                </svg>
+                                <!-- 切换时的加载动画 -->
+                                <div v-if="isSwitchingCamera" class="camera-loading">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="loading-spinner">
+                                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <transition name="camera-switch" mode="out-in">
+                                <span :key="currentCameraIndex" class="camera-name">{{ cameras[currentCameraIndex]?.label || '摄像头' }}</span>
+                            </transition>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="camera-arrow">
+                                <path d="M6 9l6 6 6-6" />
+                            </svg>
+                        </div>
+                        <template #dropdown>
+                            <el-dropdown-menu class="camera-dropdown-menu">
+                                <el-dropdown-item 
+                                    v-for="(camera, index) in cameras" 
+                                    :key="index" 
+                                    :command="index"
+                                    class="camera-dropdown-item"
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="camera-item-icon">
+                                        <path d="M15 10l4.553-2.276A1 1 0 0 1 21 8.618v6.764a1 1 0 0 1-1.447.894L15 14M6 18H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2m5.658 0L12 2.342a1 1 0 0 1 1.707 0L14.342 4M6 18a2 2 0 0 0 2 2h2.342a1 1 0 0 1 .707 1.293l1.314 2.626a1 1 0 0 1-.553 1.361l-2.573 1.286a11.042 11.042 0 0 1-5.516 0l-2.573-1.286a1 1 0 0 1-.553-1.361l1.314-2.626A1 1 0 0 1 6.342 20H8a2 2 0 0 0 2-2z" />
+                                    </svg>
+                                    <span :class="{ 'camera-item-active': index === currentCameraIndex }">
+                                        <span v-if="index === currentCameraIndex" class="camera-check">✓</span>
+                                        <span v-else class="camera-dot">○</span>
+                                    </span>
+                                    <span class="camera-item-label">{{ camera.label }}</span>
+                                </el-dropdown-item>
+                            </el-dropdown-menu>
+                        </template>
+                    </el-dropdown>
 
                 </div>
 
@@ -136,6 +198,8 @@
                             </div>
                         </div>
 
+                        
+
                         <!-- 置信度分布条 -->
                         <div class="confidence-bars">
                             <transition-group name="emotion-sort" tag="div">
@@ -182,9 +246,14 @@
             </div>
         </div>
 
-        <!-- ✅ 新增: 性能监控面板 -->
-        <PerformanceMonitor :fps="perfFps" :latency="perfLatency" :skip-rate="perfSkipRate" :gpu-memory="perfGpuMemory"
-            :detect-interval="perfDetectInterval" :http-latency="perfHttpLatency" :error-rate="perfErrorRate" />
+        <!-- ✅ 新增: 性能监控面板（真实数据） -->
+        <PerformanceMonitor 
+            :camera-fps="perfFps" 
+            :inference-time="perfInferenceTime" 
+            :detection-latency="perfDetectionLatency" 
+            :network-latency="perfNetworkLatency" 
+            :is-using-gpu="isUsingGpu" 
+        />
 
         <!-- ✅ 新增: 情绪反馈对话框（静态快照） -->
         <EmotionFeedback v-model:visible="showFeedback" :snapshot="feedbackSnapshot"
@@ -225,6 +294,10 @@ const videoElement = ref(null)
 const canvasElement = ref(null)
 const videoContainer = ref(null)
 const isCameraOn = ref(false)
+// ✅ 新增: 摄像头切换相关变量
+const cameras = ref([])  // 可用摄像头列表
+const currentCameraIndex = ref(0)  // 当前选中的摄像头索引
+const isSwitchingCamera = ref(false)  // 摄像头切换中状态
 const isEmotionDetectionOn = ref(true)
 const currentEmotion = ref(null)
 const currentConfidence = ref(0)
@@ -344,7 +417,7 @@ const performTrendAnalysis = async () => {
 }
 const currentFaces = ref([])
 const fps = ref(0)
-// ✅ 新增: 性能监控数据
+// ✅ 新增: 性能监控数据（真实数据）
 const perfLatency = ref(0)
 const perfSkipRate = ref(0)
 const perfGpuMemory = ref(0)
@@ -352,8 +425,21 @@ const perfDetectInterval = ref(2)
 // ✅ 新增: HTTP延迟和错误率
 const perfHttpLatency = ref(0)
 const perfErrorRate = ref(0)
-// ✅ 修复: 添加缺失的 perfFps 变量
+
+// ✅ 真实帧率测量（基于渲染帧时间）
 const perfFps = ref(0)
+const _frameTimestamps = []
+const _MAX_FRAME_HISTORY = 60
+
+// ✅ 新增: 真实性能数据
+const perfInferenceTime = ref(0)    // 模型推理时间(ms)
+const perfDetectionLatency = ref(0) // 检测延迟(ms)
+const perfNetworkLatency = ref(0)   // 网络延迟(Ping)(ms)
+const isUsingGpu = ref(false)       // 是否使用GPU
+
+// ✅ 真实跳帧率计算（基于实际帧计数）
+let _totalFramesProcessed = 0
+let _totalFramesReceived = 0
 
 // ✅ 新增: 错误计数（用于计算错误率）
 let errorCount = 0
@@ -370,45 +456,48 @@ let lastAdjustTime = 0
 let lastSaveTime = 0  // ✅ 新增: 上次保存时间戳,防止重复保存
 const SAVE_COOLDOWN = 2000  // ✅ 新增: 保存冷却时间(2秒)
 
-// ✅ 新增: 性能模式配置
+// ✅ 新增: 性能模式配置（三级模式）
 let performanceModeConfig = {
     send_width: 160,
     send_height: 120,
     frame_skip_threshold: 2,
-    ema_alpha: 0.25,  // ✅ 优化: 从 0.15 提高到 0.25，更快响应
-    enable_realtime_charts: true
+    ema_alpha: 0.25,
+    enable_realtime_charts: true,
+    use_gpu: false  // ✅ 是否使用GPU
 }
 
-// ✅ 新增: 加载性能模式配置
+// ✅ 新增: 加载性能模式配置（支持三级模式）
 const loadPerformanceConfig = async () => {
     try {
         const response = await fetch(`${API.baseUrl}/api/config`)
         if (!response.ok) throw new Error('获取配置失败')
         const data = await response.json()
 
-        const perfMode = data.config.performance_mode || 'high'
+        const perfMode = data.config.performance_mode || 'cpu_high'
         logger.debug(`加载性能模式: ${perfMode}`)
 
-        // 根据性能模式设置分辨率和参数
-        if (perfMode === 'ultra') {
-            currentResolution = { width: 224, height: 168 }
-            performanceModeConfig.frame_skip_threshold = 1
-            EMA_ALPHA = 0.3  // ✅ 优化: 提高到 0.3，极速响应
-        } else if (perfMode === 'high') {
-            currentResolution = { width: 160, height: 120 }
+        // ✅ 三级模式配置（gpu/cpu_high/cpu_low）
+        if (perfMode === 'gpu') {
+            currentResolution = { width: 320, height: 240 }
             performanceModeConfig.frame_skip_threshold = 2
-            EMA_ALPHA = 0.25  // ✅ 优化: 提高到 0.25
-        } else if (perfMode === 'medium') {
-            currentResolution = { width: 128, height: 96 }
-            performanceModeConfig.frame_skip_threshold = 3
-            EMA_ALPHA = 0.25  // ✅ 优化: 提高到 0.25
-        } else if (perfMode === 'low') {
-            currentResolution = { width: 96, height: 72 }
-            performanceModeConfig.frame_skip_threshold = 5
+            performanceModeConfig.use_gpu = true  // ✅ 使用GPU
             EMA_ALPHA = 0.25
+        } else if (perfMode === 'cpu_high') {
+            currentResolution = { width: 256, height: 192 }
+            performanceModeConfig.frame_skip_threshold = 3
+            performanceModeConfig.use_gpu = false  // ✅ 使用CPU
+            EMA_ALPHA = 0.2
+        } else if (perfMode === 'cpu_low') {
+            currentResolution = { width: 128, height: 96 }
+            performanceModeConfig.frame_skip_threshold = 5
+            performanceModeConfig.use_gpu = false  // ✅ 使用CPU
+            EMA_ALPHA = 0.15
         }
 
-        logger.debug(`应用配置: 分辨率=${currentResolution.width}x${currentResolution.height}, 跳帧=${performanceModeConfig.frame_skip_threshold}, EMA=${EMA_ALPHA}`)
+        logger.debug(`应用配置: 分辨率=${currentResolution.width}x${currentResolution.height}, 跳帧=${performanceModeConfig.frame_skip_threshold}, EMA=${EMA_ALPHA}, GPU=${performanceModeConfig.use_gpu}`)
+
+        // ✅ 更新 GPU 状态（用于性能监控面板显示）
+        isUsingGpu.value = performanceModeConfig.use_gpu === true
 
         // ✅ 新增: 重新初始化发送 Canvas
         if (sendCanvas) {
@@ -566,7 +655,66 @@ const cleanupCanvas = () => {
 
 // === 摄像头控制 ===
 
-const startCamera = async () => {
+// ✅ 新增: 枚举可用摄像头
+const enumerateCameras = async () => {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const videoDevices = devices.filter(device => device.kind === 'videoinput')
+        cameras.value = videoDevices.map((device, index) => ({
+            id: device.deviceId,
+            label: device.label || `摄像头 ${index + 1}`,
+            deviceId: device.deviceId
+        }))
+        logger.debug(`检测到 ${cameras.value.length} 个摄像头设备`)
+    } catch (error) {
+        logger.error('枚举摄像头失败:', error)
+        cameras.value = [{ id: 'default', label: '默认摄像头', deviceId: '' }]
+    }
+}
+
+// ✅ 新增: 切换摄像头
+const switchCamera = async (index) => {
+    if (index === currentCameraIndex.value || isSwitchingCamera.value) return
+    
+    isSwitchingCamera.value = true
+    currentCameraIndex.value = index
+    
+    try {
+        const camera = cameras.value[index]
+        if (!camera) return
+
+        // 停止当前流
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop())
+            stream = null
+        }
+
+        // 启动新摄像头
+        const constraints = { 
+            video: { 
+                deviceId: camera.deviceId ? { exact: camera.deviceId } : undefined 
+            } 
+        }
+        
+        stream = await navigator.mediaDevices.getUserMedia(constraints)
+        
+        if (videoElement.value) {
+            videoElement.value.srcObject = stream
+            await videoElement.value.play()
+        }
+        
+        ElMessage.success(`已切换到 ${camera.label}`)
+    } catch (error) {
+        logger.error('切换摄像头失败:', error)
+        ElMessage.error('切换摄像头失败')
+        // 回退到之前的摄像头
+        currentCameraIndex.value = index === 0 ? 1 : 0
+    } finally {
+        isSwitchingCamera.value = false
+    }
+}
+
+const startCamera = async (cameraIndex = 0) => {
     try {
         // ✅ 重置重连状态，确保重新连接
         wsManager.resetReconnect()
@@ -574,8 +722,19 @@ const startCamera = async () => {
             await wsManager.connect()
         }
 
+        // 枚举摄像头
+        await enumerateCameras()
+        
         if (stream) stream.getTracks().forEach(t => t.stop())
-        stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        
+        // 根据索引选择摄像头
+        const camera = cameras.value[cameraIndex]
+        const constraints = camera && camera.deviceId 
+            ? { video: { deviceId: { exact: camera.deviceId } } }
+            : { video: true }
+        
+        stream = await navigator.mediaDevices.getUserMedia(constraints)
+        currentCameraIndex.value = cameraIndex
         
         if (videoElement.value) {
             videoElement.value.srcObject = stream
@@ -849,6 +1008,19 @@ const startRendering = () => {
 
         frameSkip++
 
+        // ✅ 计算真实帧率（基于渲染帧时间）
+        const now = performance.now()
+        _frameTimestamps.push(now)
+        if (_frameTimestamps.length > _MAX_FRAME_HISTORY) {
+            _frameTimestamps.shift()
+        }
+        
+        if (_frameTimestamps.length >= 2) {
+            const elapsed = _frameTimestamps[_frameTimestamps.length - 1] - _frameTimestamps[0]
+            const frameCount = _frameTimestamps.length - 1
+            perfFps.value = frameCount > 0 && elapsed > 0 ? (frameCount / elapsed) * 1000 : 0
+        }
+
         if (performance.now() - lastAdjustTime > 5000) {
             adjustResolution()
             lastAdjustTime = performance.now()
@@ -908,38 +1080,25 @@ const handleWsMessage = (data) => {
     const actualRtt = performance.now() - lastSentTime
     perfLatency.value = Math.max(0, actualRtt)  // 确保非负
 
-    if (data.gpu_memory !== undefined) {
-        perfGpuMemory.value = data.gpu_memory
+    // ✅ 更新真实性能数据
+    if (data.process_duration_ms !== undefined) {
+        perfInferenceTime.value = data.process_duration_ms  // 模型推理时间
     }
+    
+    // ✅ 检测延迟 = 往返延迟
+    perfDetectionLatency.value = Math.max(0, actualRtt)
+    
+    // ✅ 网络延迟(Ping) = 往返延迟的一半（近似）
+    perfNetworkLatency.value = Math.max(0, actualRtt / 2)
+    
+    // ✅ 判断是否使用GPU（根据性能模式）
+    isUsingGpu.value = performanceModeConfig.use_gpu === true
 
     // 计算真实处理延迟
     const rtt = Math.max(0, actualRtt)
 
     _roundTripHistory.push(rtt)
     if (_roundTripHistory.length > 10) _roundTripHistory.shift()
-
-    // ✅ 修复: 计算 FPS（基于平均往返延迟）
-    const avgRtt = _roundTripHistory.length > 0
-        ? _roundTripHistory.reduce((a, b) => a + b, 0) / _roundTripHistory.length : 0
-
-    // FPS = 1000ms / 平均延迟(ms)
-    if (avgRtt > 0) {
-        perfFps.value = 1000 / avgRtt
-    }
-
-    // ✅ 修复: 计算跳帧率（基于实际跳帧阈值）
-    const baseSkipThreshold = performanceModeConfig.frame_skip_threshold
-    const skipThreshold = avgRtt > 250 ? baseSkipThreshold + 1 : avgRtt > 150 ? baseSkipThreshold : Math.max(1, baseSkipThreshold - 1)
-    // 跳帧率 = (跳过的帧数 / 总帧数) * 100
-    perfSkipRate.value = ((skipThreshold - 1) / skipThreshold) * 100
-
-    // ✅ 修复: 检测间隔 = 跳帧阈值
-    perfDetectInterval.value = skipThreshold
-
-    // ✅ 新增: 更新错误率（每10帧计算一次）
-    if (totalFrames > 0 && totalFrames % 10 === 0) {
-        perfErrorRate.value = (errorCount / totalFrames) * 100
-    }
 
     awaitingResult = false
 
@@ -963,6 +1122,7 @@ const handleWsMessage = (data) => {
 
     if (validFaces.length) {
         const rawScores = validFaces[0]?.scores
+        const rawConf = validFaces[0]?.confidence  // ✅ 保存原始置信度
 
         // ✅ 修复: 防御性检查，防止 scores 为 undefined 导致崩溃
         if (!rawScores || typeof rawScores !== 'object' || Object.keys(rawScores).length === 0) {
@@ -970,6 +1130,7 @@ const handleWsMessage = (data) => {
             return
         }
 
+        // ✅ 计算平滑后的分数
         if (Object.keys(_emaScores).length === 0) {
             Object.keys(rawScores).forEach(k => { _emaScores[k] = rawScores[k] })
             _lastGoodScores = { ...rawScores }
@@ -997,8 +1158,11 @@ const handleWsMessage = (data) => {
         }
 
         currentEmotion.value = smoothedEmotion
-        currentConfidence.value = smoothedConf
-        emotionScores.value = { ..._emaScores }
+        
+        // ✅ 使用原始置信度值
+        currentConfidence.value = rawConf
+        emotionScores.value = { ...rawScores }
+        
         currentFaces.value = validFaces
 
         // ✅ 新增: 更新 Pinia store，使顶部情绪分析面板能获取数据
@@ -1870,6 +2034,32 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ✅ 新增: 置信度显示模式切换 */
+.confidence-mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: color-mix(in srgb, var(--text) 5%, transparent);
+    border-radius: 8px;
+}
+
+.mode-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 100;
+}
+
+/* ✅ 新增: 原始置信度提示 */
+.raw-confidence-hint {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-left: 6px;
+    color: var(--text-secondary);
+    font-weight: 100;
+}
+
 .bar-value {
     font-size: 18px;
     font-weight: 100;
@@ -2080,5 +2270,281 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 
 .trend-chart-wrapper {
     width: 100%;
+}
+
+/* ✅ 新增: 摄像头切换按钮样式 */
+.camera-switch-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--btn-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 120px;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.camera-switch-wrapper:hover {
+    background: color-mix(in srgb, var(--primary) 15%, transparent);
+    border-color: var(--primary);
+    color: var(--primary);
+    transform: scale(1.02);
+}
+
+.camera-switch-wrapper:active {
+    transform: scale(0.98);
+}
+
+/* 切换中的状态 */
+.camera-switch-wrapper.switching {
+    pointer-events: none;
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+/* 图标包装器 */
+.camera-icon-wrapper {
+    position: relative;
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.camera-icon {
+    color: var(--primary);
+    transition: opacity 0.3s ease;
+}
+
+.camera-switch-wrapper.switching .camera-icon {
+    opacity: 0;
+}
+
+/* 加载动画 */
+.camera-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-spinner {
+    animation: spin 0.6s linear infinite;
+    color: var(--primary);
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.camera-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 100;
+    text-align: left;
+    min-width: 60px;
+}
+
+.camera-arrow {
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+/* ✅ 摄像头名称切换动画 */
+.camera-switch-enter-active,
+.camera-switch-leave-active {
+    transition: all 0.3s ease;
+}
+
+.camera-switch-enter-from {
+    opacity: 0;
+    transform: translateX(-10px) scale(0.9);
+}
+
+.camera-switch-leave-to {
+    opacity: 0;
+    transform: translateX(10px) scale(0.9);
+}
+
+.camera-switch-wrapper:hover .camera-arrow {
+    transform: rotate(180deg);
+}
+
+/* ✅ 视频画面切换动画 */
+.video-canvas {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.video-canvas.camera-switch-transition {
+    opacity: 0.5;
+    transform: scale(0.98);
+    filter: blur(5px);
+}
+
+/* ✅ 摄像头切换过渡遮罩 */
+.camera-transition-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: overlayFadeIn 0.3s ease forwards;
+}
+
+@keyframes overlayFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.camera-transition-overlay .transition-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 32px 48px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    animation: contentScaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes contentScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.camera-transition-overlay .transition-icon {
+    width: 64px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--primary) 15%, transparent);
+    border-radius: 50%;
+    border: 2px solid var(--primary);
+}
+
+.camera-transition-overlay .transition-spinner {
+    color: var(--primary);
+    animation: spin 0.8s linear infinite;
+}
+
+.camera-transition-overlay .transition-text {
+    font-size: 14px;
+    font-weight: 100;
+    color: var(--text-secondary);
+}
+
+/* 下拉菜单项样式 */
+.camera-dropdown-menu {
+    background: var(--card-bg) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: var(--shadow-lg) !important;
+    padding: 4px 0 !important;
+    min-width: 200px !important;
+    animation: dropdownFadeIn 0.25s ease;
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.camera-dropdown-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 10px 14px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    color: var(--text-secondary) !important;
+    font-size: 13px !important;
+}
+
+.camera-dropdown-item:hover {
+    background: color-mix(in srgb, var(--primary) 10%, transparent) !important;
+    color: var(--text) !important;
+}
+
+.camera-item-icon {
+    flex-shrink: 0;
+    color: var(--primary);
+    opacity: 0.7;
+}
+
+.camera-dropdown-item:hover .camera-item-icon {
+    opacity: 1;
+}
+
+.camera-item-active {
+    color: var(--success) !important;
+}
+
+.camera-check {
+    color: var(--success);
+    font-weight: 100;
+    font-size: 14px;
+    min-width: 16px;
+}
+
+.camera-dot {
+    color: var(--text-secondary);
+    opacity: 0.4;
+    font-size: 10px;
+    min-width: 16px;
+}
+
+.camera-item-label {
+    flex: 1;
+    font-weight: 100;
+}
+
+/* ✅ 新增: 淡入动画 */
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
 }
 </style>

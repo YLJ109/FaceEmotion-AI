@@ -5,81 +5,58 @@
         </div>
 
         <div class="monitor-content">
-            <!-- FPS -->
+            <!-- ✅ 摄像头帧率 -->
             <div class="metric-item">
                 <div class="metric-label">
-                    <span class="metric-icon">⚡</span>
-                    FPS
+                    <span class="metric-icon">📷</span>
+                    摄像头帧率
                 </div>
-                <div class="metric-value" :class="getFpsClass(fps)">
-                    {{ fps.toFixed(1) }}
+                <div class="metric-value" :class="getFpsClass(cameraFps)">
+                    {{ cameraFps.toFixed(1) }} FPS
                 </div>
             </div>
 
-            <!-- 延迟 -->
+            <!-- ✅ 模型推理时间 -->
             <div class="metric-item">
                 <div class="metric-label">
-                    <span class="metric-icon">⏱️</span>
-                    延迟
+                    <span class="metric-icon">🧠</span>
+                    推理时间
                 </div>
-                <div class="metric-value" :class="getLatencyClass(latency)">
-                    {{ latency.toFixed(0) }}ms
+                <div class="metric-value" :class="getInferenceClass(inferenceTime)">
+                    {{ inferenceTime.toFixed(1) }}ms
                 </div>
             </div>
 
-            <!-- 跳帧率 -->
-            <div class="metric-item">
-                <div class="metric-label">
-                    <span class="metric-icon"></span>
-                    跳帧率
-                    <span v-if="skipRate === 0" class="metric-hint">(正常)</span>
-                </div>
-                <div class="metric-value" :class="getSkipRateClass(skipRate)">
-                    {{ skipRate.toFixed(1) }}%
-                </div>
-            </div>
-
-            <!-- GPU显存 -->
-            <div class="metric-item">
-                <div class="metric-label">
-                    <span class="metric-icon">🎮</span>
-                    GPU显存
-                </div>
-                <div class="metric-value" :class="getGpuClass(gpuMemory)">
-                    {{ gpuMemory.toFixed(0) }}MB
-                </div>
-            </div>
-
-            <!-- 检测间隔 -->
+            <!-- ✅ 检测延迟 -->
             <div class="metric-item">
                 <div class="metric-label">
                     <span class="metric-icon">🎯</span>
-                    检测间隔
+                    检测延迟
                 </div>
-                <div class="metric-value">
-                    {{ detectInterval }}帧
+                <div class="metric-value" :class="getLatencyClass(detectionLatency)">
+                    {{ detectionLatency.toFixed(0) }}ms
                 </div>
             </div>
 
-            <!-- ✅ 新增: HTTP延迟 -->
+            <!-- ✅ 网络延迟(Ping) -->
             <div class="metric-item">
                 <div class="metric-label">
                     <span class="metric-icon">🌐</span>
-                    HTTP延迟
+                    网络延迟
                 </div>
-                <div class="metric-value" :class="getHttpLatencyClass(httpLatency)">
-                    {{ httpLatency.toFixed(0) }}ms
+                <div class="metric-value" :class="getPingClass(networkLatency)">
+                    {{ networkLatency.toFixed(0) }}ms
                 </div>
             </div>
 
-            <!-- ✅ 新增: 错误率 -->
+            <!-- ✅ 运行设备 (CPU/GPU) -->
             <div class="metric-item">
                 <div class="metric-label">
-                    <span class="metric-icon">❌</span>
-                    错误率
+                    <span class="metric-icon">{{ isUsingGpu ? '🎮' : '💻' }}</span>
+                    运行设备
                 </div>
-                <div class="metric-value" :class="getErrorRateClass(errorRate)">
-                    {{ errorRate.toFixed(1) }}%
+                <div class="metric-value" :class="isUsingGpu ? 'good' : 'medium'">
+                    {{ isUsingGpu ? 'GPU' : 'CPU' }}
                 </div>
             </div>
         </div>
@@ -100,15 +77,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Close, Warning, Monitor } from '@element-plus/icons-vue'
 
+// ✅ 真实性能数据 props
 const props = defineProps({
-    fps: { type: Number, default: 0 },
-    latency: { type: Number, default: 0 },
-    skipRate: { type: Number, default: 0 },
-    gpuMemory: { type: Number, default: 0 },
-    detectInterval: { type: Number, default: 2 },
-    // ✅ 新增: HTTP延迟和错误率
-    httpLatency: { type: Number, default: 0 },
-    errorRate: { type: Number, default: 0 }
+    cameraFps: { type: Number, default: 0 },      // 摄像头帧率
+    inferenceTime: { type: Number, default: 0 },  // 模型推理时间(ms)
+    detectionLatency: { type: Number, default: 0 }, // 检测延迟(ms)
+    networkLatency: { type: Number, default: 0 },  // 网络延迟(Ping)(ms)
+    isUsingGpu: { type: Boolean, default: false }  // 是否使用GPU
 })
 
 const isVisible = ref(false)
@@ -117,73 +92,50 @@ const isVisible = ref(false)
 const suggestions = computed(() => {
     const tips = []
 
-    if (props.fps < 10) {
-        tips.push('FPS过低，建议降低分辨率或关闭其他程序')
+    if (props.cameraFps < 15) {
+        tips.push('摄像头帧率过低，检查摄像头连接')
     }
 
-    if (props.latency > 300) {
-        tips.push('延迟过高，尝试增加跳帧间隔')
+    if (props.inferenceTime > 100) {
+        tips.push('推理时间过长，建议降低分辨率')
     }
 
-    if (props.skipRate > 50) {
-        tips.push('跳帧率过高，后端处理可能过载')
+    if (props.detectionLatency > 200) {
+        tips.push('检测延迟过高，后端处理可能过载')
     }
 
-    if (props.gpuMemory > 4000) {
-        tips.push('GPU显存占用较高，注意内存泄漏')
-    }
-
-    // ✅ 新增: HTTP延迟和错误率建议
-    if (props.httpLatency > 150) {
-        tips.push('HTTP请求延迟过高，检查网络连接')
-    }
-
-    if (props.errorRate > 5) {
-        tips.push('错误率过高，检查后端服务状态')
+    if (props.networkLatency > 100) {
+        tips.push('网络延迟过高，检查网络连接')
     }
 
     return tips
 })
 
-// ✅ FPS等级
+// ✅ 帧率等级
 const getFpsClass = (fps) => {
     if (fps >= 25) return 'good'
     if (fps >= 15) return 'medium'
     return 'bad'
 }
 
-// ✅ 延迟等级
+// ✅ 推理时间等级
+const getInferenceClass = (time) => {
+    if (time < 30) return 'good'
+    if (time < 60) return 'medium'
+    return 'bad'
+}
+
+// ✅ 检测延迟等级
 const getLatencyClass = (latency) => {
     if (latency < 100) return 'good'
     if (latency < 200) return 'medium'
     return 'bad'
 }
 
-// ✅ 跳帧率等级
-const getSkipRateClass = (rate) => {
-    if (rate < 20) return 'good'
-    if (rate < 40) return 'medium'
-    return 'bad'
-}
-
-// ✅ GPU显存等级
-const getGpuClass = (memory) => {
-    if (memory < 2000) return 'good'
-    if (memory < 4000) return 'medium'
-    return 'bad'
-}
-
-// ✅ 新增: HTTP延迟等级
-const getHttpLatencyClass = (latency) => {
+// ✅ 网络延迟(Ping)等级
+const getPingClass = (latency) => {
     if (latency < 50) return 'good'
-    if (latency < 150) return 'medium'
-    return 'bad'
-}
-
-// ✅ 新增: 错误率等级
-const getErrorRateClass = (rate) => {
-    if (rate < 1) return 'good'
-    if (rate < 5) return 'medium'
+    if (latency < 100) return 'medium'
     return 'bad'
 }
 

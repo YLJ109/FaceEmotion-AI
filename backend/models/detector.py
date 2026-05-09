@@ -1,4 +1,4 @@
-"""人脸检测器 - Caffe SSD（纯 CPU）"""
+"""人脸检测器 - Caffe SSD（支持自动检测后端）"""
 import cv2
 import numpy as np
 from typing import List, Dict
@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 class FaceDetector:
-    """基于 Caffe SSD 的人脸检测器（CPU 优化）"""
+    """基于 Caffe SSD 的人脸检测器"""
 
-    def __init__(self, proto_file: str, model_file: str):
+    def __init__(self, proto_file: str = None, model_file: str = None):
         """
         初始化 Caffe SSD 人脸检测器
 
@@ -18,21 +18,29 @@ class FaceDetector:
             proto_file: Caffe prototxt 路径
             model_file: Caffe caffemodel 路径
         """
+        # 设置默认路径
+        if proto_file is None:
+            proto_file = 'configs/deploy.prototxt'
+        if model_file is None:
+            model_file = 'weights/res10_300x300_ssd_iter_140000_fp16.caffemodel'
+
         self.face_net = cv2.dnn.readNetFromCaffe(proto_file, model_file)
         if self.face_net.empty():
             raise RuntimeError("无法加载Caffe模型")
 
-        # 设置 CPU 后端
+        # ✅ 固定使用 CPU（行业标准配置）
+        # Caffe 人脸模型太小、太快，CPU 完全够用，放 GPU 纯属浪费
         self.face_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
         self.face_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-        logger.info("✅ Caffe 人脸检测器使用 CPU")
+        logger.info("✅ Caffe 人脸检测器固定使用 CPU")
 
         self._target_size = (300, 300)
         self._mean = (104.0, 177.0, 123.0)
         self._scale_factor = 1.0
-        logger.info("✅ Caffe人脸检测器初始化完成")
+        self.conf_threshold = 0.6  # ✅ 参考realtime_inference.py，稍微降低到0.6，避免漏检
+        logger.info(f"✅ Caffe人脸检测器初始化完成 | 置信度阈值: {self.conf_threshold}")
 
-    def detect(self, frame: np.ndarray, confidence_threshold: float = 0.6, max_faces: int = 10) -> List[Dict]:
+    def detect(self, frame: np.ndarray, confidence_threshold: float = 0.5, max_faces: int = 10) -> List[Dict]:
         """
         人脸检测
 
@@ -90,7 +98,6 @@ class FaceDetector:
 
         return faces
 
-    # ✅ 优化2: bbox坐标后处理优化
     def _postprocess_bboxes(self, faces: List[Dict], image_shape: tuple) -> List[Dict]:
         """
         bbox坐标后处理优化
@@ -132,7 +139,6 @@ class FaceDetector:
 
         return filtered_faces
 
-    # ✅ 优化3: 人脸对齐功能
     @staticmethod
     def align_face(frame: np.ndarray, bbox: list, target_size: tuple = (112, 112)) -> np.ndarray:
         """

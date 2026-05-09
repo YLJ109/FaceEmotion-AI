@@ -98,14 +98,17 @@ async def detect_image(file: UploadFile = File(...)):
         if frame.shape[0] < 10 or frame.shape[1] < 10:
             raise HTTPException(status_code=422, detail="图片尺寸过小")
 
-        faces = _face_detector.detect(frame)
+        # ✅ 图片检测使用默认参数，不受系统设置的检测参数影响
+        # max_faces 使用默认值 10，确保检测所有可见人脸
+        faces = _face_detector.detect(frame, max_faces=10)
         results = []
 
         for face in faces:
             x, y, w, h = face['bbox']
             face_img = frame[y:y+h, x:x+w]
             if face_img.size > 0 and _emotion_model:
-                emotion, confidence, scores = _emotion_model.predict(face_img)
+                # ✅ 图片检测禁用防抖，避免多人脸检测时状态共享导致错误
+                emotion, confidence, scores = _emotion_model.predict(face_img, use_stabilization=False)
                 results.append({
                     'bbox': [int(x), int(y), int(w), int(h)],
                     'emotion': emotion,
@@ -159,13 +162,15 @@ async def detect_batch(files: List[UploadFile] = File(...)):
             nparr = np.frombuffer(contents, np.uint8)
             frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             if frame is not None:
-                faces = _face_detector.detect(frame)
+                # ✅ 批量图片检测使用默认参数，不受系统设置的检测参数影响
+                faces = _face_detector.detect(frame, max_faces=10)
                 for face in faces:
                     x, y, w, h = face['bbox']
                     face_img = frame[y:y+h, x:x+w]
                     if face_img.size > 0 and _emotion_model:
+                        # ✅ 批量图片检测禁用防抖，避免多人脸检测时状态共享导致错误
                         emotion, confidence, scores = _emotion_model.predict(
-                            face_img)
+                            face_img, use_stabilization=False)
                         results.append({
                             'filename': file.filename,
                             'bbox': [int(x), int(y), int(w), int(h)],
@@ -218,7 +223,8 @@ async def detect_video(file: UploadFile = File(...)):
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = total_frames / fps if fps > 0 else 0
 
-        frame_interval = max(1, int(fps))
+        # ✅ 视频检测使用帧间隔（每秒检测一次）
+        frame_interval = max(1, int(fps)) if fps > 0 else 30
         key_frames = []
         frame_index = 0
 
@@ -228,7 +234,8 @@ async def detect_video(file: UploadFile = File(...)):
                 break
 
             if frame_index % frame_interval == 0:
-                faces = _face_detector.detect(frame)
+                # ✅ 视频检测使用默认参数，不受系统设置的检测参数影响
+                faces = _face_detector.detect(frame, max_faces=10)
                 frame_data = {
                     "frame": frame_index,
                     "timestamp": frame_index / fps if fps > 0 else 0,
@@ -238,8 +245,9 @@ async def detect_video(file: UploadFile = File(...)):
                 for face in faces:
                     x, y, w, h = face['bbox']
                     face_roi = frame[y:y+h, x:x+w]
+                    # ✅ 视频检测禁用防抖，避免多人脸检测时状态共享导致错误
                     emotion, confidence, scores = _emotion_model.predict(
-                        face_roi)
+                        face_roi, use_stabilization=False)
 
                     frame_data["faces"].append({
                         "bbox": face['bbox'],
@@ -327,8 +335,8 @@ async def detect_batch_video(files: List[UploadFile] = File(...)):
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             duration = total_frames / fps if fps > 0 else 0
 
-            # 提取关键帧
-            frame_interval = max(1, int(fps))
+            # ✅ 批量视频检测使用帧间隔（每秒检测一次）
+            frame_interval = max(1, int(fps)) if fps > 0 else 30
             key_frames = []
             frame_index = 0
 
@@ -338,7 +346,8 @@ async def detect_batch_video(files: List[UploadFile] = File(...)):
                     break
 
                 if frame_index % frame_interval == 0:
-                    faces = _face_detector.detect(frame)
+                    # ✅ 批量视频检测使用默认参数，不受系统设置的检测参数影响
+                    faces = _face_detector.detect(frame, max_faces=10)
                     frame_data = {
                         "frame": frame_index,
                         "timestamp": frame_index / fps if fps > 0 else 0,
@@ -348,8 +357,9 @@ async def detect_batch_video(files: List[UploadFile] = File(...)):
                     for face in faces:
                         x, y, w, h = face['bbox']
                         face_roi = frame[y:y+h, x:x+w]
+                        # ✅ 批量视频检测禁用防抖，避免多人脸检测时状态共享导致错误
                         emotion, confidence, scores = _emotion_model.predict(
-                            face_roi)
+                            face_roi, use_stabilization=False)
 
                         frame_data["faces"].append({
                             "bbox": face['bbox'],

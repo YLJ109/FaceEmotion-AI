@@ -103,7 +103,7 @@ async def lifespan(app: FastAPI):
         logger.info("🔧 正在加载 Caffe SSD 人脸检测模型...")
         start_time = _time.time()
 
-        #  切换回 Caffe SSD 人脸检测模型 (CPU)
+        # 使用 Caffe SSD 人脸检测模型（自动检测GPU/CPU）
         proto_file = os.path.join(
             os.path.dirname(__file__), 'configs', 'deploy.prototxt')
         model_file = os.path.join(os.path.dirname(
@@ -114,19 +114,19 @@ async def lifespan(app: FastAPI):
             model_file=model_file
         )
         elapsed = _time.time() - start_time
-        logger.info(f"✅ Caffe 人脸检测器加载完成 ({elapsed:.2f}s, CPU)")
+        logger.info(f"✅ Caffe 人脸检测器加载完成 ({elapsed:.2f}s)")
 
-        # ✅ 固定使用 ONNX 情绪识别模型 (CPU)
+        # 使用 ONNX 情绪识别模型（自动检测GPU/CPU）
         logger.info("🔧 正在加载 ONNX 情绪识别模型...")
         start_time = _time.time()
 
         onnx_emotion_model_path = os.path.join(os.path.dirname(
-            __file__), 'weights', 'emotion_model.onnx')
+            __file__), 'weights', 'final_model.onnx')
 
         from models.emotion_classifier_onnx import EmotionClassifierONNX
         emotion_model = EmotionClassifierONNX(onnx_emotion_model_path)
         elapsed = _time.time() - start_time
-        logger.info(f"✅ ONNX 情绪识别模型加载完成 ({elapsed:.2f}s, CPU, 7种表情)")
+        logger.info(f"✅ ONNX 情绪识别模型加载完成 ({elapsed:.2f}s, 7种表情)")
     except Exception as e:
         logger.error(f"❌ 模型加载失败: {e}")
         raise

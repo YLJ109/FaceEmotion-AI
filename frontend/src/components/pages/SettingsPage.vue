@@ -29,10 +29,9 @@
                                 <div class="mode-selector-row">
                                     <el-select v-model="settingsConfig.performance_mode"
                                         @change="handlePerformanceModeChange" class="compact-select">
-                                        <el-option label="🚀 极致模式 (Ultra)" value="ultra" />
-                                        <el-option label="⚡ 高性能模式 (High)" value="high" />
-                                        <el-option label="🔄 平衡模式 (Medium)" value="medium" />
-                                        <el-option label="🌙 节能模式 (Low)" value="low" />
+                                        <el-option label="🎮 GPU 版本 (NVIDIA/CUDA)" value="gpu" />
+                                        <el-option label="⚡ CPU 高性能模式" value="cpu_high" />
+                                        <el-option label="🌙 CPU 低性能模式" value="cpu_low" />
                                     </el-select>
                                     <el-button type="primary" round @click="detectAndRecommendMode"
                                         :loading="detecting" size="small">
@@ -43,45 +42,35 @@
                                     </el-button>
                                 </div>
                                 <div class="mode-description">
-                                    <div v-if="settingsConfig.performance_mode === 'ultra'">
+                                    <div v-if="settingsConfig.performance_mode === 'gpu'">
                                         <div class="mode-stats">
-                                            <span class="stat-item"><strong>分辨率:</strong> 256×192</span>
-                                            <span class="stat-item"><strong>跳帧:</strong> 无</span>
-                                            <span class="stat-item"><strong>线程:</strong> 4</span>
-                                        </div>
-                                        <p><strong>适用场景：</strong>高端游戏本/台式机 (Intel i7+ / AMD Ryzen 7+)</p>
-                                        <p><strong>特点：</strong>极致画质，每帧检测，最低延迟，适合专业场景</p>
-                                        <p><strong>硬件要求：</strong>CPU 6核心以上，内存 ≥ 8GB</p>
-                                    </div>
-                                    <div v-else-if="settingsConfig.performance_mode === 'high'">
-                                        <div class="mode-stats">
-                                            <span class="stat-item"><strong>分辨率:</strong> 192×144</span>
+                                            <span class="stat-item"><strong>推理设备:</strong> GPU (CUDA)</span>
+                                            <span class="stat-item"><strong>分辨率:</strong> 320×240</span>
                                             <span class="stat-item"><strong>跳帧:</strong> 1/2</span>
-                                            <span class="stat-item"><strong>线程:</strong> 3</span>
                                         </div>
-                                        <p><strong>适用场景：</strong>主流笔记本/台式机 (Intel i5 / AMD Ryzen 5)</p>
-                                        <p><strong>特点：</strong>高性能，平衡画质与流畅度，适合日常使用</p>
-                                        <p><strong>硬件要求：</strong>CPU 4核心以上，内存 ≥ 4GB</p>
+                                        <p><strong>适用场景：</strong>配备 NVIDIA GPU 的设备 (RTX 2060+)</p>
+                                        <p><strong>特点：</strong>GPU 加速推理，最高性能，最低延迟</p>
+                                        <p><strong>硬件要求：</strong>NVIDIA GPU + CUDA 环境，显存 ≥ 4GB</p>
                                     </div>
-                                    <div v-else-if="settingsConfig.performance_mode === 'medium'">
+                                    <div v-else-if="settingsConfig.performance_mode === 'cpu_high'">
                                         <div class="mode-stats">
-                                            <span class="stat-item"><strong>分辨率:</strong> 128×96</span>
-                                            <span class="stat-item"><strong>跳帧:</strong> 1/4</span>
-                                            <span class="stat-item"><strong>线程:</strong> 2</span>
+                                            <span class="stat-item"><strong>推理设备:</strong> CPU</span>
+                                            <span class="stat-item"><strong>分辨率:</strong> 256×192</span>
+                                            <span class="stat-item"><strong>跳帧:</strong> 1/3</span>
                                         </div>
-                                        <p><strong>适用场景：</strong>入门级设备 (Intel i3 / AMD Ryzen 3)</p>
-                                        <p><strong>特点：</strong>CPU推理模式，禁用高级特性，稳定运行</p>
-                                        <p><strong>硬件要求：</strong>CPU 2核心以上，内存 ≥ 4GB</p>
+                                        <p><strong>适用场景：</strong>高性能 CPU 设备 (Intel i5+ / AMD Ryzen 5+)</p>
+                                        <p><strong>特点：</strong>多线程推理，平衡画质与流畅度</p>
+                                        <p><strong>硬件要求：</strong>CPU 4核心以上，内存 ≥ 8GB</p>
                                     </div>
                                     <div v-else>
                                         <div class="mode-stats">
-                                            <span class="stat-item"><strong>分辨率:</strong> 80×60</span>
-                                            <span class="stat-item"><strong>跳帧:</strong> 1/8</span>
-                                            <span class="stat-item"><strong>线程:</strong> 1</span>
+                                            <span class="stat-item"><strong>推理设备:</strong> CPU</span>
+                                            <span class="stat-item"><strong>分辨率:</strong> 128×96</span>
+                                            <span class="stat-item"><strong>跳帧:</strong> 1/5</span>
                                         </div>
-                                        <p><strong>适用场景：</strong>老旧设备或低功耗笔记本</p>
-                                        <p><strong>特点：</strong>节能优先，禁用实时图表，最低资源占用</p>
-                                        <p><strong>硬件要求：</strong>任意 CPU，内存 ≥ 2GB</p>
+                                        <p><strong>适用场景：</strong>低性能设备或老旧电脑</p>
+                                        <p><strong>特点：</strong>节能优先，单线程推理，稳定运行</p>
+                                        <p><strong>硬件要求：</strong>CPU 2核心以上，内存 ≥ 4GB</p>
                                     </div>
                                 </div>
                             </el-form-item>
@@ -112,67 +101,70 @@
                         </el-form>
                     </div>
 
-                    <!-- AI 模型配置 -->
-                    <div v-show="activeTab === 'ai'" class="tab-panel">
-                        <el-form label-position="top" size="large">
-                            <!-- ✅ 修复: 移除推理设备选项（当前仅支持 CPU） -->
-                            <el-alert title="当前运行模式" type="info" :closable="false" show-icon
-                                style="margin-bottom: 20px;">
-                                <template #default>
-                                    <p style="margin: 0;">🖥️ <strong>CPU 推理模式</strong></p>
-                                    <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);">
-                                        系统当前使用 ONNX Runtime + Caffe SSD 进行纯 CPU 推理，无需 GPU 加速。
-                                    </p>
-                                </template>
-                            </el-alert>
-
-                            <el-form-item label="置信度阈值">
-                                <div class="slider-group">
-                                    <el-slider v-model="settingsConfig.confidence_threshold" :min="0.3" :max="0.9"
-                                        :step="0.05" :format-tooltip="val => (val * 100).toFixed(0) + '%'"
-                                        @change="handleConfigChange" />
-                                    <span class="slider-hint">当前阈值: {{ (settingsConfig.confidence_threshold *
-                                        100).toFixed(0) }}%</span>
-                                </div>
-                                <p class="field-description">
-                                    较低的值会检测到更多人脸但可能增加误检，较高的值更严格但可能漏检。
-                                </p>
-                            </el-form-item>
-                        </el-form>
-                    </div>
-
                     <!-- 检测参数 -->
-                    <div v-show="activeTab === 'detection'" class="tab-panel">
-                        <el-form label-position="top" size="large">
-                            <el-form-item label="摄像头分辨率">
-                                <el-select v-model="settingsConfig.resolution" style="width:100%"
-                                    @change="handleConfigChange" class="compact-select">
-                                    <el-option label="320×240 (流畅)" value="320x240" />
-                                    <el-option label="640×480 (清晰)" value="640x480" />
-                                    <el-option label="1280×720 (高清)" value="1280x720" />
-                                </el-select>
-                            </el-form-item>
-
-                            <el-form-item label="检测频率">
-                                <div class="slider-group">
-                                    <el-slider v-model="settingsConfig.detect_every_n_frames" :min="1" :max="5"
-                                        :step="1" show-stops @change="handleConfigChange" />
-                                    <span class="slider-hint">每 {{ settingsConfig.detect_every_n_frames }} 帧检测一次</span>
+                    <div v-show="activeTab === 'detection'" class="tab-panel detection-panel">
+                        <div class="detection-config">
+                            <!-- 检测频率 -->
+                            <div class="config-item">
+                                <label class="config-label">
+                                    <span class="label-icon">⚡</span>
+                                    <span>检测频率</span>
+                                </label>
+                                <div class="config-content">
+                                    <div class="slider-wrapper">
+                                        <el-slider v-model="settingsConfig.detect_every_n_frames" 
+                                            :min="1" :max="5" :step="1" 
+                                            show-stops @change="handleConfigChange" />
+                                    </div>
+                                    <div class="config-hint">
+                                        每 <strong>{{ settingsConfig.detect_every_n_frames }}</strong> 帧检测一次
+                                    </div>
                                 </div>
-                            </el-form-item>
+                            </div>
 
-                            <!-- ✅ 新增: 最大人脸数量配置 -->
-                            <el-form-item label="最大检测人脸数量">
-                                <div class="slider-group">
-                                    <el-slider v-model="settingsConfig.max_faces" :min="1" :max="10"
-                                        :step="1" show-stops @change="handleConfigChange" />
-                                    <span class="slider-hint">最多检测 {{ settingsConfig.max_faces }} 张人脸</span>
+                            <!-- 最大检测人脸数量 -->
+                            <div class="config-item">
+                                <label class="config-label">
+                                    <span class="label-icon">👥</span>
+                                    <span>最大检测人脸数量</span>
+                                </label>
+                                <div class="config-content">
+                                    <div class="slider-wrapper">
+                                        <el-slider v-model="settingsConfig.max_faces" 
+                                            :min="1" :max="10" :step="1" 
+                                            show-stops @change="handleConfigChange" />
+                                    </div>
+                                    <div class="config-hint">
+                                        最多检测 <strong>{{ settingsConfig.max_faces }}</strong> 张人脸
+                                    </div>
+                                    <p class="config-description">
+                                        设置实时检测时最多识别的人脸数量。较少的数量可提高检测速度，较多的数量可支持多人场景。
+                                    </p>
                                 </div>
-                                <p class="field-description">
-                                    设置实时检测时最多识别的人脸数量。较少的数量可提高检测速度，较多的数量可支持多人场景。
-                                </p>
-                            </el-form-item>
-                        </el-form>
+                            </div>
+
+                            <!-- 自适应校准开关 -->
+                            <div class="config-item">
+                                <label class="config-label">
+                                    <span class="label-icon">🧠</span>
+                                    <span>自适应校准</span>
+                                </label>
+                                <div class="config-content">
+                                    <div class="switch-wrapper">
+                                        <el-switch 
+                                            v-model="settingsConfig.enable_adaptive_calibration" 
+                                            @change="handleConfigChange"
+                                            active-text="已启用"
+                                            inactive-text="已禁用"
+                                            size="large"
+                                        />
+                                    </div>
+                                    <p class="config-description">
+                                        启用后，系统会根据用户反馈动态调整情绪识别的置信度，提高识别准确性。禁用后使用模型原始输出。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- 界面设置 -->
@@ -243,7 +235,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { ElMessage } from 'element-plus'
 import { Setting, Cpu, Monitor, VideoCamera, Brush, Odometer, Headset } from '@element-plus/icons-vue'
@@ -253,10 +245,9 @@ import generativeAudio from '@/utils/generativeAudio'
 const themeStore = useThemeStore()
 
 // 系统设置选项卡状态
-const activeTab = ref('ai') // 默认显示 AI 模型配置
+const activeTab = ref('performance') // 默认显示性能优化
 const settingsTabs = [
     { key: 'performance', label: '性能优化', icon: 'Odometer' },
-    { key: 'ai', label: 'AI 模型配置', icon: 'Cpu' },
     { key: 'detection', label: '检测参数', icon: 'VideoCamera' },
     { key: 'ui', label: '界面设置', icon: 'Brush' },
     { key: 'music', label: 'AI 音乐配置', icon: 'Headset' }
@@ -274,6 +265,7 @@ const settingsConfig = reactive({
     resolution: '640x480',
     detect_every_n_frames: 2,
     max_faces: 10,  // ✅ 新增: 最大检测人脸数量
+    enable_adaptive_calibration: false,  // ✅ 新增: 自适应校准开关
 
     // 界面设置
     theme_mode: 'auto',
@@ -293,8 +285,48 @@ const originalConfig = ref(null)
 const hardwareInfo = reactive({
     gpu: null,
     cpu: null,
+    cpuCores: null,
+    memory: null,
     recommendedMode: null
 })
+
+// ✅ 新增: 自动检测并分配模式
+const autoDetectMode = async () => {
+    try {
+        const response = await fetch(`${API.baseUrl}/api/performance/recommend`)
+        if (!response.ok) throw new Error('检测失败')
+        const data = await response.json()
+
+        // 更新硬件信息
+        hardwareInfo.gpu = data.gpu || '未检测到'
+        hardwareInfo.cpu = data.cpu || '未知'
+        hardwareInfo.cpuCores = data.cpu_cores || '未知'
+        hardwareInfo.memory = data.memory || '未知'
+        hardwareInfo.recommendedMode = data.recommended_mode || 'cpu_high'
+
+        return hardwareInfo.recommendedMode
+    } catch (error) {
+        console.error('❌ 自动检测失败:', error)
+        // 降级到 CPU 高性能模式
+        return 'cpu_high'
+    }
+}
+
+// ✅ 新增: 组件挂载时自动检测并应用推荐模式
+const applyAutoMode = async () => {
+    const recommendedMode = await autoDetectMode()
+    settingsConfig.performance_mode = recommendedMode
+    await saveConfig(true)
+    
+    // 显示提示
+    const modeName = recommendedMode === 'gpu' ? 'GPU 版本' : 
+                     recommendedMode === 'cpu_high' ? 'CPU 高性能模式' : 'CPU 低性能模式'
+    ElMessage({
+        message: `✅ 已自动检测并应用 ${modeName}`,
+        type: 'success',
+        duration: 3000
+    })
+}
 
 // 从后端加载配置
 const loadConfig = async () => {
@@ -389,11 +421,13 @@ const handlePerformanceModeChange = async () => {
 const saveConfig = async (silent = false) => {
     saving.value = true
     try {
-        // 1. 同步到后端（✅ 修复: 移除已废弃的模型切换参数）
+        // 1. 同步到后端（✅ 修复: 添加 max_faces 参数）
         const payload = {
             performance_mode: settingsConfig.performance_mode,
             confidence_threshold: settingsConfig.confidence_threshold,
             detect_every_n_frames: settingsConfig.detect_every_n_frames,
+            max_faces: settingsConfig.max_faces,  // ✅ 新增: 最大检测人脸数
+            enable_adaptive_calibration: settingsConfig.enable_adaptive_calibration,  // ✅ 新增: 自适应校准开关
             theme_mode: settingsConfig.theme_mode,
             // AI 音乐配置
             music_volume: settingsConfig.music_volume,
@@ -453,9 +487,13 @@ const resetConfig = async () => {
     }
 }
 
-// 组件挂载时加载配置
-onMounted(() => {
-    loadConfig()
+// 组件挂载时加载配置并自动检测模式
+onMounted(async () => {
+    await loadConfig()
+    // ✅ 自动检测硬件并应用推荐模式（仅首次访问或配置为空时）
+    if (!settingsConfig.performance_mode || settingsConfig.performance_mode === '') {
+        await applyAutoMode()
+    }
 })
 
 // ✅ 新增: 监听音乐配置变化并同步到音频引擎
@@ -583,10 +621,95 @@ watch(
     line-height: 1.5;
 }
 
-/* 响应式适配：小屏幕时恢复垂直排列 */
+/* ✅ 检测参数面板全新布局样式 */
+.detection-panel {
+    padding: 8px 0;
+}
+
+.detection-config {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.config-item {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.config-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: default;
+}
+
+.label-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+}
+
+.config-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(113, 57, 255, 0.1);
+}
+
+.config-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding-left: 8px;
+    
+    strong {
+        color: var(--primary);
+        font-weight: 600;
+    }
+}
+
+.config-description {
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    line-height: 1.5;
+    padding-left: 8px;
+    margin: 0;
+}
+
+.slider-wrapper {
+    width: 100%;
+}
+
+.slider-wrapper .el-slider {
+    width: 100%;
+}
+
+.switch-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+.resolution-select {
+    width: 100%;
+    max-width: 280px;
+}
+
+/* 响应式适配 */
 @media (max-width: 768px) {
     .hardware-info {
         grid-template-columns: 1fr;
+    }
+    
+    .config-content {
+        padding: 12px;
     }
 }
 </style>

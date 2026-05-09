@@ -11,7 +11,7 @@ from typing import Tuple, List, Dict, Optional
 from models.detector import FaceDetector
 from models.emotion_classifier_onnx import EmotionClassifierONNX
 from optimizer.dynamic_inference import DynamicInferenceOptimizer
-from core.config_manager import ConfigManager
+from core.config import ConfigManager
 
 
 class DetectionService:
@@ -19,11 +19,19 @@ class DetectionService:
     
     def __init__(self):
         self.config = ConfigManager()
-        self.face_detector = FaceDetector()
+        
+        # 加载人脸检测模型
+        proto_path = self.config.get('face_detector_proto', 'configs/deploy.prototxt')
+        model_path = self.config.get('face_detector_model', 'weights/res10_300x300_ssd_iter_140000_fp16.caffemodel')
+        self.face_detector = FaceDetector(proto_file=proto_path, model_file=model_path)
+        
+        # 加载情感分类模型
+        emotion_model_path = self.config.get('emotion_model', 'weights/final_model.onnx')
         self.emotion_classifier = EmotionClassifierONNX(
-            model_path=self.config.get('model.path', './weights/emotion_model.onnx'),
-            use_quantized=self.config.get('model.use_quantization', True)
+            model_path=emotion_model_path,
+            use_quantized=self.config.get('use_fp16', True)
         )
+        
         self.optimizer = DynamicInferenceOptimizer()
         
         # 缓存上一帧结果用于运动检测复用
@@ -49,7 +57,8 @@ class DetectionService:
                 return self._last_frame_results or self._create_empty_result()
             
             # 人脸检测
-            faces = self.face_detector.detect(image)
+            confidence_threshold = self.config.get('face_detect_confidence', 0.5)
+            faces = self.face_detector.detect(image, confidence_threshold=confidence_threshold)
             
             if not faces:
                 return self._create_empty_result()
@@ -84,39 +93,32 @@ class DetectionService:
         np_arr = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         
-        # 转换为RGB格式
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        
         return image
     
     def _analyze_emotion(self, image: np.ndarray, face: dict) -> Dict:
         """分析单张人脸的情感"""
         # 提取人脸区域
-        x1, y1, x2, y2 = face['bbox']
-        face_roi = image[y1:y2, x1:x2]
+        x1, y1, w, h = face['bbox']
+        face_roi = image[y1:y1+h, x1:x1+w]
         
-        # 调整大小以匹配模型输入
-        face_roi = cv2.resize(face_roi, (96, 96))
-        
-        # 预处理
-        face_roi = face_roi / 255.0
-        face_roi = np.expand_dims(face_roi, axis=0).astype(np.float32)
+        if face_roi.size == 0:
+            return {
+                'bbox': face['bbox'],
+                'confidence': face['confidence'],
+                'emotion': 'neutral',
+                'emotion_confidence': 0.0,
+                'all_emotions': {}
+            }
         
         # 推理
-        emotion_probs = self.emotion_classifier.predict(face_roi)
-        
-        # 获取最可能的情感
-        emotion_labels = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
-        max_idx = np.argmax(emotion_probs)
-        dominant_emotion = emotion_labels[max_idx]
-        confidence = float(emotion_probs[max_idx])
+        emotion, confidence, scores = self.emotion_classifier.predict(face_roi)
         
         return {
             'bbox': face['bbox'],
             'confidence': face['confidence'],
-            'emotion': dominant_emotion,
+            'emotion': emotion,
             'emotion_confidence': confidence,
-            'all_emotions': dict(zip(emotion_labels, [float(p) for p in emotion_probs]))
+            'all_emotions': scores
         }
     
     def _create_empty_result(self, error: str = None) -> Dict:

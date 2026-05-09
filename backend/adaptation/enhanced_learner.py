@@ -55,7 +55,7 @@ class EnhancedAdaptiveLearner:
 
         # ✅ 新增: 遗忘机制参数
         self.half_life_days = 30  # 反馈半衰期（30天）
-        self.min_samples_for_calibration = 3  # 最少样本数
+        self.min_samples_for_calibration = 10  # ✅ 提高阈值: 最少10个样本才触发校准
 
     # ── 持久化 ─────────────────────────────────────────────
 
