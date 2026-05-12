@@ -19,7 +19,7 @@ class TestEmotionClassifierONNX:
     @pytest.fixture(scope="class")
     def classifier(self):
         """创建分类器实例"""
-        model_path = './backend/weights/emotion_model.onnx'
+        model_path = './backend/weights/final_model.onnx'
         if not os.path.exists(model_path):
             pytest.skip("模型文件不存在，跳过测试")
         
@@ -35,8 +35,8 @@ class TestEmotionClassifierONNX:
     
     def test_predict_single_face(self, classifier):
         """测试单张人脸预测"""
-        # 创建随机测试图像（96x96灰度图）
-        test_image = np.random.randint(0, 255, (96, 96, 3), dtype=np.uint8)
+        # 创建随机测试图像（128x128 RGB图）
+        test_image = np.random.randint(0, 255, (128, 128, 3), dtype=np.uint8)
         
         result = classifier.predict(test_image)
         
@@ -68,7 +68,7 @@ class TestEmotionClassifierONNX:
         """测试批量预测"""
         # 创建多张测试图像
         test_images = [
-            np.random.randint(0, 255, (96, 96, 3), dtype=np.uint8)
+            np.random.randint(0, 255, (128, 128, 3), dtype=np.uint8)
             for _ in range(3)
         ]
         
@@ -93,7 +93,7 @@ class TestEmotionClassifierONNX:
     
     def test_fp16_quantization(self):
         """测试FP16量化模式"""
-        model_path = './backend/weights/emotion_model.onnx'
+        model_path = './backend/weights/final_model.onnx'
         if not os.path.exists(model_path):
             pytest.skip("模型文件不存在，跳过测试")
         
@@ -103,7 +103,7 @@ class TestEmotionClassifierONNX:
         assert classifier.session is not None
         
         # 测试量化模式下的预测
-        test_image = np.random.randint(0, 255, (96, 96, 3), dtype=np.uint8)
+        test_image = np.random.randint(0, 255, (128, 128, 3), dtype=np.uint8)
         emotion, confidence, scores = classifier.predict(test_image)
         
         assert emotion in EMOTION_NAMES
