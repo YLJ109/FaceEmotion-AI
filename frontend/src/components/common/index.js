@@ -3,5 +3,4 @@
  */
 export { default as EmotionSVG } from './EmotionSVG.vue'
 export { default as FpsDisplay } from './FpsDisplay.vue'
-export { default as AppState } from './AppState.vue'
 export { default as ThemeSelector } from './ThemeSelector.vue'

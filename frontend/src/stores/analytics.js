@@ -6,8 +6,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { API } from '@/api/config'
-import httpMonitor from '@/utils/httpMonitor'
+import { getEmotionTrend, getUserAnalytics } from '@/api/modules/analytics'
 
 export const useAnalyticsStore = defineStore('analytics', () => {
     // 状态
@@ -46,21 +45,13 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     async function fetchStats() {
         isLoading.value = true
         try {
-            const response = await httpMonitor.monitoredFetch(`${API.base}/api/analytics/stats`)
+            const data = await getUserAnalytics()
+            stats.value = data.stats || {}
+            emotionDist.value = data.emotion_dist || {}
+            typeDist.value = data.type_dist || {}
+            lastUpdated.value = new Date().toISOString()
 
-            if (response.ok) {
-                const data = await response.json()
-                stats.value = data.stats || {}
-                emotionDist.value = data.emotion_dist || {}
-                typeDist.value = data.type_dist || {}
-                lastUpdated.value = new Date().toISOString()
-
-                console.log('✅ 统计数据已更新')
-            } else {
-                console.warn('⚠️ 获取统计数据失败')
-                // 降级: 使用模拟数据
-                _useMockStats()
-            }
+            
         } catch (error) {
             console.error('❌ 获取统计数据异常:', error)
             _useMockStats()
@@ -75,18 +66,9 @@ export const useAnalyticsStore = defineStore('analytics', () => {
     async function fetchEmotionTrend(days = 7) {
         isLoading.value = true
         try {
-            const response = await httpMonitor.monitoredFetch(
-                `${API.base}/api/analytics/emotion_trend?days=${days}`
-            )
-
-            if (response.ok) {
-                const data = await response.json()
-                emotionTrend.value = data.trend || []
-                console.log('✅ 情绪趋势数据已更新')
-            } else {
-                console.warn('⚠️ 获取情绪趋势失败')
-                _useMockTrend()
-            }
+            const data = await getEmotionTrend({ days })
+            emotionTrend.value = data.trend || []
+            
         } catch (error) {
             console.error('❌ 获取情绪趋势异常:', error)
             _useMockTrend()
@@ -110,7 +92,7 @@ export const useAnalyticsStore = defineStore('analytics', () => {
      */
     function logFeatureUsage(featureName, metadata = {}) {
         // 这里可以集成到后端API
-        console.log(`📊 功能使用: ${featureName}`, metadata)
+        
 
         // TODO: 发送到后端统计接口
         // fetch('/api/analytics/log_usage', {
@@ -165,16 +147,18 @@ export const useAnalyticsStore = defineStore('analytics', () => {
      */
     function _useMockTrend() {
         const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-        const emotions = ['happy', 'sad', 'angry', 'surprise', 'neutral']
+        const emotions = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 
         emotionTrend.value = days.map(day => ({
             date: day,
             emotions: {
-                happy: Math.floor(Math.random() * 50) + 20,
-                sad: Math.floor(Math.random() * 30) + 10,
                 angry: Math.floor(Math.random() * 20) + 5,
-                surprise: Math.floor(Math.random() * 15) + 5,
-                neutral: Math.floor(Math.random() * 40) + 15
+                disgust: Math.floor(Math.random() * 10) + 3,
+                fear: Math.floor(Math.random() * 15) + 5,
+                happy: Math.floor(Math.random() * 50) + 20,
+                neutral: Math.floor(Math.random() * 40) + 15,
+                sad: Math.floor(Math.random() * 30) + 10,
+                surprise: Math.floor(Math.random() * 15) + 5
             }
         }))
     }

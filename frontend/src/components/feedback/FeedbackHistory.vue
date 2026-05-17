@@ -288,8 +288,8 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Search, Loading, DocumentDelete, Picture, Delete, View, Close, InfoFilled, DataAnalysis } from '@element-plus/icons-vue'
-import { getEmotionName, getEmotionEmoji, getEmotionColor, EMOTION_LIST } from '@/utils/emotion'
-import { API } from '@/api/config'
+import { getEmotionName, getEmotionEmoji, getEmotionColor, EMOTION_LIST } from '@/constants/emotions'
+import { getFeedbackHistory, deleteFeedback } from '@/api/modules/system'
 
 // ✅ 使用完整的 emotion 列表（过滤别名，避免重复）
 const emotionList = EMOTION_LIST.filter(e => !['surprised', 'fearful', 'calm'].includes(e))
@@ -363,22 +363,16 @@ const setEmotionFilter = (emotion) => {
 const loadFeedbackHistory = async () => {
     loading.value = true
     try {
-        const params = new URLSearchParams({
-            limit: pageSize.value,
-            offset: (currentPage.value - 1) * pageSize.value
-        })
-
-        if (filters.value.emotion) {
-            params.append('emotion', filters.value.emotion)
-        }
-
+        const queryParams = {}
+        if (filters.value.emotion) queryParams.emotion = filters.value.emotion
         if (dateRange.value && dateRange.value.length === 2) {
-            params.append('start_date', dateRange.value[0])
-            params.append('end_date', dateRange.value[1])
+            queryParams.start_date = dateRange.value[0]
+            queryParams.end_date = dateRange.value[1]
         }
+        queryParams.page = currentPage.value
+        queryParams.page_size = pageSize.value
 
-        const response = await fetch(`${API.feedbackHistory}?${params.toString()}`)
-        const data = await response.json()
+        const data = await getFeedbackHistory(queryParams)
 
         if (data.status === 'success') {
             feedbackRecords.value = data.records
@@ -436,23 +430,15 @@ const deleteRecord = async (record, event) => {
             }
         )
 
-        const response = await fetch(`${API.feedback}/${record.id}`, {
-            method: 'DELETE'
-        })
+        await deleteFeedback(record.id)
 
-        const data = await response.json()
-
-        if (data.status === 'success') {
-            ElMessage.success('删除成功')
-            const index = feedbackRecords.value.findIndex(r => r.id === record.id)
-            if (index !== -1) {
-                feedbackRecords.value.splice(index, 1)
-                total.value -= 1
-            }
-            detailVisible.value = false
-        } else {
-            ElMessage.error('删除失败')
+        ElMessage.success('反馈记录已删除')
+        const index = feedbackRecords.value.findIndex(r => r.id === record.id)
+        if (index !== -1) {
+            feedbackRecords.value.splice(index, 1)
+            total.value -= 1
         }
+        detailVisible.value = false
     } catch (error) {
         if (error !== 'cancel') {
             console.error('删除反馈记录失败:', error)
@@ -493,11 +479,11 @@ const batchDelete = async () => {
         )
 
         const deletePromises = selectedRecords.value.map(record =>
-            fetch(`${API.feedback}/${record.id}`, { method: 'DELETE' })
+            deleteFeedback(record.id)
         )
 
-        const results = await Promise.all(deletePromises)
-        const successCount = results.filter(r => r.ok).length
+        const results = await Promise.allSettled(deletePromises)
+        const successCount = results.filter(r => r.status === 'fulfilled').length
 
         if (successCount > 0) {
             ElMessage.success(`成功删除 ${successCount} 条记录`)

@@ -183,29 +183,32 @@
                     <!-- AI 音乐配置 -->
                     <div v-show="activeTab === 'music'" class="tab-panel">
                         <el-form label-position="top" size="large">
-                            <el-form-item label="基础音量">
-                                <div class="slider-group">
-                                    <el-slider v-model="settingsConfig.music_volume" :min="0" :max="100" :step="1"
-                                        :format-tooltip="val => val + '%'" @change="handleConfigChange" />
-                                    <span class="slider-hint">当前音量: {{ settingsConfig.music_volume }}%</span>
-                                </div>
-                            </el-form-item>
+                            <!-- ✅ 三个滑块改为一行排列 -->
+                            <div class="music-sliders-row">
+                                <el-form-item label="基础音量" class="slider-item">
+                                    <div class="slider-group">
+                                        <el-slider v-model="settingsConfig.music_volume" :min="0" :max="100" :step="1"
+                                            :format-tooltip="val => val + '%'" @change="handleConfigChange" />
+                                        <span class="slider-hint">当前音量: {{ settingsConfig.music_volume }}%</span>
+                                    </div>
+                                </el-form-item>
 
-                            <el-form-item label="情绪敏感度">
-                                <div class="slider-group">
-                                    <el-slider v-model="settingsConfig.emotion_sensitivity" :min="0" :max="100"
-                                        :step="1" :format-tooltip="val => val + '%'" @change="handleConfigChange" />
-                                    <span class="slider-hint">当前敏感度: {{ settingsConfig.emotion_sensitivity }}%</span>
-                                </div>
-                            </el-form-item>
+                                <el-form-item label="情绪敏感度" class="slider-item">
+                                    <div class="slider-group">
+                                        <el-slider v-model="settingsConfig.emotion_sensitivity" :min="0" :max="100"
+                                            :step="1" :format-tooltip="val => val + '%'" @change="handleConfigChange" />
+                                        <span class="slider-hint">当前敏感度: {{ settingsConfig.emotion_sensitivity }}%</span>
+                                    </div>
+                                </el-form-item>
 
-                            <el-form-item label="节奏平滑度">
-                                <div class="slider-group">
-                                    <el-slider v-model="settingsConfig.rhythm_smoothness" :min="0" :max="100" :step="1"
-                                        :format-tooltip="val => val + '%'" @change="handleConfigChange" />
-                                    <span class="slider-hint">当前平滑度: {{ settingsConfig.rhythm_smoothness }}%</span>
-                                </div>
-                            </el-form-item>
+                                <el-form-item label="节奏平滑度" class="slider-item">
+                                    <div class="slider-group">
+                                        <el-slider v-model="settingsConfig.rhythm_smoothness" :min="0" :max="100" :step="1"
+                                            :format-tooltip="val => val + '%'" @change="handleConfigChange" />
+                                        <span class="slider-hint">当前平滑度: {{ settingsConfig.rhythm_smoothness }}%</span>
+                                    </div>
+                                </el-form-item>
+                            </div>
 
                             <el-form-item label="音色风格">
                                 <el-select v-model="settingsConfig.timbre_style" style="width:100%"
@@ -215,6 +218,13 @@
                                     <el-option label="温暖锯齿波 (Sawtooth)" value="sawtooth" />
                                     <el-option label="复古方波 (Square)" value="square" />
                                 </el-select>
+                            </el-form-item>
+
+                            <el-form-item label="自动播放音乐">
+                                <div class="toggle-group">
+                                    <span class="toggle-label">检测完成后自动播放情绪音乐</span>
+                                    <el-switch v-model="settingsConfig.auto_play_music" @change="handleConfigChange" />
+                                </div>
                             </el-form-item>
                         </el-form>
                     </div>
@@ -239,8 +249,9 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { ElMessage } from 'element-plus'
 import { Setting, Cpu, Monitor, VideoCamera, Brush, Odometer, Headset } from '@element-plus/icons-vue'
-import { API } from '@/api/config'
+import { getSystemConfig, updateSystemConfig, getPerformanceRecommend } from '@/api/modules/system'
 import generativeAudio from '@/utils/generativeAudio'
+import logger from '@/utils/logger'
 
 const themeStore = useThemeStore()
 
@@ -274,7 +285,8 @@ const settingsConfig = reactive({
     music_volume: 70,
     emotion_sensitivity: 50,
     rhythm_smoothness: 50,
-    timbre_style: 'sine'
+    timbre_style: 'sine',
+    auto_play_music: false  // ✅ 新增: 是否在检测完成后自动播放音乐
 })
 
 const saving = ref(false)
@@ -293,9 +305,7 @@ const hardwareInfo = reactive({
 // ✅ 新增: 自动检测并分配模式
 const autoDetectMode = async () => {
     try {
-        const response = await fetch(`${API.baseUrl}/api/performance/recommend`)
-        if (!response.ok) throw new Error('检测失败')
-        const data = await response.json()
+        const data = await getPerformanceRecommend()
 
         // 更新硬件信息
         hardwareInfo.gpu = data.gpu || '未检测到'
@@ -331,9 +341,7 @@ const applyAutoMode = async () => {
 // 从后端加载配置
 const loadConfig = async () => {
     try {
-        const response = await fetch(`${API.baseUrl}/api/config`)
-        if (!response.ok) throw new Error('获取配置失败')
-        const data = await response.json()
+        const data = await getSystemConfig()
 
         // 同步后端配置到前端
         const backendConfig = data.config
@@ -352,7 +360,7 @@ const loadConfig = async () => {
         // 保存原始配置用于重置
         originalConfig.value = { ...settingsConfig }
 
-        console.debug('配置加载成功')
+        
     } catch (error) {
         console.error('❌ 加载配置失败:', error)
         ElMessage.error('加载配置失败，使用默认值')
@@ -373,10 +381,7 @@ const handleConfigChange = () => {
 const detectAndRecommendMode = async () => {
     detecting.value = true
     try {
-        // 调用后端 API 检测硬件并推荐模式
-        const response = await fetch(`${API.baseUrl}/api/performance/recommend`)
-        if (!response.ok) throw new Error('检测失败')
-        const data = await response.json()
+        const data = await getPerformanceRecommend()
 
         // 更新硬件信息
         hardwareInfo.gpu = data.gpu || '未检测到'
@@ -395,7 +400,7 @@ const detectAndRecommendMode = async () => {
             duration: 3000
         })
     } catch (error) {
-        console.error('❌ 智能检测失败:', error)
+        logger.error('智能检测失败:', error)
         ElMessage.error('检测失败，请手动选择模式')
     } finally {
         detecting.value = false
@@ -404,7 +409,7 @@ const detectAndRecommendMode = async () => {
 
 // ✅ 修改: 性能模式切换处理
 const handlePerformanceModeChange = async () => {
-    console.debug(`切换性能模式: ${settingsConfig.performance_mode}`)
+    
 
     // 立即保存配置（静默模式，避免提示重叠）
     await saveConfig(true)
@@ -436,13 +441,7 @@ const saveConfig = async (silent = false) => {
             timbre_style: settingsConfig.timbre_style
         }
 
-        const response = await fetch(`${API.baseUrl}/api/config`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-
-        if (!response.ok) throw new Error('保存配置失败')
+        await updateSystemConfig(payload)
 
         // 2. 保存到本地
         localStorage.setItem('app_config', JSON.stringify(settingsConfig))
@@ -461,6 +460,43 @@ const saveConfig = async (silent = false) => {
     } finally {
         saving.value = false
     }
+}
+
+// ===== 连接设置 =====
+const formatServerUrl = (input) => {
+  let url = input.trim()
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'http://' + url
+  }
+  return url.replace(/\/+$/, '')
+}
+
+const handleServerSave = () => {
+  const url = formatServerUrl(serverInput.value)
+  ElMessage.info('正在切换服务器地址...')
+  setServerUrl(url)
+}
+
+const handleServerReset = () => {
+  resetServerUrl()
+}
+
+const testConnection = async () => {
+  testing.value = true
+  testResult.value = null
+  try {
+    const url = formatServerUrl(serverInput.value || currentServerUrl.value)
+    const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3000) })
+    if (res.ok) {
+      testResult.value = { ok: true, msg: '✅ 连接成功！服务器运行正常' }
+    } else {
+      testResult.value = { ok: false, msg: `❌ 服务器返回 ${res.status}` }
+    }
+  } catch (e) {
+    testResult.value = { ok: false, msg: `❌ 无法连接: ${e.message}` }
+  } finally {
+    testing.value = false
+  }
 }
 
 // 恢复默认配置
@@ -508,7 +544,7 @@ watch(
         // 同步到音频引擎
         if (generativeAudio.isInitialized) {
             generativeAudio.updateConfig(newConfig);
-            console.log('[音乐] 音乐配置已同步到音频引擎:', newConfig);
+            
         }
     },
     { deep: true }
@@ -702,7 +738,87 @@ watch(
     max-width: 280px;
 }
 
+/* ✅ AI音乐配置滑块横向排列 */
+.music-sliders-row {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+}
+
+.music-sliders-row .slider-item {
+    flex: 1;
+    min-width: 0;
+}
+
+.music-sliders-row .slider-item .el-form-item__label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.music-sliders-row .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.music-sliders-row .slider-hint {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
 /* 响应式适配 */
+/* ===== 连接设置 ===== */
+.server-input-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.server-input-row .el-input {
+    flex: 1;
+}
+
+.server-test-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.test-pass { color: #26DE81; font-weight: 600; font-size: 13px; }
+.test-fail { color: #FF4757; font-weight: 600; font-size: 13px; }
+
+.server-input-row code,
+.field-description code,
+.tip-box code {
+    background: rgba(162, 89, 255, 0.15);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--primary);
+}
+
+.tip-box {
+    padding: 12px 14px;
+    background: rgba(10, 189, 227, 0.06);
+    border-left: 3px solid #0ABDE3;
+    border-radius: 6px;
+    width: 100%;
+}
+
+.tip-box p {
+    margin: 6px 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.tip-box strong {
+    color: var(--text);
+    font-weight: 600;
+}
+
 @media (max-width: 768px) {
     .hardware-info {
         grid-template-columns: 1fr;
@@ -710,6 +826,15 @@ watch(
     
     .config-content {
         padding: 12px;
+    }
+    
+    .music-sliders-row {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .server-input-row {
+        flex-direction: column;
     }
 }
 </style>

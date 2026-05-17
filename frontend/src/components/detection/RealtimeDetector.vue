@@ -18,6 +18,16 @@
                     </div>
                 </div>
 
+                <!-- 摄像头启动加载遮罩 -->
+                <div v-if="isLoading" class="camera-loading-overlay">
+                    <div class="loading-content">
+                        <div class="loading-icon">
+                            <el-icon :size="48" class="spinner"><Loading /></el-icon>
+                        </div>
+                        <span class="loading-text">连接中...</span>
+                    </div>
+                </div>
+
                 <!-- FPS显示 -->
                 <div class="fps-badge" v-if="fps > 0 && isCameraOn">
                     <span class="fps-dot"></span>
@@ -187,37 +197,32 @@
                 <!-- 摄像头已启动 -->
                 <template v-else>
                     <!-- 检测到人脸 -->
-                    <div v-if="currentEmotion" class="emotion-display">
-                        <!-- 情绪名称和置信度（颜色随情绪变化） -->
-                        <div class="emotion-info" :style="{ '--emotion-color': getEmotionColor(currentEmotion) }">
-                            <div class="emotion-name" :style="{ color: getEmotionColor(currentEmotion) }">
-                                {{ getEmotionEmoji(currentEmotion) }} {{ getEmotionName(currentEmotion) }}
-                            </div>
-                            <div class="emotion-confidence" :style="{ color: getEmotionColor(currentEmotion) }">
-                                置信度: {{ (currentConfidence * 100).toFixed(1) }}%
-                            </div>
+                    <div v-if="currentFaces.length > 0" class="emotion-display">
+                        <!-- 多人脸标签 -->
+                        <div v-if="currentFaces.length > 1" class="multi-face-badge">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                            检测到 {{ currentFaces.length }} 张人脸
                         </div>
 
-                        
-
-                        <!-- 置信度分布条 -->
-                        <div class="confidence-bars">
-                            <transition-group name="emotion-sort" tag="div">
-                                <div v-for="(item, index) in sortedEmotionScores" :key="item.emotion"
-                                    class="confidence-bar-item">
-                                    <span class="bar-label">
-                                        <EmotionSVG :emotion="item.emotion" size="small" :animated="false" />
-                                        {{ getEmotionName(item.emotion) }}
-                                    </span>
-                                    <div class="bar-track">
-                                        <div class="bar-fill" :style="{
-                                            width: `${item.score * 100}%`, background: getEmotionColor(item.emotion),
-                                            boxShadow: `0 0 8px ${getEmotionColor(item.emotion)}`
-                                        }"></div>
+                        <!-- 人脸卡片列表 -->
+                        <div class="face-cards-list">
+                            <div v-for="(face, index) in currentFaces" :key="index" class="face-card"
+                                :style="{ '--face-color': getEmotionColor(face.emotion) }">
+                                <div class="face-card-number">人脸 {{ index + 1 }}</div>
+                                <div class="face-card-row">
+                                    <span class="face-card-emoji">{{ getEmotionEmoji(face.emotion) }}</span>
+                                    <span class="face-card-emotion-name">{{ getEmotionName(face.emotion) }}</span>
+                                    <div class="face-card-bar-track">
+                                        <div class="face-card-bar-fill" :style="{ width: `${face.confidence * 100}%` }"></div>
                                     </div>
-                                    <span class="bar-value">{{ (item.score * 100).toFixed(0) }}%</span>
+                                    <span class="face-card-bar-value">{{ (face.confidence * 100).toFixed(1) }}%</span>
                                 </div>
-                            </transition-group>
+                            </div>
                         </div>
                     </div>
 
@@ -240,7 +245,8 @@
                         </h4>
                     </div>
                     <div class="trend-chart-wrapper">
-                        <EmotionLineChart :emotion-history="emotionHistory" />
+                        <EmotionLineChart v-if="!isMultiFace" :emotion-history="emotionHistory" />
+                        <MultiFaceEmotionChart v-else :face-histories="faceEmotionHistories" />
                     </div>
                 </div>
             </div>
@@ -263,21 +269,23 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, onActivated, onDeactivated, reactive, computed } from 'vue'
-import { VideoCamera, VideoPlay } from '@element-plus/icons-vue'
+import { VideoCamera, VideoPlay, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
 import { useDetectionStore } from '@/stores/detection'
-import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotion'
+import { getEmotionName, getEmotionColor, getEmotionEmoji, EMOTION_KEYS } from '@/constants/emotions'
 import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
 import wsManager from '@/api/websocket'
 import EmotionSVG from '@/components/common/EmotionSVG.vue'
 import { logFeatureUsage } from '@/utils/analytics'
-import httpMonitor from '@/utils/httpMonitor'
-import { API } from '@/api/config'
+import { getSystemConfig, submitFeedback } from '@/api/modules/system'
+import { saveHistoryRecord } from '@/api/modules/history'
+import { analyzeEmotionTrend } from '@/api/modules/analytics'
 import generativeAudio from '@/utils/generativeAudio'
 import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
 import EmotionFeedback from '@/components/feedback/EmotionFeedback.vue'
 import EmotionLineChart from '@/components/charts/EmotionLineChart.vue'
+import MultiFaceEmotionChart from '@/components/charts/MultiFaceEmotionChart.vue'
 import EmotionTrendPanel from '@/components/analysis/EmotionTrendPanel.vue'
 import { TrendCharts } from '@element-plus/icons-vue'
 import logger from '@/utils/logger'
@@ -298,6 +306,7 @@ const isCameraOn = ref(false)
 const cameras = ref([])  // 可用摄像头列表
 const currentCameraIndex = ref(0)  // 当前选中的摄像头索引
 const isSwitchingCamera = ref(false)  // 摄像头切换中状态
+const isLoading = ref(false)  // 摄像头启动加载中状态
 const isEmotionDetectionOn = ref(true)
 const currentEmotion = ref(null)
 const currentConfidence = ref(0)
@@ -311,11 +320,11 @@ const feedbackSnapshot = ref({  // ✅ 新增: 反馈快照数据
     timestamp: null
 })
 const emotionScores = ref({})
-// ✅ 修复: 情绪列表（7种情绪，calm 合并到 neutral）
-const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+const emotionList = EMOTION_KEYS
 
 // ✅ 新增: 情绪历史数据（用于趋势曲线图）
 const emotionHistory = ref([])  // [{ timestamp, emotions: { happy: 0.8, ... } }]
+const faceEmotionHistories = ref({})  // { 0: [{ timestamp, emotion, confidence }], 1: [...] }
 const HISTORY_MAX_LENGTH = 60  // 最多保存60秒的数据
 let historyTimer = null  // 定时器，每秒记录一次
 
@@ -326,12 +335,28 @@ const comprehensiveAnalysis = ref({})
 const showTrendPanel = ref(true)
 let trendAnalysisTimer = null  // 情绪趋势分析定时器
 
-// ✅ 新增: 情绪分数排序计算属性（从高到低）
-const sortedEmotionScores = computed(() => {
-    return Object.entries(emotionScores.value)
-        .map(([emotion, score]) => ({ emotion, score }))
-        .sort((a, b) => b.score - a.score)  // 降序排序
-})
+// ✅ 新增: 计算所有检测人脸的平均情绪分数（用于图表）
+const getAverageScores = (faces) => {
+    if (!faces || faces.length === 0) return {}
+    const avgScores = {}
+    const emotionKeys = EMOTION_KEYS
+    emotionKeys.forEach(key => { avgScores[key] = 0 })
+    let validFaceCount = 0
+    faces.forEach(face => {
+        if (face.scores && typeof face.scores === 'object') {
+            validFaceCount++
+            emotionKeys.forEach(key => {
+                avgScores[key] += face.scores[key] || 0
+            })
+        }
+    })
+    if (validFaceCount > 0) {
+        emotionKeys.forEach(key => {
+            avgScores[key] /= validFaceCount
+        })
+    }
+    return avgScores
+}
 
 // ✅ 新增: 启动情绪历史记录定时器
 const startHistoryTimer = () => {
@@ -343,10 +368,32 @@ const startHistoryTimer = () => {
                 emotions: { ...emotionScores.value }
             }
             emotionHistory.value.push(record)
-            // 限制历史记录长度
             if (emotionHistory.value.length > HISTORY_MAX_LENGTH) {
                 emotionHistory.value = emotionHistory.value.slice(-HISTORY_MAX_LENGTH)
             }
+        }
+        if (currentFaces.value.length > 1) {
+            const newHistories = { ...faceEmotionHistories.value }
+            currentFaces.value.forEach((face, index) => {
+                if (!newHistories[index]) newHistories[index] = []
+                newHistories[index].push({
+                    timestamp: Date.now(),
+                    emotion: face.emotion,
+                    confidence: face.confidence
+                })
+                if (newHistories[index].length > HISTORY_MAX_LENGTH) {
+                    newHistories[index] = newHistories[index].slice(-HISTORY_MAX_LENGTH)
+                }
+            })
+            const activeIds = new Set(currentFaces.value.map((_, i) => i))
+            Object.keys(newHistories).forEach(key => {
+                if (!activeIds.has(Number(key))) {
+                    delete newHistories[key]
+                }
+            })
+            faceEmotionHistories.value = newHistories
+        } else {
+            faceEmotionHistories.value = {}
         }
     }, 1000)
 }
@@ -362,6 +409,7 @@ const stopHistoryTimer = () => {
 // ✅ 新增: 清空情绪历史
 const clearEmotionHistory = () => {
     emotionHistory.value = []
+    faceEmotionHistories.value = {}
 }
 
 // ✅ 新增: 启动情绪趋势分析定时器
@@ -396,19 +444,12 @@ const performTrendAnalysis = async () => {
         if (windowAnalysis.hasData && windowAnalysis.dataPoints >= 3) {
             const backendData = prepareBackendData(windowAnalysis)
 
-            const response = await fetch(API.emotionTrendAnalyze, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(backendData)
-            })
+            const result = await analyzeEmotionTrend(backendData)
 
-            if (response.ok) {
-                const result = await response.json()
-                if (result.status === 'success') {
-                    trendAnalysis.value = result.emotion_trend_analysis
-                    textAnalysis.value = result.text_analysis
-                    comprehensiveAnalysis.value = result.comprehensive_analysis
-                }
+            if (result.status === 'success') {
+                trendAnalysis.value = result.emotion_trend_analysis
+                textAnalysis.value = result.text_analysis
+                comprehensiveAnalysis.value = result.comprehensive_analysis
             }
         }
     } catch (error) {
@@ -416,6 +457,7 @@ const performTrendAnalysis = async () => {
     }
 }
 const currentFaces = ref([])
+const isMultiFace = computed(() => currentFaces.value.length > 1)
 const fps = ref(0)
 // ✅ 新增: 性能监控数据（真实数据）
 const perfLatency = ref(0)
@@ -452,6 +494,9 @@ const SEND_RESOLUTIONS = {
     high: { width: 224, height: 168 }     // FPS > 20
 }
 let currentResolution = SEND_RESOLUTIONS.medium
+
+// ✅ 新增: 最大检测人脸数量（从系统配置读取）
+let maxDetectFaces = 10
 let lastAdjustTime = 0
 let lastSaveTime = 0  // ✅ 新增: 上次保存时间戳,防止重复保存
 const SAVE_COOLDOWN = 2000  // ✅ 新增: 保存冷却时间(2秒)
@@ -469,32 +514,32 @@ let performanceModeConfig = {
 // ✅ 新增: 加载性能模式配置（支持三级模式）
 const loadPerformanceConfig = async () => {
     try {
-        const response = await fetch(`${API.baseUrl}/api/config`)
-        if (!response.ok) throw new Error('获取配置失败')
-        const data = await response.json()
-
+        const data = await getSystemConfig()
         const perfMode = data.config.performance_mode || 'cpu_high'
-        logger.debug(`加载性能模式: ${perfMode}`)
+        
+        // ✅ 新增: 获取最大检测人脸数量配置
+        const maxFaces = data.config.max_faces
+        if (maxFaces !== undefined && maxFaces !== null) {
+            maxDetectFaces = maxFaces
+        }
 
         // ✅ 三级模式配置（gpu/cpu_high/cpu_low）
         if (perfMode === 'gpu') {
             currentResolution = { width: 320, height: 240 }
             performanceModeConfig.frame_skip_threshold = 2
-            performanceModeConfig.use_gpu = true  // ✅ 使用GPU
-            EMA_ALPHA = 0.25
+            performanceModeConfig.use_gpu = true
+            performanceModeConfig.ema_alpha = 0.25
         } else if (perfMode === 'cpu_high') {
             currentResolution = { width: 256, height: 192 }
             performanceModeConfig.frame_skip_threshold = 3
-            performanceModeConfig.use_gpu = false  // ✅ 使用CPU
-            EMA_ALPHA = 0.2
+            performanceModeConfig.use_gpu = false
+            performanceModeConfig.ema_alpha = 0.2
         } else if (perfMode === 'cpu_low') {
             currentResolution = { width: 128, height: 96 }
             performanceModeConfig.frame_skip_threshold = 5
-            performanceModeConfig.use_gpu = false  // ✅ 使用CPU
-            EMA_ALPHA = 0.15
+            performanceModeConfig.use_gpu = false
+            performanceModeConfig.ema_alpha = 0.15
         }
-
-        logger.debug(`应用配置: 分辨率=${currentResolution.width}x${currentResolution.height}, 跳帧=${performanceModeConfig.frame_skip_threshold}, EMA=${EMA_ALPHA}, GPU=${performanceModeConfig.use_gpu}`)
 
         // ✅ 更新 GPU 状态（用于性能监控面板显示）
         isUsingGpu.value = performanceModeConfig.use_gpu === true
@@ -503,7 +548,7 @@ const loadPerformanceConfig = async () => {
         if (sendCanvas) {
             sendCanvas.width = currentResolution.width
             sendCanvas.height = currentResolution.height
-            logger.debug('发送 Canvas 已更新为新分辨率')
+            
         }
     } catch (error) {
         logger.error('加载性能模式配置失败:', error)
@@ -525,7 +570,7 @@ const adjustResolution = () => {
 
     // 只在分辨率变化时更新
     if (newResolution.width !== currentResolution.width || newResolution.height !== currentResolution.height) {
-        logger.debug(`调整分辨率: ${currentResolution.width}x${currentResolution.height} -> ${newResolution.width}x${newResolution.height}`)
+        
         currentResolution = newResolution
 
         // 重新初始化发送 Canvas
@@ -552,35 +597,106 @@ let awaitingResult = false
 let lastSentTime = 0
 const RESULT_TIMEOUT = 5000
 
-// === EMA 平滑(抗情绪闪烁) ===
-const _emaScores = reactive({})
-// ✅ 优化: 提高 EMA_ALPHA，减少情绪响应延迟 + 增强平滑
-let EMA_ALPHA = 0.3  // 从 0.25 提高到 0.3，更快响应 + 更平滑
+// === 情绪状态（后端已做EMA平滑，前端直接使用） ===
 let _consecutiveEmpty = 0
-// ✅ 优化: 降低 EMPTY_THRESHOLD，快速清除误检框（10帧 ≈ 1秒）
-const EMPTY_THRESHOLD = 10  // 从 15 降到 10，约 1 秒快速清除
+const EMPTY_THRESHOLD = 10
 let _lastGoodEmotion = null
 let _lastGoodScores = {}
-let _adaptiveQuality = 0.5  // retained for compatibility, no longer used for JPEG
+let _adaptiveQuality = 0.5
 let _roundTripHistory = []
 let _themeChangeTimer = null
 let _analyticsLogged = false
-// 后端人脸检测间隔计数器(后端每2帧全检测,其余1帧仅分类)
 let _lastFaceUpdate = 0
-// ✅ 新增: 人脸框位置平滑
-let _smoothedBbox = null
-const BBOX_SMOOTH_ALPHA = 0.4  // ✅ 修复: 从0.25提升到0.4,减少延迟感,更跟随实时位置
-// 说明: 值越大越跟随实时位置(0.8-1.0), 值越小越平滑(0.1-0.3)
-// 0.4 是平衡点：既不会闪烁，也不会有明显延迟
-// ✅ 新增: 淡出效果控制
+let _smoothedBbox = {}
+const BBOX_SMOOTH_ALPHA = 0.92
+let _nextFaceId = 0
+
+function _computeIoU(boxA, boxB) {
+  const [ax1, ay1, aw, ah] = boxA
+  const [bx1, by1, bw, bh] = boxB
+  const ax2 = ax1 + aw, ay2 = ay1 + ah
+  const bx2 = bx1 + bw, by2 = by1 + bh
+  const ix1 = Math.max(ax1, bx1), iy1 = Math.max(ay1, by1)
+  const ix2 = Math.min(ax2, bx2), iy2 = Math.min(ay2, by2)
+  const iw = Math.max(0, ix2 - ix1), ih = Math.max(0, iy2 - iy1)
+  const inter = iw * ih
+  const union = aw * ah + bw * bh - inter
+  return union > 0 ? inter / union : 0
+}
+
+function _matchFacesByIoU(prevBboxes, currFaces, iouThreshold = 0.3) {
+  const prevIds = Object.keys(prevBboxes).map(Number)
+  if (prevIds.length === 0) {
+    const matches = {}
+    currFaces.forEach((_, i) => { matches[i] = _nextFaceId++ })
+    return matches
+  }
+
+  const pairs = []
+  currFaces.forEach((face, ci) => {
+    prevIds.forEach(pid => {
+      const iou = _computeIoU(prevBboxes[pid], face.bbox)
+      if (iou > iouThreshold) {
+        pairs.push({ iou, pid, ci })
+      }
+    })
+  })
+
+  pairs.sort((a, b) => b.iou - a.iou)
+
+  const matches = {}
+  const usedPrev = new Set()
+  const usedCurr = new Set()
+
+  pairs.forEach(({ pid, ci }) => {
+    if (!usedPrev.has(pid) && !usedCurr.has(ci)) {
+      matches[ci] = pid
+      usedPrev.add(pid)
+      usedCurr.add(ci)
+    }
+  })
+
+  currFaces.forEach((_, ci) => {
+    if (!(ci in matches)) {
+      matches[ci] = _nextFaceId++
+    }
+  })
+
+  return matches
+}
 let _fadeOutActive = false
 let _fadeOutStartTime = 0
-const FADE_OUT_DURATION = 500  // 500ms淡出时长
-// ✅ 新增: 记录上次加载的性能模式
+const FADE_OUT_DURATION = 500
 let lastLoadedPerfMode = 'high'
+let _configCheckInterval = null
+
+const startIntervals = () => {
+    stopIntervals()
+
+    _configCheckInterval = setInterval(async () => {
+        try {
+            const data = await getSystemConfig()
+            const currentMode = data.config.performance_mode || 'high'
+
+            if (currentMode !== lastLoadedPerfMode) {
+                
+                lastLoadedPerfMode = currentMode
+                await loadPerformanceConfig()
+            }
+        } catch (error) {
+        }
+    }, 30000)
+}
+
+const stopIntervals = () => {
+    if (_configCheckInterval) {
+        clearInterval(_configCheckInterval)
+        _configCheckInterval = null
+    }
+}
 
 onMounted(() => {
-    wsManager.onConnect(() => { logger.debug('WebSocket 就绪') })
+    wsManager.onConnect(() => {})
     wsManager.onMessage(handleWsMessage)
     wsManager.onDisconnect(() => {
         awaitingResult = false
@@ -588,61 +704,26 @@ onMounted(() => {
         currentEmotion.value = null
     })
 
-    // ✅ 新增: 定时更新HTTP监控数据(每2秒)
-    const httpMonitorInterval = setInterval(() => {
-        const stats = httpMonitor.getStats()
-        perfHttpLatency.value = stats.averageLatency
-        perfErrorRate.value = stats.errorRate
-    }, 2000)
-
-    // ✅ 新增: 加载性能模式配置
     loadPerformanceConfig()
-
-    // ✅ 新增: 监听性能模式变化（通过轮询检测）
-    const configCheckInterval = setInterval(async () => {
-        try {
-            const response = await fetch(`${API.baseUrl}/api/config`)
-            if (!response.ok) return
-            const data = await response.json()
-            const currentMode = data.config.performance_mode || 'high'
-
-            // 如果性能模式发生变化，重新加载配置
-            if (currentMode !== lastLoadedPerfMode) {
-                logger.debug(`检测到性能模式变化: ${lastLoadedPerfMode} -> ${currentMode}`)
-                lastLoadedPerfMode = currentMode
-                await loadPerformanceConfig()
-            }
-        } catch (error) {
-            // 静默失败，不影响主流程
-        }
-    }, 3000)  // 每 3 秒检查一次
-
-    // 保存 interval ID 以便清理
-    window._perfModeCheckInterval = configCheckInterval
+    startIntervals()
 })
 
 onUnmounted(() => {
     stopCamera()
-    // ✅ 优化: 清理 Canvas 防止内存泄漏
     cleanupCanvas()
-
-    // ✅ 新增: 清理性能模式检查定时器
-    if (window._perfModeCheckInterval) {
-        clearInterval(window._perfModeCheckInterval)
-        window._perfModeCheckInterval = null
-        logger.debug('性能模式检查定时器已清理')
-    }
+    stopIntervals()
 })
 
 // ✅ 新增: keep-alive 缓存时的生命周期
 onDeactivated(() => {
-    logger.debug('实时检测组件被缓存，停止摄像头')
+    
     stopCamera()
+    stopIntervals()
 })
 
 onActivated(() => {
-    logger.debug('实时检测组件被激活，恢复状态')
-    // 注意: 不自动启动摄像头,由用户手动点击“启动摄像头”按钮
+    
+    startIntervals()
 })
 
 // ✅ 新增: Canvas 清理函数
@@ -665,7 +746,7 @@ const enumerateCameras = async () => {
             label: device.label || `摄像头 ${index + 1}`,
             deviceId: device.deviceId
         }))
-        logger.debug(`检测到 ${cameras.value.length} 个摄像头设备`)
+        
     } catch (error) {
         logger.error('枚举摄像头失败:', error)
         cameras.value = [{ id: 'default', label: '默认摄像头', deviceId: '' }]
@@ -674,9 +755,10 @@ const enumerateCameras = async () => {
 
 // ✅ 新增: 切换摄像头
 const switchCamera = async (index) => {
-    if (index === currentCameraIndex.value || isSwitchingCamera.value) return
+    if (index === currentCameraIndex.value || isSwitchingCamera.value || isLoading.value) return
     
     isSwitchingCamera.value = true
+    isLoading.value = true
     currentCameraIndex.value = index
     
     try {
@@ -711,10 +793,12 @@ const switchCamera = async (index) => {
         currentCameraIndex.value = index === 0 ? 1 : 0
     } finally {
         isSwitchingCamera.value = false
+        isLoading.value = false
     }
 }
 
 const startCamera = async (cameraIndex = 0) => {
+    isLoading.value = true
     try {
         // ✅ 重置重连状态，确保重新连接
         wsManager.resetReconnect()
@@ -767,6 +851,8 @@ const startCamera = async (cameraIndex = 0) => {
         } else {
             ElMessage.error(`摄像头启动失败: ${error.message}`)
         }
+    } finally {
+        isLoading.value = false
     }
 }
 
@@ -792,7 +878,7 @@ const stopCamera = () => {
     awaitingResult = false
     _consecutiveEmpty = 0
     _adaptiveQuality = 0.5
-    _smoothedBbox = null
+    _smoothedBbox = {}
     clearEmotionHistory()
     // ✅ 新增: 停止检测时自动停止音乐
     if (generativeAudio.isInitialized) {
@@ -829,33 +915,7 @@ const toggleEmotionDetection = () => {
         currentEmotion.value = null
         currentConfidence.value = 0
         emotionScores.value = {}
-        _smoothedBbox = null
-    }
-}
-
-// ✅ 新增: 提交情绪纠正反馈
-const submitFeedback = async (correctEmotion) => {
-    try {
-        // ✅ 使用monitoredFetch追踪HTTP性能
-        const response = await httpMonitor.monitoredFetch(API.feedback, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                emotion: currentEmotion.value,
-                predicted_emotion: currentEmotion.value,
-                correct_emotion: correctEmotion,
-                feedback_type: 'incorrect'
-            })
-        })
-
-        if (response.ok) {
-            ElMessage.success('感谢反馈！系统将自动优化')
-        } else {
-            throw new Error('提交失败')
-        }
-    } catch (error) {
-        logger.error('反馈提交失败:', error)
-        ElMessage.error('反馈提交失败')
+        _smoothedBbox = {}
     }
 }
 
@@ -982,18 +1042,6 @@ const startRendering = () => {
             currentFaces.value.forEach((face, index) => {
                 let [x, y, w, h] = face.bbox
 
-                if (_smoothedBbox && _smoothedBbox[index]) {
-                    const [px, py, pw, ph] = _smoothedBbox[index]
-                    x = px * (1 - BBOX_SMOOTH_ALPHA) + x * BBOX_SMOOTH_ALPHA
-                    y = py * (1 - BBOX_SMOOTH_ALPHA) + y * BBOX_SMOOTH_ALPHA
-                    w = pw * (1 - BBOX_SMOOTH_ALPHA) + w * BBOX_SMOOTH_ALPHA
-                    h = ph * (1 - BBOX_SMOOTH_ALPHA) + h * BBOX_SMOOTH_ALPHA
-                    _smoothedBbox[index] = [x, y, w, h]
-                } else {
-                    if (!_smoothedBbox) _smoothedBbox = []
-                    _smoothedBbox[index] = [x, y, w, h]
-                }
-
                 const sx = x * scaleX, sy = y * scaleY, sw = w * scaleX, sh = h * scaleY
                 const flippedBbox = [canvas.width - sx - sw, sy, sw, sh]
                 const color = getEmotionColor(face.emotion)
@@ -1002,8 +1050,6 @@ const startRendering = () => {
                 const labelRect = drawEmotionLabel(ctx, flippedBbox, face.emotion, face.confidence, themeStore.currentTheme, index + 1, totalFaces, drawnLabels)
                 drawnLabels.push(labelRect)
             })
-        } else {
-            _smoothedBbox = null
         }
 
         frameSkip++
@@ -1044,12 +1090,13 @@ const startRendering = () => {
             sendCtx.drawImage(video, 0, 0, currentResolution.width, currentResolution.height)
             const imageData = sendCtx.getImageData(0, 0, currentResolution.width, currentResolution.height)
             
-            const buf = new ArrayBuffer(1 + 4 + imageData.data.length)
+            const buf = new ArrayBuffer(6 + imageData.data.length)
             const dv = new DataView(buf)
-            dv.setUint8(0, 0x01)
-            dv.setUint16(1, currentResolution.width, true)
-            dv.setUint16(3, currentResolution.height, true)
-            new Uint8Array(buf, 5).set(imageData.data)
+            dv.setUint8(0, 0x02)
+            dv.setUint8(1, 0x00)
+            dv.setUint16(2, currentResolution.width, true)
+            dv.setUint16(4, currentResolution.height, true)
+            new Uint8Array(buf, 6).set(imageData.data)
 
             try {
                 const success = wsManager.sendBinary(buf)
@@ -1113,90 +1160,53 @@ const handleWsMessage = (data) => {
     }) || []
 
     // ✅ 新增: 诊断日志
-    if (data.faces && data.faces.length > 0) {
-        logger.debug(`收到 ${data.faces.length} 个人脸，过滤后 ${validFaces.length} 个`)
-        data.faces.forEach((face, i) => {
-            logger.debug(`人脸${i}: 置信度=${face.confidence?.toFixed(2)}, 缓存=${face._cached || false}`)
-        })
-    }
+    
 
     if (validFaces.length) {
-        const rawScores = validFaces[0]?.scores
-        const rawConf = validFaces[0]?.confidence  // ✅ 保存原始置信度
+        const firstFace = validFaces[0]
+        const rawScores = firstFace?.scores
+        const rawConf = firstFace?.confidence
 
-        // ✅ 修复: 防御性检查，防止 scores 为 undefined 导致崩溃
         if (!rawScores || typeof rawScores !== 'object' || Object.keys(rawScores).length === 0) {
             logger.warn('收到无效的 scores 数据，跳过此帧')
             return
         }
 
-        // ✅ 计算平滑后的分数
-        if (Object.keys(_emaScores).length === 0) {
-            Object.keys(rawScores).forEach(k => { _emaScores[k] = rawScores[k] })
-            _lastGoodScores = { ...rawScores }
-        } else {
-            Object.entries(rawScores).forEach(([k, v]) => {
-                _emaScores[k] = (_emaScores[k] !== undefined ? _emaScores[k] : 0) * (1 - EMA_ALPHA) + v * EMA_ALPHA
-            })
-        }
-
-        const smoothedEmotion = Object.keys(_emaScores).reduce((a, b) =>
-            _emaScores[a] > _emaScores[b] ? a : b
+        const dominantEmotion = Object.keys(rawScores).reduce((a, b) =>
+            rawScores[a] > rawScores[b] ? a : b
         )
-        const smoothedConf = _emaScores[smoothedEmotion]
 
-        _lastGoodEmotion = smoothedEmotion
-        _lastGoodScores = { ..._emaScores }
+        _lastGoodEmotion = dominantEmotion
+        _lastGoodScores = { ...rawScores }
         _consecutiveEmpty = 0
 
-
-
-        if (rtt < 100) {
-            // quickly restore after a slow frame
-        } else if (rtt > 300) {
-            // backend is loaded, skip will auto-adjust
-        }
-
-        currentEmotion.value = smoothedEmotion
-        
-        // ✅ 使用原始置信度值
+        currentEmotion.value = dominantEmotion
         currentConfidence.value = rawConf
-        emotionScores.value = { ...rawScores }
-        
-        currentFaces.value = validFaces
+        emotionScores.value = getAverageScores(validFaces)
+        // ✅ 使用系统配置的最大人脸数量限制
+        currentFaces.value = validFaces.slice(0, maxDetectFaces)
 
-        // ✅ 新增: 更新 Pinia store，使顶部情绪分析面板能获取数据
-        detectionStore.updateDetection(validFaces, smoothedEmotion, { ..._emaScores })
+        detectionStore.updateDetection(validFaces, dominantEmotion, { ...rawScores })
 
-        // ✅ 优化: 移除延迟,立即触发主题更新(防抖在 themeStore 内部处理)
-        themeStore.updateThemeByEmotion(smoothedEmotion)
+        themeStore.updateThemeByEmotion(dominantEmotion)
     } else {
-        // ✅ 关键修复: 没有检测到有效人脸时，增加容错帧数
         _consecutiveEmpty++
 
-        // ✅ 优化: 连续 10 帧无人脸才清除（从 15 降到 10，约 1 秒）
-        // 这可以在“检出精准”和“消失及时”之间取得平衡
         if (_consecutiveEmpty >= EMPTY_THRESHOLD) {
-            // ✅ 新增: 平滑清除过渡（将透明度快速降为0）
-            // 注意：这里直接清除数据，因为 Canvas 渲染循环会自动处理
             currentEmotion.value = null
             currentConfidence.value = 0
             emotionScores.value = {}
-            currentFaces.value = []  // ✅ 修复: 必须清除人脸框，避免残留
+            currentFaces.value = []
 
-            // 重置EMA和缓存
-            Object.keys(_emaScores).forEach(key => delete _emaScores[key])
             _lastGoodEmotion = null
             _lastGoodScores = {}
-            _smoothedBbox = null
+            _smoothedBbox = {}
             _consecutiveEmpty = 0
         } else {
-            // ✅ 优化: 在阈值内保持当前状态，但逐渐降低置信度（平滑过渡）
-            // 这可以防止误检框突兀消失，提供自然流畅的视觉体验
-            const decayFactor = 1 - (_consecutiveEmpty / EMPTY_THRESHOLD) * 0.5  // 逐渐降到 50%
+            const decayFactor = 1 - (_consecutiveEmpty / EMPTY_THRESHOLD) * 0.5
             currentConfidence.value *= decayFactor
 
-            logger.debug(`连续${_consecutiveEmpty}帧无人脸，置信度衰减至 ${(currentConfidence.value * 100).toFixed(1)}%`)
+            
         }
     }
 }
@@ -1394,18 +1404,8 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
             detected_faces: savedFaces  // ✅ bbox已是320x240坐标系
         }
 
-        // 调用保存接口
-        const response = await fetch(API.historySave, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(historyData)
-        })
-
-        if (response.ok) {
-            logger.debug('实时检测历史记录已保存')
-        } else {
-            logger.warn('保存历史记录失败:', response.statusText)
-        }
+        await saveHistoryRecord(historyData)
+        
     } catch (error) {
         logger.error('保存实时检测历史记录失败:', error)
     }
@@ -1463,6 +1463,50 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     height: 100%;
     object-fit: contain;
     display: block;
+}
+
+/* 摄像头启动加载遮罩 */
+.camera-loading-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: color-mix(in srgb, var(--background) 85%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 25;
+    border-radius: inherit;
+}
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.loading-icon .spinner {
+    color: var(--primary);
+    animation: loadingSpin 1s linear infinite;
+}
+
+@keyframes loadingSpin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
 }
 
 .fps-badge,
@@ -1589,6 +1633,7 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
     border-radius: 30px;
     padding: 0 16px;
     gap: 6px;
+        width: 90px;
 }
 
 .ctrl-stop:hover {
@@ -2547,4 +2592,128 @@ const saveRealtimeToHistory = async (emotion, confidence, faces) => {
 .fade-leave-to {
     opacity: 0;
 }
+
+/* ✅ 新增: 多人脸标签 */
+.multi-face-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, rgba(113, 57, 255, 0.15), rgba(156, 78, 255, 0.1));
+    border: 1px solid rgba(113, 57, 255, 0.3);
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--primary-light);
+    flex-shrink: 0;
+    animation: fadeIn 0.3s ease;
+}
+
+/* ✅ 新增: 人脸卡片列表 */
+.face-cards-list {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 2px;
+}
+
+.face-cards-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.face-cards-list::-webkit-scrollbar-thumb {
+    background: rgba(146, 78, 255, 0.25);
+    border-radius: 2px;
+}
+
+.face-cards-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ✅ 新增: 单个人脸卡片 */
+.face-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.face-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--face-color, #7139FF);
+    border-radius: 0 2px 2px 0;
+}
+
+.face-card:hover {
+    border-color: var(--face-color, #7139FF);
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--face-color, #7139FF) 20%, transparent);
+    transform: translateY(-1px);
+}
+
+.face-card-number {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.face-card-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.face-card-emoji {
+    font-size: 20px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.face-card-emotion-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--face-color, #7139FF);
+    flex-shrink: 0;
+}
+
+.face-card-bar-track {
+    flex: 1;
+    height: 7px;
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+    border-radius: 4px;
+    overflow: hidden;
+    min-width: 40px;
+}
+
+.face-card-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--face-color, #7139FF);
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--face-color, #7139FF) 40%, transparent);
+}
+
+.face-card-bar-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--face-color, #7139FF);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ✅ 新增: 多人脸图表提示 */
 </style>

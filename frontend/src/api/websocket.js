@@ -2,6 +2,7 @@
  * WebSocket连接管理 V2 — 支持心跳、指数退避重连
  */
 import { ElMessage } from 'element-plus'
+import logger from '@/utils/logger'
 
 class WebSocketManager {
   constructor(url) {
@@ -22,13 +23,7 @@ class WebSocketManager {
   }
 
   getUrl() {
-    if (this.url) return this.url
-    try {
-      const config = JSON.parse(localStorage.getItem('app_config') || '{}')
-      return config.ws_url || 'ws://localhost:8000/ws/stream'
-    } catch {
-      return 'ws://localhost:8000/ws/stream'
-    }
+    return this.url || 'ws://localhost:8000/ws/stream'
   }
 
   connect() {
@@ -71,7 +66,7 @@ class WebSocketManager {
               }
               this.notifyHandlers(data)
             } catch (e) {
-              console.warn('WebSocket消息解析失败:', e)
+              logger.warn('WebSocket消息解析失败:', e)
             }
           }
         }
@@ -170,7 +165,7 @@ class WebSocketManager {
 
   notifyHandlers(data) {
     this.messageHandlers.forEach(handler => {
-      try { handler(data) } catch (error) { console.error('消息处理器错误:', error) }
+      try { handler(data) } catch (error) { logger.error('消息处理器错误:', error) }
     })
   }
 
@@ -204,11 +199,11 @@ class WebSocketManager {
       
       this._pongTimeout = setTimeout(() => {
         if (this._expectingPong && this.isConnected) {
-          console.warn('[WebSocket] Pong超时，断开连接')
+          logger.warn('[WebSocket] Pong超时，断开连接')
           this.ws.close(1000, 'Pong超时')
         }
-      }, 5000)
-    }, 10000)
+      }, 15000)
+    }, 15000)
   }
 
   _stopHeartbeat() {
@@ -224,12 +219,6 @@ class WebSocketManager {
   }
 }
 
-const defaultWsUrl = (() => {
-  try {
-    const c = JSON.parse(localStorage.getItem('app_config') || '{}')
-    return c.ws_url || undefined
-  } catch { return undefined }
-})()
-
-export const wsManager = new WebSocketManager(defaultWsUrl)
+export { WebSocketManager }
+export const wsManager = new WebSocketManager()
 export default wsManager

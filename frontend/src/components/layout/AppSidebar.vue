@@ -55,16 +55,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, inject } from 'vue'
 import { useNavigation } from '@/composables/useNavigation'
 import SvgIcon from '@/components/icons/SvgIcons.vue'
 
 const { navigateTo, isActive, navigationMenus } = useNavigation()
 
-// 侧边栏收缩状态
-const isCollapsed = ref(false)
+const isCollapsed = inject('sidebarCollapsed')
 
-// localStorage 存储键
 const STORAGE_KEY = 'sidebar_collapsed'
 
 // 切换收缩状态

@@ -296,6 +296,7 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
+import { analyzeText, analyzeTextBatch, analyzeTextFeedback } from '@/api/modules/system'
 
 const tabs = [
   { key: 'single', label: '单条分析' },
@@ -336,12 +337,7 @@ const feedbackSummary = reactive({
 
 async function analyzeSingleText() {
   try {
-    const response = await fetch('/api/text-analysis/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: inputText.value })
-    })
-    const data = await response.json()
+    const data = await analyzeText({ text: inputText.value })
     if (data.status === 'success') {
       singleResult.value = data.data
     }
@@ -353,12 +349,7 @@ async function analyzeSingleText() {
 async function analyzeBatchText() {
   const texts = batchInput.value.split('\n').filter(t => t.trim())
   try {
-    const response = await fetch('/api/text-analysis/analyze-batch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ texts })
-    })
-    const data = await response.json()
+    const data = await analyzeTextBatch({ texts })
     if (data.status === 'success') {
       batchResults.value = data.data
       Object.assign(batchSummary, data.summary)
@@ -370,8 +361,7 @@ async function analyzeBatchText() {
 
 async function analyzeFeedbackRecords() {
   try {
-    const response = await fetch('/api/text-analysis/analyze-feedback?limit=100')
-    const data = await response.json()
+    const data = await analyzeTextFeedback({ limit: 100 })
     if (data.status === 'success') {
       feedbackResults.value = data.data
       Object.assign(feedbackSummary, data.summary)

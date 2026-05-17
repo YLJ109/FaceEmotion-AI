@@ -3,51 +3,51 @@
  * 统一管理情绪相关的配置和映射
  */
 
-// 情绪键名（与后端一致）
-export const EMOTION_KEYS = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+// 情绪键名（与后端 core/constants.py EMOTION_NAMES 严格一致）
+export const EMOTION_KEYS = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 
 // 情绪中文名映射
 export const EMOTION_NAME_MAP = {
-  happy: '开心',
-  sad: '悲伤',
   angry: '愤怒',
-  surprise: '惊讶',
-  fear: '恐惧',
   disgust: '厌恶',
-  neutral: '平静'
+  fear: '恐惧',
+  happy: '开心',
+  neutral: '平静',
+  sad: '悲伤',
+  surprise: '惊讶'
 }
 
 // 情绪图标映射（使用emoji）
 export const EMOTION_EMOJI_MAP = {
-  happy: '😊',
-  sad: '😢',
   angry: '😠',
-  surprise: '😮',
-  fear: '😨',
   disgust: '🤢',
-  neutral: '😐'
+  fear: '😨',
+  happy: '😊',
+  neutral: '😐',
+  sad: '😢',
+  surprise: '😮'
 }
 
 // 情绪颜色映射（主题色）
 export const EMOTION_COLOR_MAP = {
-  happy: '#10B981',    // 绿色
-  sad: '#3B82F6',      // 蓝色
   angry: '#EF4444',    // 红色
-  surprise: '#8B5CF6', // 紫色
-  fear: '#9333EA',     // 深紫色
   disgust: '#F59E0B',  // 橙色
-  neutral: '#6B7280'   // 灰色
+  fear: '#9333EA',     // 深紫色
+  happy: '#10B981',    // 绿色
+  neutral: '#6B7280',  // 灰色
+  sad: '#3B82F6',      // 蓝色
+  surprise: '#8B5CF6'  // 紫色
 }
 
-// 情绪颜色十六进制数组（用于图表）
+// 情绪颜色十六进制数组（用于图表，顺序与 EMOTION_KEYS 一致）
 export const EMOTION_COLORS = [
-  '#10B981',  // happy - 绿色
-  '#3B82F6',  // sad - 蓝色
   '#EF4444',  // angry - 红色
-  '#8B5CF6',  // surprise - 紫色
-  '#9333EA',  // fear - 深紫色
   '#F59E0B',  // disgust - 橙色
-  '#6B7280'   // neutral - 灰色
+  '#9333EA',  // fear - 深紫色
+  '#10B981',  // happy - 绿色
+  '#6B7280',  // neutral - 灰色
+  '#3B82F6',  // sad - 蓝色
+  '#8B5CF6'   // surprise - 紫色
 ]
 
 // 兼容性导出 - 保持与旧代码的兼容性
@@ -60,7 +60,7 @@ export const EMOTION_LIST = EMOTION_KEYS.map(key => ({
   color: EMOTION_COLOR_MAP[key]
 }))
 
-// 获取情绪中文名
+// 获取情绪名称（中文）
 export function getEmotionName(key) {
   return EMOTION_NAME_MAP[key] || key
 }

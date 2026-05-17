@@ -113,19 +113,29 @@ export const useThemeStore = defineStore('theme', () => {
   function animateToTheme(themeName) {
     const targetTheme = getTheme(themeName)
     const fromTheme = _savedPrevTheme.value || getTheme(themeName)
-    // ✅ 优化: 动画时长保持 300ms,确保视觉平滑
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) {
+      currentThemeName.value = themeName
+      applyThemeToCSS()
+      _animating.value = false
+      _savedPrevTheme.value = null
+      return
+    }
+
     const duration = 300
     const startTime = performance.now()
+
+    document.documentElement.style.setProperty('will-change', 'background, color')
+    document.documentElement.style.setProperty('contain', 'paint')
 
     _animating.value = true
 
     function step(now) {
       const elapsed = now - startTime
       const t = Math.min(1, elapsed / duration)
-      // ✅ 使用 cubic-bezier ease-out,前半段快后半段慢,感知更快
       const eased = 1 - Math.pow(1 - t, 3)
 
-      // 应用插值后的 CSS 变量
       const map = _buildInterpolatedMap(fromTheme, targetTheme, eased)
       Object.entries(map).forEach(([key, val]) => {
         document.documentElement.style.setProperty(key, val)
@@ -136,7 +146,8 @@ export const useThemeStore = defineStore('theme', () => {
       } else {
         _animating.value = false
         _savedPrevTheme.value = null
-        // 最终确保设置为精确目标值
+        document.documentElement.style.removeProperty('will-change')
+        document.documentElement.style.removeProperty('contain')
         applyThemeToCSS()
       }
     }
@@ -200,6 +211,13 @@ export const useThemeStore = defineStore('theme', () => {
     Object.entries(map).forEach(([key, val]) => {
       document.documentElement.style.setProperty(key, val)
     })
+
+    const isDark = theme.background.includes('gradient')
+      ? theme.background.includes('#0') || theme.background.includes('rgb(0')
+      : false
+    document.documentElement.style.setProperty(
+      'color-scheme', isDark ? 'dark' : 'light'
+    )
   }
 
   function getEmotionColor(emotion) {

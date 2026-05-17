@@ -42,7 +42,7 @@
                         </div>
 
                         <div class="action-buttons">
-                            <el-button type="primary" @click="detectImage" :loading="detecting" :icon="Aim" round
+                            <el-button type="primary" @click="handleDetectImage" :loading="detecting" :icon="Aim" round
                                 size="large">
                                 {{ detecting ? '检测中...' : '开始检测' }}
                             </el-button>
@@ -195,13 +195,16 @@ import { UploadFilled, Aim, Document, Edit } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
 import { useThemeStore } from '@/stores/theme'
-import { getEmotionName, getEmotionColor, getEmotionEmoji } from '@/utils/emotion'
-import { API } from '@/api/config'
+import { getEmotionName, getEmotionColor, getEmotionEmoji, EMOTION_KEYS } from '@/constants/emotions'
+import { detectImage } from '@/api/modules/detection'
+import { saveHistoryRecord } from '@/api/modules/history'
+import { submitFeedback } from '@/api/modules/system'
 import EmotionSVG from '@/components/common/EmotionSVG.vue'
 import { logFeatureUsage } from '@/utils/analytics'
 import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
 import generativeAudio from '@/utils/generativeAudio'
 import wsManager from '@/api/websocket'
+import logger from '@/utils/logger'
 
 // ✅ 新增: 组件名称,用于 keep-alive 缓存
 defineOptions({
@@ -216,8 +219,7 @@ const detecting = ref(false)
 const detectionResult = ref(null)
 const showDetectionBoxes = ref(true) // 控制是否显示检测框
 const fileName = ref('') // 文件名
-// ✅ 新增: 情绪列表
-const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+const emotionList = EMOTION_KEYS
 
 // ✅ 新增: 性能监控数据
 const perfFps = ref(0)
@@ -281,7 +283,7 @@ const drawImagePreview = () => {
     img.src = previewUrl.value
 }
 
-const detectImage = async () => {
+const handleDetectImage = async () => {
     if (!selectedFile.value) { ElMessage.warning('请先选择图片'); return }
     detecting.value = true
     const startTime = performance.now()
@@ -289,9 +291,7 @@ const detectImage = async () => {
     try {
         const formData = new FormData()
         formData.append('file', selectedFile.value)
-        const response = await fetch(API.detectImage, { method: 'POST', body: formData })
-        if (!response.ok) throw new Error('检测失败')
-        const result = await response.json()
+        const result = await detectImage(formData)
 
         // ✅ 新增: 计算 HTTP 延迟
         const endTime = performance.now()
@@ -313,7 +313,8 @@ const detectImage = async () => {
         perfSkipRate.value = 0  // 图片检测无跳帧
         perfGpuMemory.value = 0  // 图片检测不直接监控GPU
 
-        // ✅ 修复: 传递情绪数据到音乐引擎（必须使用后端返回的music_params）
+        // ✅ 传递情绪数据到音乐引擎（必须使用后端返回的music_params）
+        // 注意：这里只更新音乐参数，不自动播放，避免检测完突然播放音乐
         if (result.faces?.length > 0) {
             const musicParams = result.music_params
 
@@ -322,18 +323,14 @@ const detectImage = async () => {
                 window.dispatchEvent(new CustomEvent('music-params-updated', {
                     detail: musicParams
                 }))
-
-                // 直接调用音乐引擎播放（先检查是否已初始化）
-                if (generativeAudio.isInitialized) {
-                    generativeAudio.playMusic(musicParams)
-                }
+                // ✅ 移除自动播放：用户可以手动点击播放按钮来播放音乐
             }
         }
 
         // 保存到历史记录
         await saveToHistory(result, previewUrl.value)
     } catch (error) {
-        console.error('检测错误:', error)
+        logger.error('检测错误:', error)
         perfErrorRate.value += 1  // 记录错误
         ElMessage.error('检测失败: ' + error.message)
     } finally { detecting.value = false }
@@ -433,10 +430,7 @@ const saveToHistory = async (result, thumbnail) => {
             return
         }
 
-        await fetch(API.historySave, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        await saveHistoryRecord({
                 detection_type: 'image',
                 results: faces,
                 source: '单张图片检测',
@@ -445,34 +439,25 @@ const saveToHistory = async (result, thumbnail) => {
                 thumbnail: thumbnail,
                 dominant_emotion: dominantEmotion,
                 confidence: confidence,
-                detected_faces: faces  // ✅ 修复: 添加 detected_faces 字段
+                detected_faces: faces
             })
-        })
-        console.log('✅ 历史记录已保存')
+        
     } catch (error) {
         console.error('保存历史记录失败:', error)
     }
 }
 
 // ✅ 新增: 提交情绪纠正反馈
-const submitFeedback = async (correctEmotion) => {
+const submitFeedbackFn = async (correctEmotion) => {
     try {
-        const response = await fetch(API.feedback, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                emotion: detectionResult.value.faces?.[0]?.emotion,
-                predicted_emotion: detectionResult.value.faces?.[0]?.emotion,
-                correct_emotion: correctEmotion,
-                feedback_type: 'incorrect'
-            })
+        await submitFeedback({
+            emotion: detectionResult.value.faces?.[0]?.emotion,
+            predicted_emotion: detectionResult.value.faces?.[0]?.emotion,
+            correct_emotion: correctEmotion,
+            feedback_type: 'incorrect'
         })
 
-        if (response.ok) {
-            ElMessage.success('感谢反馈！系统将自动优化')
-        } else {
-            throw new Error('提交失败')
-        }
+        ElMessage.success('感谢反馈！系统将自动优化')
     } catch (error) {
         console.error('反馈提交失败:', error)
         ElMessage.error('反馈提交失败')
@@ -906,7 +891,7 @@ const submitFeedback = async (correctEmotion) => {
     overflow-y: auto;
     animation: fadeIn 0.3s ease;
     /* ✅ 新增: 设置最大高度，超出后滚动 */
-    max-height: calc(100vh - 280px);
+    max-height: calc(100vh - 210px);
 }
 
 /* ✅ 新增: 多人脸显示区域滚动条样式 */

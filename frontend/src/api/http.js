@@ -10,10 +10,7 @@ import logger from '@/utils/logger'
 // 创建 Axios 实例
 const http = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 30000, // 30秒超时
-    headers: {
-        'Content-Type': 'application/json'
-    }
+    timeout: 30000
 })
 
 // ==================== 请求拦截器 ====================
@@ -25,8 +22,10 @@ http.interceptors.request.use(
         //   config.headers.Authorization = `Bearer ${token}`
         // }
 
-        // 使用统一日志工具
-        logger.apiRequest(config.method, config.url)
+        // 使用统一日志工具（可通过 config.log = false 禁用）
+        if (config.log !== false) {
+            logger.apiRequest(config.method, config.url)
+        }
 
         return config
     },
@@ -39,8 +38,10 @@ http.interceptors.request.use(
 // ==================== 响应拦截器 ====================
 http.interceptors.response.use(
     response => {
-        // 使用统一日志工具
-        logger.apiResponse(response.status, response.config.url)
+        // 使用统一日志工具（可通过 config.log = false 禁用）
+        if (response.config.log !== false) {
+            logger.apiResponse(response.status, response.config.url)
+        }
 
         // 直接返回 data，简化调用
         return response.data
@@ -85,6 +86,8 @@ function getErrorMessage(error) {
             return '禁止访问'
         case 404:
             return '请求的资源不存在'
+        case 429:
+            return data.detail || '请求过于频繁，请稍后重试'
         case 500:
             return '服务器内部错误'
         case 502:

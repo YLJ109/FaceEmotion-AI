@@ -46,7 +46,10 @@
           <h3>情绪变化趋势</h3>
           <span class="chart-hint">近7天情绪分布</span>
         </div>
-        <div ref="emotionTrendChart" class="chart-body"></div>
+        <div class="chart-body">
+          <ChartLoader v-if="loading" type="line" />
+          <div v-show="!loading" ref="emotionTrendChart" class="chart-echarts"></div>
+        </div>
       </div>
 
       <!-- 2. 情绪分布统计 - 饼图 -->
@@ -55,7 +58,10 @@
           <h3>情绪分布统计</h3>
           <span class="chart-hint">各情绪占比</span>
         </div>
-        <div ref="emotionDistChart" class="chart-body"></div>
+        <div class="chart-body">
+          <ChartLoader v-if="loading" type="pie" />
+          <div v-show="!loading" ref="emotionDistChart" class="chart-echarts"></div>
+        </div>
       </div>
 
       <!-- 3. 检测类型分布 - 南丁格尔玫瑰图 -->
@@ -64,7 +70,10 @@
           <h3>检测类型分布</h3>
           <span class="chart-hint">各检测方式使用频率</span>
         </div>
-        <div ref="typeDistChart" class="chart-body"></div>
+        <div class="chart-body">
+          <ChartLoader v-if="loading" type="pie" />
+          <div v-show="!loading" ref="typeDistChart" class="chart-echarts"></div>
+        </div>
       </div>
 
       <!-- 4. 置信度分布 - 柱状图 -->
@@ -73,7 +82,10 @@
           <h3>置信度分布</h3>
           <span class="chart-hint">识别把握度统计</span>
         </div>
-        <div ref="confidenceChart" class="chart-body"></div>
+        <div class="chart-body">
+          <ChartLoader v-if="loading" type="bar" />
+          <div v-show="!loading" ref="confidenceChart" class="chart-echarts"></div>
+        </div>
       </div>
 
       <!-- 5. 情绪转换矩阵 - 桑基图 -->
@@ -82,7 +94,10 @@
           <h3>情绪转换矩阵</h3>
           <span class="chart-hint">情绪变化流向分析</span>
         </div>
-        <div ref="faceCountChart" class="chart-body"></div>
+        <div class="chart-body">
+          <ChartLoader v-if="loading" type="sankey" />
+          <div v-show="!loading" ref="faceCountChart" class="chart-echarts"></div>
+        </div>
       </div>
 
       <!-- 6. 检测类型趋势 - 面积图 -->
@@ -91,16 +106,22 @@
           <h3>检测类型趋势</h3>
           <span class="chart-hint">近7天各检测方式使用情况</span>
         </div>
-        <div ref="typeTrendChart" class="chart-body"></div>
+        <div class="chart-body">
+          <ChartLoader v-if="loading" type="area" />
+          <div v-show="!loading" ref="typeTrendChart" class="chart-echarts"></div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
-import { getEmotionName, getEmotionColor } from '@/utils/emotion'
+import { getEmotionName, getEmotionColor, EMOTION_KEYS } from '@/constants/emotions'
+import { getHistoryStats, getHistoryList } from '@/api/modules/history'
+import { getEmotionTrend, getEmotionTransitions } from '@/api/modules/analytics'
+import ChartLoader from '@/components/common/ChartLoader.vue'
 
 // ✅ 动态获取当前主题的 CSS 变量值
 function getThemeColors() {
@@ -140,6 +161,7 @@ const emotionTrend = ref([])
 const typeDist = ref({})
 const confidenceDist = ref({})
 const faceCountDist = ref({})
+const loading = ref(true)
 
 // ECharts 实例引用
 const emotionTrendChart = ref(null)
@@ -192,34 +214,23 @@ const sortedEmotions = computed(() => {
 // 从历史记录 API 获取数据
 async function fetchData() {
   try {
-    const baseUrl = localStorage.getItem('api_base') || 'http://localhost:8000'
+    const statsData = await getHistoryStats()
 
-    // 获取统计信息
-    const statsRes = await fetch(`${baseUrl}/api/history/stats`)
-    if (statsRes.ok) {
-      const statsData = await statsRes.json()
+    const avgConfidence = statsData.stats?.average_confidence
+      || statsData.stats?.avg_confidence
+      || statsData.avg_confidence
+      || 0
 
-      // ✅ 修复: 平均置信度在 stats 对象里
-      const avgConfidence = statsData.stats?.average_confidence
-        || statsData.stats?.avg_confidence
-        || statsData.avg_confidence
-        || 0
-
-      stats.value = {
-        total_records: statsData.total_records || 0,
-        avg_confidence: avgConfidence,  // ✅ 从 stats 对象中获取
-        stats: statsData.stats || {}
-      }
+    stats.value = {
+      total_records: statsData.total_records || 0,
+      avg_confidence: avgConfidence,
+      stats: statsData.stats || {}
     }
 
-    // 获取所有历史记录来计算分布
-    // ✅ 修复: 获取全部历史记录（根据总检测次数动态调整 limit）
     const totalRecords = stats.value.total_records || 0
-    const limit = Math.max(totalRecords, 1000)  // 至少获取 1000 条，最多获取全部
+    const limit = Math.max(totalRecords, 1000)
 
-    const historyRes = await fetch(`${baseUrl}/api/history?limit=${limit}&offset=0`)
-    if (historyRes.ok) {
-      const historyData = await historyRes.json()
+    const historyData = await getHistoryList({ limit, offset: 0 })
       const records = historyData.data || []
 
       const emotions = {}
@@ -254,13 +265,9 @@ async function fetchData() {
       typeDist.value = types
       confidenceDist.value = confidence
       faceCountDist.value = faceCounts
-    }
 
-    // 获取情绪趋势数据
     try {
-      const trendRes = await fetch(`${baseUrl}/api/analytics/emotion_trend?days=7`)
-      if (trendRes.ok) {
-        const trendData = await trendRes.json()
+      const trendData = await getEmotionTrend({ days: 7 })
         const rawTrend = trendData.daily_emotion_trend || {}
         emotionTrend.value = Object.entries(rawTrend)
           .sort(([a], [b]) => a.localeCompare(b))
@@ -269,15 +276,16 @@ async function fetchData() {
             emotions
           }))
           .slice(-7)
-      }
     } catch (e) {
       console.warn('获取情绪趋势失败:', e)
     }
 
-    // 渲染所有图表
+    loading.value = false
+    await nextTick()
     renderAllCharts()
   } catch (e) {
     console.error('获取分析数据失败:', e)
+    loading.value = false
   }
 }
 
@@ -305,7 +313,7 @@ function renderEmotionTrendChart() {
   const textSecondaryColor = colors.textSecondary
   const borderColor = colors.border
 
-  const emotions = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+  const emotions = EMOTION_KEYS
   const dates = emotionTrend.value.map(d => d.date)
 
   const series = emotions.map(emotion => ({
@@ -704,13 +712,9 @@ async function renderFaceCountChart() {
   // ✅ 从后端API获取真实的情绪转换数据
   let links = []
   try {
-    const baseUrl = localStorage.getItem('api_base') || 'http://localhost:8000'
-    const response = await fetch(`${baseUrl}/api/analytics/emotion_transitions?limit=1000`)
+    const data = await getEmotionTransitions({ limit: 1000 })
 
-    if (response.ok) {
-      const data = await response.json()
-
-      if (data.status === 'success' && data.transitions && data.transitions.length > 0) {
+    if (data.status === 'success' && data.transitions && data.transitions.length > 0) {
         // 将后端返回的英文情绪名转换为中文，并过滤掉不符合DAG规则的连接
         const validLinks = []
 
@@ -739,7 +743,6 @@ async function renderFaceCountChart() {
         })
 
         links = validLinks
-      }
     }
   } catch (e) {
     console.warn('获取情绪转换数据失败，使用模拟数据:', e)
@@ -1162,8 +1165,13 @@ onUnmounted(() => {
 .chart-body {
   height: 300px;
   padding: 10px 14px 14px;
-  /* ✅ 修复: 确保图表容器背景透明 */
   background: transparent !important;
+  position: relative;
+}
+
+.chart-echarts {
+  width: 100%;
+  height: 100%;
 }
 
 /* ===== 响应式 ===== */

@@ -5,7 +5,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
-import { getEmotionName, getEmotionColor } from '@/utils/emotion'
+import { getEmotionName, getEmotionColor, EMOTION_KEYS } from '@/constants/emotions'
 import { useThemeStore } from '@/stores/theme'
 
 const props = defineProps({
@@ -18,9 +18,6 @@ const props = defineProps({
 const chartRef = ref(null)
 const themeStore = useThemeStore()
 let chartInstance = null
-
-// 7种情绪列表（与项目一致）
-const EMOTION_KEYS = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
 
 // ✅ 动态获取当前主题的 CSS 变量值
 function getThemeColors() {
@@ -171,9 +168,7 @@ const updateChart = () => {
       data: EMOTION_KEYS.map((key, index) => {
         const value = props.emotionCounts[key] || 0
         // ✅ 调试: 打印数据
-        if (index === 0) {
-          console.debug('📊 情绪图表数据:', EMOTION_KEYS.map(k => `${getEmotionName(k)}:${props.emotionCounts[k] || 0}`))
-        }
+        
         return value
       }),
       barWidth: '50%',

@@ -200,9 +200,10 @@ import { ref, computed, nextTick } from 'vue'
 import { UploadFilled, Upload, Delete, VideoPlay, WarningFilled, ArrowRight, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
-import { getEmotionName, getEmotionEmoji, getEmotionColor } from '@/utils/emotion'
+import { getEmotionName, getEmotionEmoji, getEmotionColor } from '@/constants/emotions'
 import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
-import { API } from '@/api/config'
+import { detectVideo } from '@/api/modules/detection'
+import { saveHistoryRecord } from '@/api/modules/history'
 import { logFeatureUsage } from '@/utils/analytics'
 import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
 import generativeAudio from '@/utils/generativeAudio'
@@ -300,7 +301,7 @@ const startBatchDetection = async () => {
     if (!generativeAudio.isInitialized) {
         try {
             await generativeAudio.init()
-            console.log('✅ 音频引擎已初始化')
+            
         } catch (error) {
             console.warn('音频引擎初始化失败:', error)
         }
@@ -320,8 +321,7 @@ const startBatchDetection = async () => {
             const itemStartTime = performance.now()
             const formData = new FormData()
             formData.append('file', item.file)
-            const res = await fetch(API.detectVideo, { method: 'POST', body: formData })
-            const result = await res.json()
+            const result = await detectVideo(formData)
             const itemEndTime = performance.now()
 
             totalLatency += (itemEndTime - itemStartTime)
@@ -418,7 +418,7 @@ const startBatchDetection = async () => {
 
 // 视频事件处理函数
 const onVideoLoaded = () => {
-    console.debug('视频元数据加载完成')
+    
 }
 
 // 视频时间更新时绘制检测框并切换音乐
@@ -462,14 +462,14 @@ const onVideoTimeUpdate = () => {
 
 // 视频开始播放
 const onVideoPlay = () => {
-    console.debug('视频开始播放')
+    
     isPlaying = true
     drawLoop()
 }
 
 // 视频暂停
 const onVideoPause = () => {
-    console.debug('视频暂停')
+    
     isPlaying = false
     if (animationFrameId) {
         cancelAnimationFrame(animationFrameId)
@@ -483,7 +483,7 @@ const onVideoPause = () => {
 
 // 用户拖动进度条（开始）
 const onVideoSeeking = () => {
-    console.debug('开始拖动进度条')
+    
     const currentResult = results.value.find(r => r.filename === selectedVideoFile.value.name)
     if (currentResult && currentResult.status === 'success') {
         drawDetectionBoxes(currentResult.key_frames)
@@ -492,7 +492,7 @@ const onVideoSeeking = () => {
 
 // 用户拖动进度条（结束）
 const onVideoSeeked = () => {
-    console.debug('拖动进度条结束')
+    
     const currentResult = results.value.find(r => r.filename === selectedVideoFile.value.name)
     if (currentResult && currentResult.status === 'success') {
         drawDetectionBoxes(currentResult.key_frames)
@@ -676,7 +676,7 @@ const generateVideoThumbnail = async (result) => {
         }
 
         const face = firstFrame.faces[0]
-        console.debug(`开始裁剪人脸 (时间: ${face.videoTime || 0}s)`)
+        
 
         // 创建一个临时video元素
         const tempVideo = document.createElement('video')
@@ -686,12 +686,12 @@ const generateVideoThumbnail = async (result) => {
 
         // 先等待元数据加载完成
         tempVideo.onloadedmetadata = () => {
-            console.debug(`视频元数据加载完成: ${tempVideo.videoWidth}x${tempVideo.videoHeight}`)
+            
             tempVideo.currentTime = face.videoTime || 0
         }
 
         tempVideo.onseeked = () => {
-            console.debug(`视频帧定位成功 (${face.videoTime || 0}s)`)
+            
             try {
                 // 创建canvas并绘制视频帧
                 const canvas = document.createElement('canvas')
@@ -721,7 +721,7 @@ const generateVideoThumbnail = async (result) => {
                 cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
 
                 const thumbnail = cropCanvas.toDataURL('image/jpeg', 0.8)
-                console.debug(`人脸裁剪完成, Base64长度: ${thumbnail.length}`)
+                
 
                 URL.revokeObjectURL(videoUrl)
                 tempVideo.remove()
@@ -742,7 +742,7 @@ const generateVideoThumbnail = async (result) => {
 
         // 添加超时保护(5秒)
         setTimeout(() => {
-            console.debug('视频帧裁剪超时,使用降级缩略图')
+            
             URL.revokeObjectURL(videoUrl)
             tempVideo.remove()
             resolve(generateFallbackThumbnail(result.dominantEmotion))
@@ -820,35 +820,26 @@ const saveBatchToHistory = async () => {
                     continue
                 }
 
-                const response = await fetch(API.historySave, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        detection_type: 'batch_video',
-                        results: result.key_frames || [],
-                        source: `批量视频检测 (${i + 1}/${results.value.length})`,
-                        video_path: '',
-                        video_type: 'batch_video',
-                        thumbnail: thumbnail,
-                        dominant_emotion: result.dominantEmotion,
-                        confidence: result.avgConfidence,
-                        detected_faces: allDetectedFaces
-                    })
+                await saveHistoryRecord({
+                    detection_type: 'batch_video',
+                    results: result.key_frames || [],
+                    source: `批量视频检测 (${i + 1}/${results.value.length})`,
+                    video_path: '',
+                    video_type: 'batch_video',
+                    thumbnail: thumbnail,
+                    dominant_emotion: result.dominantEmotion,
+                    confidence: result.avgConfidence,
+                    detected_faces: allDetectedFaces
                 })
 
-                if (response.ok) {
-                    successCount++
-                } else {
-                    console.error(`❌ 第 ${i + 1} 个视频保存失败: HTTP ${response.status}`)
-                    failCount++
-                }
+                successCount++
             } catch (err) {
                 console.error(` 第 ${i + 1} 个视频保存异常:`, err)
                 failCount++
             }
         }
 
-        console.log(`✅ 批量视频历史记录保存完成: 成功 ${successCount} 条, 失败 ${failCount} 条`)
+        
 
         if (failCount > 0) {
             ElMessage.warning(`部分记录保存失败 (${failCount}/${results.value.length})`)

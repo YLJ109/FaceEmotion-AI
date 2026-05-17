@@ -1,4 +1,4 @@
-"""API 路由注册中心 - 统一管理所有路由模块"""
+"""API 路由注册中心"""
 from fastapi import FastAPI
 from core.config import ConfigManager
 from core.database import DatabaseManager
@@ -14,14 +14,12 @@ def register_all_routes(
     db_manager: DatabaseManager,
     face_detector,
     emotion_model,
-    adaptive_learner: AdaptiveLearner,
-    user_analytics: UserAnalytics,
-    inference_optimizer: DynamicInferenceOptimizer,
-    executor: concurrent.futures.ThreadPoolExecutor
+    detection_service=None,
+    adaptive_learner: AdaptiveLearner = None,
+    user_analytics: UserAnalytics = None,
+    inference_optimizer: DynamicInferenceOptimizer = None,
+    executor: concurrent.futures.ThreadPoolExecutor = None
 ):
-    """注册所有 API 路由"""
-
-    # 1. 导入路由模块
     from api.websocket import router as ws_router, init_ws_router
     from api.detection import router as detection_router, init_detection_router
     from api.history import router as history_router, init_history_router
@@ -30,15 +28,15 @@ def register_all_routes(
     from api.text_analysis import router as text_analysis_router, init_text_analysis_router
     from api.emotion_trend_analysis import router as emotion_trend_router
 
-    # 2. 初始化各路由依赖
     init_ws_router(
         config_manager=config_manager,
         db_manager=db_manager,
         face_detector=face_detector,
         emotion_model=emotion_model,
+        detection_service=detection_service,
         adaptive_learner=adaptive_learner,
         executor=executor,
-        inference_optimizer=inference_optimizer  # ✅ 新增: 传递推理优化器
+        inference_optimizer=inference_optimizer
     )
 
     init_detection_router(
@@ -66,7 +64,6 @@ def register_all_routes(
 
     init_text_analysis_router(db_manager=db_manager)
 
-    # 3. 注册路由到 FastAPI 应用
     app.include_router(ws_router)
     app.include_router(detection_router)
     app.include_router(history_router)

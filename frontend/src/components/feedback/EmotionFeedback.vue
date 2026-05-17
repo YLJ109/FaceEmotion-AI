@@ -63,7 +63,7 @@
                 <el-button @click="dialogVisible = false" :icon="Close">
                     取消
                 </el-button>
-                <el-button type="primary" @click="submitFeedback" :disabled="!selectedEmotion">
+                <el-button type="primary" @click="handleSubmitFeedback" :disabled="!selectedEmotion">
                     提交反馈
                 </el-button>
             </div>
@@ -76,8 +76,8 @@ import { ref, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Close } from '@element-plus/icons-vue'
 import EmotionSVG from '@/components/common/EmotionSVG.vue'
-import { getEmotionName } from '@/utils/emotion'
-import { API } from '@/api/config'
+import { getEmotionName, EMOTION_KEYS } from '@/constants/emotions'
+import { submitFeedback } from '@/api/modules/system'
 
 const props = defineProps({
     visible: Boolean,
@@ -90,7 +90,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:visible', 'submitted'])
 
-const emotionList = ['happy', 'sad', 'angry', 'surprise', 'fear', 'disgust', 'neutral']
+const emotionList = EMOTION_KEYS
 const selectedEmotion = ref('')
 const notes = ref('')
 
@@ -123,11 +123,7 @@ watch(() => props.visible, (val) => {
         selectedEmotion.value = ''
         notes.value = ''
         // ✅ 修改: 优先使用快照数据，如果没有则使用实时数据
-        console.log('📊 反馈对话框打开:', {
-            snapshot: props.snapshot,
-            predictedEmotion: props.predictedEmotion,
-            predictedConfidence: props.predictedConfidence
-        })
+        
     }
 })
 
@@ -136,36 +132,28 @@ watch(dialogVisible, (val) => {
 })
 
 // 提交反馈
-async function submitFeedback() {
+async function handleSubmitFeedback() {
     if (!selectedEmotion.value) {
         ElMessage.warning('请选择实际情绪')
         return
     }
 
     try {
-        const response = await fetch(API.feedback, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                emotion: props.snapshot?.emotion || props.predictedEmotion,
-                predicted_emotion: props.snapshot?.emotion || props.predictedEmotion,
-                correct_emotion: selectedEmotion.value,
-                feedback_type: 'incorrect',
-                confidence: props.snapshot?.confidence || props.predictedConfidence,
-                bbox: props.snapshot?.bbox,
-                snapshot: props.snapshot?.image,  // ✅ 新增: 提交快照数据
-                timestamp: props.snapshot?.timestamp,
-                notes: notes.value
-            })
+        await submitFeedback({
+            emotion: props.snapshot?.emotion || props.predictedEmotion,
+            predicted_emotion: props.snapshot?.emotion || props.predictedEmotion,
+            correct_emotion: selectedEmotion.value,
+            feedback_type: 'incorrect',
+            confidence: props.snapshot?.confidence || props.predictedConfidence,
+            bbox: props.snapshot?.bbox,
+            snapshot: props.snapshot?.image,
+            timestamp: props.snapshot?.timestamp,
+            notes: notes.value
         })
 
-        if (response.ok) {
-            ElMessage.success('反馈已提交，系统将自动学习优化')
-            emit('submitted')
-            dialogVisible.value = false
-        } else {
-            ElMessage.error('提交失败，请重试')
-        }
+        ElMessage.success('反馈已提交，系统将自动学习优化')
+        emit('submitted')
+        dialogVisible.value = false
     } catch (error) {
         console.error('提交反馈失败:', error)
         ElMessage.error('网络错误，请稍后重试')

@@ -54,22 +54,24 @@ body {
 
 /* ===== 主体 ===== */
 .main-content {
-    display: flex;
+    display: grid;
+    grid-template-columns: 220px 1fr;
     flex: 1;
     overflow: hidden;
+    transition: grid-template-columns 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content.sidebar-collapsed {
+    grid-template-columns: 64px 1fr;
 }
 
 /* ===== 内容区 ===== */
 .content-area {
-    flex: 1;
     overflow: hidden;
     padding: 20px;
     height: 100%;
     background: transparent;
-    /* ✅ 改为透明，显示底层渐变 */
     position: relative;
-    /* ✅ 修复: 移除 all 过渡,内容区不需要背景过渡(透明) */
-    transition: padding 0.3s ease;
 }
 
 .page {

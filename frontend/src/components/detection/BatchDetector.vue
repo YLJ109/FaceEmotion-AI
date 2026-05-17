@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <div class="batch-detector">
         <div class="detector-layout">
             <!-- 左侧：上传区域 / 图片预览 -->
@@ -136,8 +136,9 @@ import { UploadFilled, Upload, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { drawCornerBox, drawEmotionLabel } from '@/utils/canvas'
 import { useThemeStore } from '@/stores/theme'
-import { getEmotionName, getEmotionEmoji, getEmotionColor } from '@/utils/emotion'
-import { API } from '@/api/config'
+import { getEmotionName, getEmotionEmoji, getEmotionColor } from '@/constants/emotions'
+import { detectImage } from '@/api/modules/detection'
+import { saveHistoryRecord } from '@/api/modules/history'
 import { logFeatureUsage } from '@/utils/analytics'
 import PerformanceMonitor from '@/components/monitor/PerformanceMonitor.vue'
 import generativeAudio from '@/utils/generativeAudio'
@@ -194,8 +195,7 @@ const startBatchDetection = async () => {
             const itemStartTime = performance.now()
             const formData = new FormData()
             formData.append('file', item.file)
-            const res = await fetch(API.detectImage, { method: 'POST', body: formData })
-            const result = await res.json()
+            const result = await detectImage(formData)
             const itemEndTime = performance.now()
 
             // ✅ 新增: 累计延迟
@@ -206,7 +206,8 @@ const startBatchDetection = async () => {
             const dominantEmotion = result.faces?.[0]?.emotion || 'neutral'
             const confidence = result.faces?.[0]?.confidence || 0
 
-            // ✅ 修复: 传递情绪数据到音乐引擎（使用第一张检测到人脸的图片，必须使用后端返回的music_params）
+            // ✅ 传递情绪数据到音乐引擎（使用第一张检测到人脸的图片，必须使用后端返回的music_params）
+            // 注意：这里只更新音乐参数，不自动播放，避免检测完突然播放音乐
             if (result.faces?.length > 0 && completed === 0) {
                 const musicParams = result.music_params
 
@@ -215,11 +216,7 @@ const startBatchDetection = async () => {
                     window.dispatchEvent(new CustomEvent('music-params-updated', {
                         detail: musicParams
                     }))
-
-                    // 直接调用音乐引擎播放（先检查是否已初始化）
-                    if (generativeAudio.isInitialized) {
-                        generativeAudio.playMusic(musicParams)
-                    }
+                    // ✅ 移除自动播放：用户可以手动点击播放按钮来播放音乐
                 }
             }
 
@@ -360,28 +357,19 @@ const saveBatchToHistory = async () => {
             }
 
             try {
-                const response = await fetch(API.historySave, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        detection_type: 'batch',
-                        results: faces,
-                        source: `批量图片检测 (${i + 1}/${results.value.length})`,
-                        image_path: '',
-                        image_type: 'batch',
-                        thumbnail: result.imageUrl || '',  // ✅ 确保 thumbnail 存在
-                        dominant_emotion: dominantEmotion,
-                        confidence: confidence,
-                        detected_faces: faces  // ✅ 包含完整的人脸数据（含 bbox）
-                    })
+                await saveHistoryRecord({
+                    detection_type: 'batch',
+                    results: faces,
+                    source: `批量图片检测 (${i + 1}/${results.value.length})`,
+                    image_path: '',
+                    image_type: 'batch',
+                    thumbnail: result.imageUrl || '',
+                    dominant_emotion: dominantEmotion,
+                    confidence: confidence,
+                    detected_faces: faces
                 })
 
-                if (response.ok) {
-                    successCount++
-                } else {
-                    console.error(`❌ 第 ${i + 1} 张图片保存失败: HTTP ${response.status}`)
-                    failCount++
-                }
+                successCount++
             } catch (err) {
                 console.error(` 第 ${i + 1} 张图片保存异常:`, err)
                 failCount++
@@ -389,7 +377,7 @@ const saveBatchToHistory = async () => {
         }
 
         // 输出保存结果
-        console.log(`✅ 批量历史记录保存完成: 成功 ${successCount} 条, 失败 ${failCount} 条`)
+        
 
         // 如果有失败，提示用户
         if (failCount > 0) {

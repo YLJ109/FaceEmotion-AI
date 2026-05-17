@@ -145,6 +145,11 @@ const routes = [
             icon: 'FileText',
             group: 'data'
         }
+    },
+    {
+        path: '/:pathMatch(.*)*',
+        name: 'not-found',
+        redirect: '/'
     }
 ]
 

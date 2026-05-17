@@ -44,3 +44,12 @@ export const logFeatureUsage = (data) => {
 export const getUserAnalytics = (params = {}) => {
     return http.get('/api/analytics/user_behavior', { params })
 }
+
+/**
+ * 实时情绪趋势分析
+ * @param {Object} data - 情绪数据
+ * @returns {Promise<Object>}
+ */
+export const analyzeEmotionTrend = (data) => {
+    return http.post('/api/emotion-trend/analyze', data, { log: false })
+}

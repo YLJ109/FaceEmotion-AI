@@ -380,7 +380,7 @@
             </div>
             <template #footer>
                 <el-button @click="feedbackDialogVisible = false">取消</el-button>
-                <el-button type="primary" @click="submitFeedback" :loading="feedbackSubmitting">提交反馈</el-button>
+                <el-button type="primary" @click="handleSubmitFeedback" :loading="feedbackSubmitting">提交反馈</el-button>
             </template>
         </el-dialog>
     </div>
@@ -390,8 +390,9 @@
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { Clock, Loading, Picture, View, Download, DataAnalysis, VideoCamera, Files, Film, Edit, InfoFilled, UserFilled, Delete, Close, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getEmotionName, getEmotionColor, getEmotionEmoji, EMOTION_LIST } from '@/utils/emotion'
-import { API } from '@/api/config'
+import { getEmotionName, getEmotionColor, getEmotionEmoji, EMOTION_LIST } from '@/constants/emotions'
+import { getHistoryList, deleteHistoryRecord } from '@/api/modules/history'
+import { submitFeedback } from '@/api/modules/system'
 
 // 过滤重复情绪（排除别名：surprised, fearful, calm）
 const emotionList = EMOTION_LIST.filter(e => !['surprised', 'fearful', 'calm'].includes(e))
@@ -456,16 +457,13 @@ const fetchHistory = async () => {
     loading.value = true
     try {
         const offset = (currentPage.value - 1) * pageSize.value
-        let url = `${API.history}?limit=${pageSize.value}&offset=${offset}`
+        const params = { limit: pageSize.value, offset }
 
-        // 添加筛选参数
         if (filterType.value !== 'all') {
-            url += `&type=${filterType.value}`
+            params.type = filterType.value
         }
 
-        const response = await fetch(url)
-        if (!response.ok) throw new Error('获取历史记录失败')
-        const data = await response.json()
+        const data = await getHistoryList(params)
         historyList.value = data.data || []
         total.value = data.total || 0
 
@@ -523,28 +521,14 @@ const deleteRecord = async (item) => {
             }
         )
 
-        // 调用后端 API
-        const response = await fetch(`${API.history}/${item.id}`, {
-            method: 'DELETE'
-        })
+        await deleteHistoryRecord(item.id)
 
-        if (!response.ok) {
-            throw new Error('删除失败')
-        }
-
-        const result = await response.json()
-
-        if (result.status === 'success') {
-            ElMessage.success('已成功删除记录')
+        ElMessage.success('已成功删除记录')
             // 关闭详情对话框
             dialogVisible.value = false
             selectedItem.value = null
-            // 刷新列表
             fetchHistory()
-        } else {
-            throw new Error(result.message || '删除失败')
-        }
-    } catch (error) {
+        } catch (error) {
         if (error !== 'cancel') {
             console.error('删除记录失败:', error)
             ElMessage.error('删除失败: ' + error.message)
@@ -577,11 +561,11 @@ const batchDelete = async () => {
         )
 
         const deletePromises = selectedRecords.value.map(record =>
-            fetch(`${API.history}/${record.id}`, { method: 'DELETE' })
+            deleteHistoryRecord(record.id)
         )
 
-        const results = await Promise.all(deletePromises)
-        const successCount = results.filter(r => r.ok).length
+        const results = await Promise.allSettled(deletePromises)
+        const successCount = results.filter(r => r.status === 'fulfilled').length
 
         if (successCount > 0) {
             ElMessage.success(`成功删除 ${successCount} 条记录`)
@@ -855,7 +839,7 @@ const openFaceFeedback = (face, index) => {
 }
 
 // ✅ 新增: 提交反馈
-const submitFeedback = async () => {
+const handleSubmitFeedback = async () => {
     if (!feedbackForm.value.correctEmotion) {
         ElMessage.warning('请选择正确的情绪')
         return
@@ -863,27 +847,17 @@ const submitFeedback = async () => {
 
     feedbackSubmitting.value = true
     try {
-        const response = await fetch(API.feedback, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                // ✅ 修复: 使用后端期望的字段名
-                predicted_emotion: feedbackForm.value.predictedEmotion,
-                correct_emotion: feedbackForm.value.correctEmotion,
-                feedback_type: 'incorrect',  // 用户提交反馈说明预测错误
-                notes: feedbackForm.value.comment || '',
-                confidence: selectedItem.value?.confidence,
-                bbox: selectedItem.value?.bbox,
-                snapshot: feedbackForm.value.snapshot || '',  // ✅ 新增: 快照图片
-                timestamp: Date.now()
-            })
+        await submitFeedback({
+            emotion: feedbackForm.value.predictedEmotion,
+            predicted_emotion: feedbackForm.value.predictedEmotion,
+            correct_emotion: feedbackForm.value.correctEmotion,
+            feedback_type: 'incorrect',
+            notes: feedbackForm.value.comment || '',
+            confidence: selectedItem.value?.confidence,
+            bbox: selectedItem.value?.bbox,
+            snapshot: feedbackForm.value.snapshot || '',
+            timestamp: Date.now()
         })
-
-        // ✅ 修复: 获取详细错误信息
-        const data = await response.json()
-        if (!response.ok) {
-            throw new Error(data.detail || data.message || '提交失败')
-        }
 
         ElMessage.success('反馈已提交，感谢您的帮助！')
         feedbackDialogVisible.value = false

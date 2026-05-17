@@ -9,11 +9,7 @@ import http from '../http'
  * @returns {Promise<Object>}
  */
 export const detectImage = (formData) => {
-    return http.post('/api/detect/image', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
-    })
+    return http.post('/api/detect/image', formData)
 }
 
 /**
@@ -22,11 +18,7 @@ export const detectImage = (formData) => {
  * @returns {Promise<Object>}
  */
 export const detectBatch = (formData) => {
-    return http.post('/api/detect/batch', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
-    })
+    return http.post('/api/detect/batch', formData)
 }
 
 /**
@@ -35,11 +27,7 @@ export const detectBatch = (formData) => {
  * @returns {Promise<Object>}
  */
 export const detectVideo = (formData) => {
-    return http.post('/api/detect/video', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
-    })
+    return http.post('/api/detect/video', formData)
 }
 
 /**
@@ -47,6 +35,9 @@ export const detectVideo = (formData) => {
  * @returns {string} WebSocket URL
  */
 export const getRealtimeStreamUrl = () => {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/stream'
-    return wsUrl
+    try {
+      const saved = localStorage.getItem('server_url')
+      if (saved) return saved.replace(/^http/, 'ws') + '/ws/stream'
+    } catch { /* ignore */ }
+    return import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/stream'
 }

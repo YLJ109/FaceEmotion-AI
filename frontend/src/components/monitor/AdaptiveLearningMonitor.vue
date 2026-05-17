@@ -91,7 +91,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as echarts from 'echarts'
-import { getEmotionEmoji, getEmotionName } from '@/utils/emotion'
+import { getEmotionEmoji, getEmotionName } from '@/constants/emotions'
+import { getLearnerStatus } from '@/api/modules/system'
 
 // ✅ 动态获取当前主题的 CSS 变量值
 function getThemeColors() {
@@ -183,17 +184,11 @@ const statCards = computed(() => {
 async function fetchLearnerStatus() {
     loading.value = true
     try {
-        const baseUrl = localStorage.getItem('api_base') || 'http://localhost:8000'
-        const response = await fetch(`${baseUrl}/api/learner/status`)
+        const data = await getLearnerStatus()
 
-        if (response.ok) {
-            const data = await response.json()
-            if (data.status === 'success') {
-                stats.value = data.learner || {}
-                renderAllCharts()
-            }
-        } else {
-            console.error('获取学习器状态失败:', response.statusText)
+        if (data.status === 'success') {
+            stats.value = data.learner || {}
+            renderAllCharts()
         }
     } catch (error) {
         console.error('获取学习器状态异常:', error)

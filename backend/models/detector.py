@@ -1,81 +1,67 @@
-"""人脸检测器 - Caffe SSD（支持自动检测后端）"""
+"""人脸检测器 - OpenCV DNN SSD"""
 import cv2
 import numpy as np
-from typing import List, Dict
+from typing import List, Dict, Optional
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 
 class FaceDetector:
-    """基于 Caffe SSD 的人脸检测器"""
+    """基于 OpenCV DNN SSD 的人脸检测器"""
 
-    def __init__(self, proto_file: str = None, model_file: str = None):
-        """
-        初始化 Caffe SSD 人脸检测器
+    def __init__(self,
+                 min_detection_confidence: float = 0.5,
+                 max_num_faces: int = 10,
+                 use_gpu: bool = True):
+        self.max_num_faces = max_num_faces
+        self.min_detection_confidence = min_detection_confidence
 
-        Args:
-            proto_file: Caffe prototxt 路径
-            model_file: Caffe caffemodel 路径
-        """
-        # 设置默认路径
-        if proto_file is None:
-            proto_file = 'configs/deploy.prototxt'
-        if model_file is None:
-            model_file = 'weights/res10_300x300_ssd_iter_140000_fp16.caffemodel'
+        proto_file = os.path.join(os.path.dirname(__file__), '..', 'configs', 'deploy.prototxt')
+        model_file = os.path.join(os.path.dirname(__file__), '..', 'weights', 'res10_300x300_ssd_iter_140000_fp16.caffemodel')
+
+        if not os.path.exists(proto_file):
+            raise RuntimeError(f"Caffe prototxt 文件不存在: {proto_file}")
+        if not os.path.exists(model_file):
+            raise RuntimeError(f"Caffe 模型文件不存在: {model_file}")
 
         self.face_net = cv2.dnn.readNetFromCaffe(proto_file, model_file)
         if self.face_net.empty():
-            raise RuntimeError("无法加载Caffe模型")
+            raise RuntimeError("无法加载 Caffe SSD 模型")
 
-        # ✅ 固定使用 CPU（行业标准配置）
-        # Caffe 人脸模型太小、太快，CPU 完全够用，放 GPU 纯属浪费
-        self.face_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-        self.face_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-        logger.info("✅ Caffe 人脸检测器固定使用 CPU")
+        if use_gpu and cv2.cuda.getCudaEnabledDeviceCount() > 0:
+            self.face_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+            self.face_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+            logger.info("SSD 使用 GPU (CUDA) 加速")
+        else:
+            self.face_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+            self.face_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+            logger.info("SSD 使用 CPU")
 
         self._target_size = (300, 300)
         self._mean = (104.0, 177.0, 123.0)
-        self._scale_factor = 1.0
-        self.conf_threshold = 0.6  # ✅ 参考realtime_inference.py，稍微降低到0.6，避免漏检
-        logger.info(f"✅ Caffe人脸检测器初始化完成 | 置信度阈值: {self.conf_threshold}")
+        logger.info(f"人脸检测器就绪 | SSD | GPU: {use_gpu} | 置信度: {min_detection_confidence}")
 
-    def detect(self, frame: np.ndarray, confidence_threshold: float = 0.5, max_faces: int = 10) -> List[Dict]:
-        """
-        人脸检测
+    def get_face_roi(self, image: np.ndarray, bbox: List[int], margin_ratio: float = 0.0) -> Optional[np.ndarray]:
+        x, y, w, h = bbox
+        hh, ww = image.shape[:2]
+        mw = int(w * margin_ratio)
+        mh = int(h * margin_ratio)
+        x1, y1 = max(0, x - mw), max(0, y - mh)
+        x2, y2 = min(ww, x + w + mw), min(hh, y + h + mh)
+        roi = image[y1:y2, x1:x2]
+        return roi if roi.size > 0 and roi.shape[0] > 0 and roi.shape[1] > 0 else None
 
-        参数:
-            frame: 输入图像
-            confidence_threshold: 置信度阈值
-            max_faces: 最多处理的人脸数量(默认10)
+    def detect(self, frame: np.ndarray, confidence_threshold: float = None, max_faces: int = None) -> List[Dict]:
+        if confidence_threshold is None:
+            confidence_threshold = self.min_detection_confidence
+        if max_faces is None:
+            max_faces = self.max_num_faces
 
-        返回:
-            检测到的人脸列表(按置信度排序,最多max_faces个)
-        """
-        faces = self._detect_caffe(frame, confidence_threshold)
-        faces = self._postprocess_bboxes(faces, frame.shape[:2])
-
-        # 按置信度排序并限制最多处理max_faces个人脸
-        faces.sort(key=lambda x: x['confidence'], reverse=True)
-        if len(faces) > max_faces:
-            logger.debug(f'检测到{len(faces)}张人脸，仅处理前{max_faces}张')
-            faces = faces[:max_faces]
-
-        return faces
-
-    def _detect_caffe(self, frame: np.ndarray, confidence_threshold: float) -> List[Dict]:
-        """Caffe SSD检测实现"""
         h, w = frame.shape[:2]
-
         blob = cv2.dnn.blobFromImage(
-            cv2.resize(frame, self._target_size),
-            self._scale_factor,
-            self._target_size,
-            self._mean,
-            False,
-            False
-        )
-
+            cv2.resize(frame, self._target_size), 1.0, self._target_size, self._mean, False, False)
         self.face_net.setInput(blob)
         detections = self.face_net.forward()
 
@@ -87,85 +73,9 @@ class FaceDetector:
                 x1, y1, x2, y2 = box.astype(int)
                 x1, y1 = max(0, x1), max(0, y1)
                 x2, y2 = min(w, x2), min(h, y2)
+                bw, bh = x2 - x1, y2 - y1
+                if bw > 0 and bh > 0:
+                    faces.append({'bbox': [x1, y1, bw, bh], 'confidence': float(confidence)})
 
-                bbox_width = x2 - x1
-                bbox_height = y2 - y1
-
-                faces.append({
-                    'bbox': [x1, y1, bbox_width, bbox_height],
-                    'confidence': float(confidence)
-                })
-
-        return faces
-
-    def _postprocess_bboxes(self, faces: List[Dict], image_shape: tuple) -> List[Dict]:
-        """
-        bbox坐标后处理优化
-        - 边界裁剪
-        - 面积过滤
-        - 坐标对齐
-        """
-        h, w = image_shape
-        min_face_size = 20  # 最小人脸尺寸(像素)
-
-        filtered_faces = []
-        for face in faces:
-            x1, y1, bw, bh = face['bbox']
-            x2, y2 = x1 + bw, y1 + bh
-
-            # 1. 边界裁剪
-            x1 = max(0, x1)
-            y1 = max(0, y1)
-            x2 = min(w, x2)
-            y2 = min(h, y2)
-
-            # 2. 重新计算宽高
-            bw = x2 - x1
-            bh = y2 - y1
-
-            # 3. 面积过滤(太小的框可能是误检)
-            if bw < min_face_size or bh < min_face_size:
-                continue
-
-            # 4. 宽高比过滤(人脸通常是0.5-1.5之间)
-            aspect_ratio = bw / bh if bh > 0 else 0
-            if aspect_ratio < 0.4 or aspect_ratio > 2.0:
-                continue
-
-            filtered_faces.append({
-                'bbox': [x1, y1, bw, bh],
-                'confidence': face['confidence']
-            })
-
-        return filtered_faces
-
-    @staticmethod
-    def align_face(frame: np.ndarray, bbox: list, target_size: tuple = (112, 112)) -> np.ndarray:
-        """
-        人脸对齐与裁剪
-
-        参数:
-            frame: 原始图像
-            bbox: [x, y, width, height]
-            target_size: 目标尺寸 (宽, 高)
-
-        返回:
-            对齐后的人脸图像
-        """
-        x, y, w, h = bbox
-
-        # 1. 扩大边界框(包含更多上下文)
-        margin = int(max(w, h) * 0.25)
-        x1 = max(0, x - margin)
-        y1 = max(0, y - margin)
-        x2 = min(frame.shape[1], x + w + margin)
-        y2 = min(frame.shape[0], y + h + margin)
-
-        # 2. 裁剪人脸区域
-        face_crop = frame[y1:y2, x1:x2]
-
-        # 3. 缩放到目标尺寸
-        aligned_face = cv2.resize(
-            face_crop, target_size, interpolation=cv2.INTER_CUBIC)
-
-        return aligned_face
+        faces.sort(key=lambda x: x['confidence'], reverse=True)
+        return faces[:max_faces]
