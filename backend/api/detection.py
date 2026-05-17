@@ -104,12 +104,13 @@ async def detect_image(file: UploadFile = File(...)):
         results = []
 
         for face in faces:
-            face_img = _face_detector.get_face_roi(frame, face['bbox'], margin_ratio=0.2)
-            if face_img is not None and face_img.size > 0 and _emotion_model:
+            x, y, w, h = face['bbox']
+            face_img = frame[y:y+h, x:x+w]
+            if face_img.size > 0 and _emotion_model:
                 # ✅ 图片检测禁用防抖，避免多人脸检测时状态共享导致错误
                 emotion, confidence, scores = _emotion_model.predict(face_img, use_stabilization=False)
                 results.append({
-                    'bbox': [int(face['bbox'][0]), int(face['bbox'][1]), int(face['bbox'][2]), int(face['bbox'][3])],
+                    'bbox': [int(x), int(y), int(w), int(h)],
                     'emotion': emotion,
                     'confidence': float(confidence),
                     'scores': {k: float(v) for k, v in scores.items()}
@@ -164,14 +165,15 @@ async def detect_batch(files: List[UploadFile] = File(...)):
                 # ✅ 批量图片检测使用默认参数，不受系统设置的检测参数影响
                 faces = _face_detector.detect(frame, max_faces=10)
                 for face in faces:
-                    face_img = _face_detector.get_face_roi(frame, face['bbox'], margin_ratio=0.2)
-                    if face_img is not None and face_img.size > 0 and _emotion_model:
+                    x, y, w, h = face['bbox']
+                    face_img = frame[y:y+h, x:x+w]
+                    if face_img.size > 0 and _emotion_model:
                         # ✅ 批量图片检测禁用防抖，避免多人脸检测时状态共享导致错误
                         emotion, confidence, scores = _emotion_model.predict(
                             face_img, use_stabilization=False)
                         results.append({
                             'filename': file.filename,
-                            'bbox': [int(face['bbox'][0]), int(face['bbox'][1]), int(face['bbox'][2]), int(face['bbox'][3])],
+                            'bbox': [int(x), int(y), int(w), int(h)],
                             'emotion': emotion,
                             'confidence': float(confidence),
                             'scores': {k: float(v) for k, v in scores.items()}
@@ -241,9 +243,8 @@ async def detect_video(file: UploadFile = File(...)):
                 }
 
                 for face in faces:
-                    face_roi = _face_detector.get_face_roi(frame, face['bbox'], margin_ratio=0.2)
-                    if face_roi is None:
-                        continue
+                    x, y, w, h = face['bbox']
+                    face_roi = frame[y:y+h, x:x+w]
                     # ✅ 视频检测禁用防抖，避免多人脸检测时状态共享导致错误
                     emotion, confidence, scores = _emotion_model.predict(
                         face_roi, use_stabilization=False)
@@ -354,9 +355,8 @@ async def detect_batch_video(files: List[UploadFile] = File(...)):
                     }
 
                     for face in faces:
-                        face_roi = _face_detector.get_face_roi(frame, face['bbox'], margin_ratio=0.2)
-                        if face_roi is None:
-                            continue
+                        x, y, w, h = face['bbox']
+                        face_roi = frame[y:y+h, x:x+w]
                         # ✅ 批量视频检测禁用防抖，避免多人脸检测时状态共享导致错误
                         emotion, confidence, scores = _emotion_model.predict(
                             face_roi, use_stabilization=False)

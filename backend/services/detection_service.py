@@ -96,9 +96,12 @@ class DetectionService:
         return image
     
     def _analyze_emotion(self, image: np.ndarray, face: dict) -> Dict:
-        face_roi = self.face_detector.get_face_roi(image, face['bbox'], margin_ratio=0.2)
-
-        if face_roi is None or face_roi.size == 0:
+        """分析单张人脸的情感"""
+        # 提取人脸区域
+        x1, y1, w, h = face['bbox']
+        face_roi = image[y1:y1+h, x1:x1+w]
+        
+        if face_roi.size == 0:
             return {
                 'bbox': face['bbox'],
                 'confidence': face['confidence'],
@@ -106,8 +109,9 @@ class DetectionService:
                 'emotion_confidence': 0.0,
                 'all_emotions': {}
             }
-
-        emotion, confidence, scores = self.emotion_classifier.predict(face_roi, use_stabilization=False)
+        
+        # 推理
+        emotion, confidence, scores = self.emotion_classifier.predict(face_roi)
         
         return {
             'bbox': face['bbox'],
