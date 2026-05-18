@@ -591,6 +591,7 @@ const drawDetectionBoxes = (keyFrames) => {
         // 计算缩放比例：原始视频尺寸 -> Canvas 显示尺寸
         const scale = drawWidth / video.videoWidth
 
+        const existingLabels = []
         interpolatedFaces.forEach((face, faceIndex) => {
             const color = getEmotionColor(face.emotion)
             const [x, y, w, h] = face.bbox
@@ -604,7 +605,8 @@ const drawDetectionBoxes = (keyFrames) => {
             // 绘制检测框和标签
             const totalFaces = interpolatedFaces.length
             drawCornerBox(ctx, [scaledX, scaledY, scaledW, scaledH], color, 4)
-            drawEmotionLabel(ctx, [scaledX, scaledY, scaledW, scaledH], face.emotion, face.confidence, themeStore.currentTheme, faceIndex + 1, totalFaces)
+            const labelRect = drawEmotionLabel(ctx, [scaledX, scaledY, scaledW, scaledH], face.emotion, face.confidence, themeStore.currentTheme, faceIndex + 1, totalFaces, existingLabels)
+            if (labelRect) existingLabels.push(labelRect)
         })
     }
 }

@@ -1,11 +1,40 @@
 /**
  * Axios HTTP 客户端配置
- * 统一管理请求拦截、响应拦截、错误处理
+ * 统一管理请求拦截、响应拦截、错误处理、重试机制
  */
 import axios from 'axios'
 import { API_BASE_URL } from './config'
 import { ElMessage } from 'element-plus'
 import logger from '@/utils/logger'
+
+const MAX_RETRIES = 3
+const RETRY_DELAY_BASE = 1000
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function retryRequest(config, retryCount = 0) {
+    try {
+        return await axios(config)
+    } catch (error) {
+        const shouldRetry = (
+            retryCount < MAX_RETRIES &&
+            (error.code === 'ECONNABORTED' ||
+             error.code === 'ERR_NETWORK' ||
+             error.response?.status >= 500 ||
+             error.response?.status === 429)
+        )
+
+        if (shouldRetry) {
+            const delay = RETRY_DELAY_BASE * Math.pow(2, retryCount)
+            logger.warn(`请求失败，${delay}ms后重试 (${retryCount + 1}/${MAX_RETRIES}): ${config.url}`)
+            await sleep(delay)
+            return retryRequest(config, retryCount + 1)
+        }
+        throw error
+    }
+}
 
 // 创建 Axios 实例
 const http = axios.create({
@@ -98,5 +127,7 @@ function getErrorMessage(error) {
             return data.detail || `请求失败 (${status})`
     }
 }
+
+http.retryRequest = retryRequest
 
 export default http

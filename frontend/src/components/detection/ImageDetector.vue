@@ -369,6 +369,7 @@ const drawResults = (result) => {
         ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
 
         if (result.faces?.length) {
+            const existingLabels = []
             result.faces.forEach((face, index) => {
                 const color = getEmotionColor(face.emotion)
 
@@ -385,7 +386,8 @@ const drawResults = (result) => {
                 if (showDetectionBoxes.value) {
                     const totalFaces = result.faces.length
                     drawCornerBox(ctx, scaledBbox, color, 4) // 加粗描边
-                    drawEmotionLabel(ctx, scaledBbox, face.emotion, face.confidence, themeStore.currentTheme, index + 1, totalFaces)
+                    const labelRect = drawEmotionLabel(ctx, scaledBbox, face.emotion, face.confidence, themeStore.currentTheme, index + 1, totalFaces, existingLabels)
+                    if (labelRect) existingLabels.push(labelRect)
                 }
             })
         }

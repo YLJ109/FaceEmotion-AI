@@ -301,6 +301,7 @@ const drawBatchCanvas = (result, index) => {
 
         // 绘制检测框和标签
         if (result.faces?.length) {
+            const existingLabels = []
             result.faces.forEach((face, faceIndex) => {
                 const color = getEmotionColor(face.emotion)
 
@@ -315,7 +316,8 @@ const drawBatchCanvas = (result, index) => {
                 // 绘制检测框和标签
                 const totalFaces = result.faces.length
                 drawCornerBox(ctx, scaledBbox, color, 4)
-                drawEmotionLabel(ctx, scaledBbox, face.emotion, face.confidence, themeStore.currentTheme, faceIndex + 1, totalFaces)
+                const labelRect = drawEmotionLabel(ctx, scaledBbox, face.emotion, face.confidence, themeStore.currentTheme, faceIndex + 1, totalFaces, existingLabels)
+                if (labelRect) existingLabels.push(labelRect)
             })
         }
     }

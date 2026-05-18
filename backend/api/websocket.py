@@ -168,15 +168,15 @@ async def websocket_endpoint(websocket: WebSocket):
         if use_gpu_mode:
             FACE_DETECT_INTERVAL = 1
             EMOTION_INFER_INTERVAL = 1
-            SMOOTH_ALPHA = 0.55
+            SMOOTH_ALPHA = 0.6
         else:
             FACE_DETECT_INTERVAL = 2
             EMOTION_INFER_INTERVAL = 1
-            SMOOTH_ALPHA = 0.45
+            SMOOTH_ALPHA = 0.5
 
-        BBOX_JITTER_THRESHOLD = 2
+        BBOX_JITTER_THRESHOLD = 3
         MAX_FACES = 5
-        MAX_CACHE_FRAMES = 8
+        MAX_CACHE_FRAMES = 6
 
         _calibration_strength = 0.0
 
@@ -188,23 +188,60 @@ async def websocket_endpoint(websocket: WebSocket):
                 self.emotion_ema_probs = None
                 self.current_emotion = None
                 self.smooth_alpha = smooth_alpha
+                self.velocity = [0.0, 0.0, 0.0, 0.0]
+                self.position_history = []
+                self.last_update_time = time.time()
+                self.predict_enabled = True
+
+            def predict(self, dt):
+                if not self.predict_enabled or dt <= 0:
+                    return self.smoothed_bbox
+                pred = []
+                for i in range(4):
+                    pred.append(self.smoothed_bbox[i] + self.velocity[i] * dt * 0.5)
+                return pred
 
             def update(self, bbox):
                 self.consecutive_misses = 0
                 self.confidence_history.append(1.0)
                 if len(self.confidence_history) > 5:
                     self.confidence_history.pop(0)
+
+                current_time = time.time()
+                dt = current_time - self.last_update_time
+                self.last_update_time = current_time
+
                 target = [float(v) for v in bbox]
                 new_smoothed = []
+
                 for i in range(4):
-                    diff = abs(target[i] - self.smoothed_bbox[i])
-                    if diff < BBOX_JITTER_THRESHOLD:
+                    diff = target[i] - self.smoothed_bbox[i]
+                    raw_diff = abs(diff)
+
+                    if raw_diff < BBOX_JITTER_THRESHOLD:
                         new_smoothed.append(self.smoothed_bbox[i])
                     else:
-                        new_smoothed.append(
-                            self.smoothed_bbox[i] + self.smooth_alpha * (target[i] - self.smoothed_bbox[i])
-                        )
+                        base_alpha = self.smooth_alpha
+                        if raw_diff > 15:
+                            base_alpha = min(0.8, self.smooth_alpha * 1.8)
+                        elif raw_diff > 8:
+                            base_alpha = min(0.65, self.smooth_alpha * 1.3)
+
+                        new_smoothed.append(self.smoothed_bbox[i] + base_alpha * diff)
+
                 self.smoothed_bbox = new_smoothed
+
+                if len(self.position_history) >= 3:
+                    self.position_history.pop(0)
+                self.position_history.append((self.smoothed_bbox[:], current_time))
+
+                if len(self.position_history) >= 2:
+                    prev_pos, prev_time = self.position_history[-2]
+                    curr_pos, curr_time = self.position_history[-1]
+                    if curr_time > prev_time:
+                        for i in range(4):
+                            self.velocity[i] = (curr_pos[i] - prev_pos[i]) / (curr_time - prev_time)
+
                 return [int(v) for v in self.smoothed_bbox]
 
             def miss(self):
