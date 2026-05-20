@@ -11,9 +11,19 @@ logger = logging.getLogger(__name__)
 class DatabaseManager:
     """数据库管理器 - 使用持久连接+写事务合并"""
 
-    def __init__(self, db_path='data/emotion.db'):
-        self.db_path = db_path
-        Path('data').mkdir(exist_ok=True)
+    def __init__(self, db_path=None):
+        # Use absolute path to ensure directory creation works in any working directory
+        if db_path is None:
+            backend_dir = Path(__file__).parent.parent
+            db_path = backend_dir / 'data' / 'emotion.db'
+        elif not Path(db_path).is_absolute():
+            backend_dir = Path(__file__).parent.parent
+            db_path = backend_dir / db_path
+
+        self.db_path = str(db_path)
+        self.db_dir = Path(self.db_path).parent
+        self.db_dir.mkdir(parents=True, exist_ok=True)
+
         self._conn = None  # 延迟初始化持久连接
         # ✅ 新增: 统计缓存
         self._stats_cache = None

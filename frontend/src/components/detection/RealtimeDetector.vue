@@ -290,6 +290,7 @@ import EmotionTrendPanel from '@/components/analysis/EmotionTrendPanel.vue'
 import { TrendCharts } from '@element-plus/icons-vue'
 import logger from '@/utils/logger'
 import { analyze3SecondWindow, prepareBackendData } from '@/utils/emotionTrendAnalyzer'
+import { workerDetectionService } from '@/services/workerDetection'
 
 // ✅ 新增: 组件名称,用于 keep-alive 缓存
 defineOptions({
@@ -308,6 +309,7 @@ const currentCameraIndex = ref(0)  // 当前选中的摄像头索引
 const isSwitchingCamera = ref(false)  // 摄像头切换中状态
 const isLoading = ref(false)  // 摄像头启动加载中状态
 const isEmotionDetectionOn = ref(true)
+const detectionMode = ref('websocket') // 'websocket' | 'worker'
 const currentEmotion = ref(null)
 const currentConfidence = ref(0)
 const showFeedback = ref(false)  // ✅ 新增: 反馈对话框显示状态
@@ -608,7 +610,12 @@ let _themeChangeTimer = null
 let _analyticsLogged = false
 let _lastFaceUpdate = 0
 let _smoothedBbox = {}
-const BBOX_SMOOTH_ALPHA = 0.92
+let _prevBboxes = {}  // 存储上一帧的原始bbox用于IoU匹配
+const BBOX_SMOOTH_ALPHA = 0.3  // ✅ 降低alpha值，增加平滑效果（0.3表示70%权重给历史值）
+const BBOX_VELOCITY_DAMPING = 0.6  // 速度阻尼系数
+let _lastDetectionTime = 0  // 上次检测时间戳
+let _targetBbox = {}  // 目标bbox（最新检测结果）
+let _renderBbox = {}  // 渲染用的插值bbox
 let _nextFaceId = 0
 
 function _computeIoU(boxA, boxB) {
@@ -1032,25 +1039,57 @@ const startRendering = () => {
             lastFrameHash = 0
         }
 
-        if (isCameraOn.value && isEmotionDetectionOn.value && currentFaces.value?.length) {
-            const scaleX = canvas.width / currentResolution.width
-            const scaleY = canvas.height / currentResolution.height
-            const totalFaces = currentFaces.value.length
+        // ✅ 计算人脸框插值（基于时间比例平滑过渡）
+            const nowForInterpolate = performance.now()
+            const timeSinceDetection = nowForInterpolate - _lastDetectionTime
+            const INTERPOLATION_DURATION = 150  // 插值持续时间ms
+            
+            if (currentFaces.value?.length) {
+                currentFaces.value.forEach((face, index) => {
+                    const target = _targetBbox[index]
+                    if (!target) return
+                    
+                    // 计算插值比例 t (0 -> 1)
+                    const t = Math.min(1, timeSinceDetection / INTERPOLATION_DURATION)
+                    // 使用 ease-out 缓动让动画更自然
+                    const easeT = 1 - Math.pow(1 - t, 3)
+                    
+                    // 初始化渲染bbox
+                    if (!_renderBbox[index]) {
+                        _renderBbox[index] = [...target]
+                    }
+                    
+                    // 逐帧插值到目标位置
+                    const [tx, ty, tw, th] = target
+                    const [rx, ry, rw, rh] = _renderBbox[index]
+                    
+                    _renderBbox[index][0] = rx + (tx - rx) * easeT
+                    _renderBbox[index][1] = ry + (ty - ry) * easeT
+                    _renderBbox[index][2] = rw + (tw - rw) * easeT
+                    _renderBbox[index][3] = rh + (th - rh) * easeT
+                })
+            }
+            
+            if (isCameraOn.value && isEmotionDetectionOn.value && currentFaces.value?.length) {
+                const scaleX = canvas.width / currentResolution.width
+                const scaleY = canvas.height / currentResolution.height
+                const totalFaces = currentFaces.value.length
 
-            const drawnLabels = []
+                const drawnLabels = []
 
-            currentFaces.value.forEach((face, index) => {
-                let [x, y, w, h] = face.bbox
+                currentFaces.value.forEach((face, index) => {
+                    // ✅ 使用插值后的bbox进行绘制
+                    const [ix, iy, iw, ih] = _renderBbox[index] || face.bbox
 
-                const sx = x * scaleX, sy = y * scaleY, sw = w * scaleX, sh = h * scaleY
-                const flippedBbox = [canvas.width - sx - sw, sy, sw, sh]
-                const color = getEmotionColor(face.emotion)
-                drawCornerBox(ctx, flippedBbox, color, 3)
+                    const sx = ix * scaleX, sy = iy * scaleY, sw = iw * scaleX, sh = ih * scaleY
+                    const flippedBbox = [canvas.width - sx - sw, sy, sw, sh]
+                    const color = getEmotionColor(face.emotion)
+                    drawCornerBox(ctx, flippedBbox, color, 3)
 
-                const labelRect = drawEmotionLabel(ctx, flippedBbox, face.emotion, face.confidence, themeStore.currentTheme, index + 1, totalFaces, drawnLabels)
-                drawnLabels.push(labelRect)
-            })
-        }
+                    const labelRect = drawEmotionLabel(ctx, flippedBbox, face.emotion, face.confidence, themeStore.currentTheme, index + 1, totalFaces, drawnLabels)
+                    drawnLabels.push(labelRect)
+                })
+            }
 
         frameSkip++
 
@@ -1083,37 +1122,118 @@ const startRendering = () => {
                 ? baseSkipThreshold
                 : Math.max(1, baseSkipThreshold - 1)
 
-        if (isEmotionDetectionOn.value && wsManager.isConnected) {
+        if (isEmotionDetectionOn.value) {
             frameSkip = 0
             lastSentTime = performance.now()
 
             sendCtx.drawImage(video, 0, 0, currentResolution.width, currentResolution.height)
             const imageData = sendCtx.getImageData(0, 0, currentResolution.width, currentResolution.height)
-            
-            const buf = new ArrayBuffer(6 + imageData.data.length)
-            const dv = new DataView(buf)
-            dv.setUint8(0, 0x02)
-            dv.setUint8(1, 0x00)
-            dv.setUint16(2, currentResolution.width, true)
-            dv.setUint16(4, currentResolution.height, true)
-            new Uint8Array(buf, 6).set(imageData.data)
 
-            try {
-                const success = wsManager.sendBinary(buf)
-                if (success) {
-                    totalFrames++
-                } else {
+            if (detectionMode.value === 'websocket' && wsManager.isConnected) {
+                // WebSocket 模式
+                const buf = new ArrayBuffer(6 + imageData.data.length)
+                const dv = new DataView(buf)
+                dv.setUint8(0, 0x02)
+                dv.setUint8(1, 0x00)
+                dv.setUint16(2, currentResolution.width, true)
+                dv.setUint16(4, currentResolution.height, true)
+                new Uint8Array(buf, 6).set(imageData.data)
+
+                try {
+                    const success = wsManager.sendBinary(buf)
+                    if (success) {
+                        totalFrames++
+                    } else {
+                        errorCount++
+                    }
+                } catch (error) {
                     errorCount++
+                    totalFrames++
                 }
-            } catch (error) {
-                errorCount++
-                totalFrames++
+            } else if (detectionMode.value === 'worker') {
+                // Web Worker 模式
+                detectWithWorker(imageData, currentResolution.width, currentResolution.height)
+                    .then((result) => {
+                        if (result) {
+                            handleWorkerResult(result)
+                            totalFrames++
+                        } else {
+                            errorCount++
+                        }
+                    })
+                    .catch(() => {
+                        errorCount++
+                    })
             }
         }
 
         animationId = requestAnimationFrame(render)
     }
     render(performance.now())
+}
+
+// === Web Worker 检测函数 ===
+const detectWithWorker = async (imageData, width, height) => {
+    try {
+        if (!workerDetectionService.isInitialized) {
+            await workerDetectionService.initialize()
+        }
+        return await workerDetectionService.detect(imageData, width, height)
+    } catch (error) {
+        logger.error('Worker 检测失败:', error)
+        return null
+    }
+}
+
+// === Web Worker 结果处理 ===
+const handleWorkerResult = (result) => {
+    if (!result || !result.faces) return
+    
+    const validFaces = result.faces.filter(face => face && face.bbox && face.bbox.length === 4)
+    
+    if (validFaces.length) {
+        const firstFace = validFaces[0]
+        const rawScores = firstFace?.scores
+        const rawConf = firstFace?.confidence
+
+        if (!rawScores || typeof rawScores !== 'object' || Object.keys(rawScores).length === 0) {
+            logger.warn('收到无效的 scores 数据，跳过此帧')
+            return
+        }
+
+        const dominantEmotion = Object.keys(rawScores).reduce((a, b) =>
+            rawScores[a] > rawScores[b] ? a : b
+        )
+
+        _lastGoodEmotion = dominantEmotion
+        _lastGoodScores = { ...rawScores }
+        _consecutiveEmpty = 0
+
+        // 更新检测数据
+        currentEmotion.value = dominantEmotion
+        currentConfidence.value = rawConf
+        emotionScores.value = getAverageScores(validFaces)
+        currentFaces.value = validFaces.slice(0, maxDetectFaces)
+        
+        // 更新状态存储
+        detectionStore.updateDetection(validFaces, dominantEmotion, rawScores)
+        detectionStore.saveRealtimeState({
+            faces: validFaces,
+            emotion: dominantEmotion,
+            timestamp: Date.now()
+        })
+    } else {
+        _consecutiveEmpty++
+        if (_consecutiveEmpty >= EMPTY_THRESHOLD) {
+            currentEmotion.value = null
+            currentConfidence.value = 0
+            emotionScores.value = {}
+            currentFaces.value = []
+            _lastGoodEmotion = null
+            _lastGoodScores = {}
+            _consecutiveEmpty = 0
+        }
+    }
 }
 
 // === WebSocket 消息处理 (含 EMA + 自适应质量) ===
@@ -1180,11 +1300,76 @@ const handleWsMessage = (data) => {
         _lastGoodScores = { ...rawScores }
         _consecutiveEmpty = 0
 
+        // ✅ 改进的 EMA 平滑人脸框（使用 IoU 匹配 + 速度阻尼）
+        const matches = _matchFacesByIoU(_prevBboxes, validFaces)
+        const currentBboxes = {}
+        
+        const smoothedFaces = validFaces.map((face, currIndex) => {
+            const rawBbox = face.bbox
+            const faceId = matches[currIndex]
+            
+            // 存储当前帧的原始bbox用于下一帧匹配
+            currentBboxes[faceId] = [...rawBbox]
+            
+            if (!_smoothedBbox[faceId]) {
+                // 首次检测到，直接使用原始值初始化
+                _smoothedBbox[faceId] = {
+                    bbox: [...rawBbox],
+                    velocity: [0, 0, 0, 0]  // 记录速度用于阻尼
+                }
+                return { ...face, bbox: [...rawBbox] }
+            }
+            
+            // 改进的 EMA 平滑算法：
+            // 1. 计算当前帧与历史帧的差异（预测下一位置）
+            // 2. 使用阻尼系数减缓速度变化
+            // 3. 应用平滑后的位置
+            
+            const prev = _smoothedBbox[faceId]
+            const newVelocity = []
+            const smoothed = []
+            
+            for (let i = 0; i < 4; i++) {
+                // 计算当前速度（当前帧 - 上一帧平滑值）
+                const rawVelocity = rawBbox[i] - prev.bbox[i]
+                
+                // 速度阻尼：保留部分历史速度，防止突变
+                newVelocity[i] = BBOX_VELOCITY_DAMPING * prev.velocity[i] + (1 - BBOX_VELOCITY_DAMPING) * rawVelocity
+                
+                // 改进的 EMA：结合当前值和预测值
+                // smoothed = alpha * raw + (1 - alpha) * (prev + velocity)
+                const predicted = prev.bbox[i] + newVelocity[i] * 0.5
+                smoothed[i] = Math.round(
+                    BBOX_SMOOTH_ALPHA * rawBbox[i] + 
+                    (1 - BBOX_SMOOTH_ALPHA) * predicted
+                )
+            }
+            
+            // 更新平滑缓冲区
+            _smoothedBbox[faceId] = {
+                bbox: smoothed,
+                velocity: newVelocity
+            }
+            
+            return { ...face, bbox: smoothed }
+        })
+        
+        // 更新上一帧的原始bbox缓存
+        _prevBboxes = currentBboxes
+        
+        // ✅ 记录检测时间和目标bbox用于渲染插值
+        _lastDetectionTime = performance.now()
+        _targetBbox = {}
+        smoothedFaces.forEach((face, idx) => {
+            _targetBbox[idx] = [...face.bbox]
+            _renderBbox[idx] = _renderBbox[idx] || [...face.bbox]
+        })
+
         currentEmotion.value = dominantEmotion
         currentConfidence.value = rawConf
         emotionScores.value = getAverageScores(validFaces)
-        // ✅ 使用系统配置的最大人脸数量限制
-        currentFaces.value = validFaces.slice(0, maxDetectFaces)
+        // ✅ 使用系统配置的最大人脸数量限制 + 平滑后的人脸框
+        currentFaces.value = smoothedFaces.slice(0, maxDetectFaces)
 
         detectionStore.updateDetection(validFaces, dominantEmotion, { ...rawScores })
 
@@ -1201,6 +1386,7 @@ const handleWsMessage = (data) => {
             _lastGoodEmotion = null
             _lastGoodScores = {}
             _smoothedBbox = {}
+            _prevBboxes = {}  // ✅ 同时清理IoU匹配缓存
             _consecutiveEmpty = 0
         } else {
             const decayFactor = 1 - (_consecutiveEmpty / EMPTY_THRESHOLD) * 0.5

@@ -55,9 +55,15 @@ _shared_executor = concurrent.futures.ThreadPoolExecutor(max_workers=min(cpu_cou
 logger.info(f"线程池: {cpu_count} CPU核心, {min(cpu_count * 2, 8)} 工作线程")
 
 
+# 初始化所有必需的目录
+from core.init_dirs import init_directories
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global face_detector, emotion_model, detection_service, adaptive_learner, user_analytics, inference_optimizer
+
+    # 启动时初始化所有必需的目录
+    init_directories()
 
     logger.info("=" * 60)
     logger.info("AI情感检测系统 V3.1.0 启动中...")

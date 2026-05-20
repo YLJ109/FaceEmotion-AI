@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from typing import List
 import logging
+from pathlib import Path
 import traceback
 
 from core.database import DatabaseManager
@@ -208,14 +209,15 @@ async def detect_batch(files: List[UploadFile] = File(...)):
 async def detect_video(file: UploadFile = File(...)):
     """视频情绪检测 - 提取关键帧分析"""
     try:
-        video_path = f"./data/uploads/{int(time.time())}_{file.filename}"
-        os.makedirs("./data/uploads", exist_ok=True)
+        backend_dir = Path(__file__).parent.parent
+        video_path = str(backend_dir / "data" / "uploads" / f"{int(time.time())}_{file.filename}")
+        os.makedirs(backend_dir / "data" / "uploads", exist_ok=True)
 
-        with open(video_path, "wb") as buffer:
+        with open(str(video_path), "wb") as buffer:
             content = await file.read()
             buffer.write(content)
 
-        cap = cv2.VideoCapture(video_path)
+        cap = cv2.VideoCapture(str(video_path))
         if not cap.isOpened():
             raise HTTPException(status_code=400, detail="无法打开视频文件")
 
@@ -314,15 +316,15 @@ async def detect_batch_video(files: List[UploadFile] = File(...)):
     for file in files:
         try:
             # 保存视频文件
-            video_path = f"./data/uploads/{int(time.time())}_{file.filename}"
-            os.makedirs("./data/uploads", exist_ok=True)
+            video_path = str(backend_dir / "data" / "uploads" / f"{int(time.time())}_{file.filename}")
+            os.makedirs(backend_dir / "data" / "uploads", exist_ok=True)
 
-            with open(video_path, "wb") as buffer:
+            with open(str(video_path), "wb") as buffer:
                 content = await file.read()
                 buffer.write(content)
 
             # 打开视频
-            cap = cv2.VideoCapture(video_path)
+            cap = cv2.VideoCapture(str(video_path))
             if not cap.isOpened():
                 results.append({
                     'filename': file.filename,

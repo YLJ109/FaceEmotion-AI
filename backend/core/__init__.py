@@ -2,5 +2,6 @@
 from .config import ConfigManager
 from .constants import *
 from .database import DatabaseManager
+from .init_dirs import init_directories
 
-__all__ = ['ConfigManager', 'DatabaseManager']
+__all__ = ['ConfigManager', 'DatabaseManager', 'init_directories']
